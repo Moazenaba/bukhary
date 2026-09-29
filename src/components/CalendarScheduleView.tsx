@@ -1,0 +1,856 @@
+import React, { useState, useMemo } from 'react';
+import { ScheduleTask, Committee, AppUser } from '../types';
+
+interface CalendarScheduleViewProps {
+  tasks: ScheduleTask[];
+  committees: Committee[];
+  currentUser: AppUser;
+  onAddTask: (task: Omit<ScheduleTask, 'id'>) => void;
+  onToggleTaskComplete: (taskId: string) => void;
+  onDeleteTask: (taskId: string) => void;
+  onOpenCommitteeDetails?: (committee: Committee) => void;
+}
+
+export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
+  tasks,
+  committees,
+  currentUser,
+  onAddTask,
+  onToggleTaskComplete,
+  onDeleteTask,
+  onOpenCommitteeDetails,
+}) => {
+  // Current view date (year and month). Default to September / October 2026
+  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 9, 2)); // 2026-10-02 (يوم الجمعة 2 أكتوبر 2026)
+  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-10-02'); // Defaults to الجمعة 10/2 as requested
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<'all' | 'mine' | 'deliverables'>('all');
+
+  // Quick switcher days
+  const quickDates = [
+    { dateStr: '2026-10-02', label: 'الجمعة 10/2 (مواعيد اللجان والتسليمات)', isFriday: true },
+    { dateStr: '2026-10-03', label: 'السبت 10/3', isFriday: false },
+    { dateStr: '2026-10-04', label: 'الأحد 10/4', isFriday: false },
+    { dateStr: '2026-10-05', label: 'الاثنين 10/5', isFriday: false },
+    { dateStr: '2026-10-06', label: 'الثلاثاء 10/6', isFriday: false },
+    { dateStr: '2026-10-09', label: 'الجمعة 10/9 (القادمة)', isFriday: true },
+    { dateStr: '2026-10-16', label: 'الجمعة 10/16', isFriday: true },
+  ];
+
+  // New task form state
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDate, setNewTaskDate] = useState('2026-10-02');
+  const [newTaskTime, setNewTaskTime] = useState('10:00 ص');
+  const [newTaskDeliverable, setNewTaskDeliverable] = useState('');
+  const [newTaskCommitteeNumber, setNewTaskCommitteeNumber] = useState<number | ''>('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'urgent' | 'high' | 'normal'>('urgent');
+  const [newTaskType, setNewTaskType] = useState<'delivery' | 'receive' | 'exam' | 'scoring' | 'review' | 'general'>('delivery');
+  const [newTaskAssistantName, setNewTaskAssistantName] = useState(currentUser.name);
+  const [newTaskNotes, setNewTaskNotes] = useState('');
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth(); // 0-indexed
+
+  // Month navigation
+  const prevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+  const nextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+  const goToToday = () => {
+    const today = new Date(2026, 9, 2);
+    setCurrentDate(today);
+    setSelectedDateStr('2026-10-02');
+  };
+
+  // Days in month calculation
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay(); // 0 is Sunday, 6 is Saturday
+
+  // Arabic days headers (start with Saturday)
+  const arabicDayNames = [
+    { name: 'السبت', short: 'سبت' },
+    { name: 'الأحد', short: 'أحد' },
+    { name: 'الاثنين', short: 'اثنين' },
+    { name: 'الثلاثاء', short: 'ثلاثاء' },
+    { name: 'الأربعاء', short: 'أربعاء' },
+    { name: 'الخميس', short: 'خميس' },
+    { name: 'الجمعة', short: 'جمعة' },
+  ];
+
+  // Map JS getDay() (0: Sun ... 6: Sat) to Saturday-first index (0: Sat ... 6: Fri)
+  const offsetToSaturday = (dayIdx: number) => {
+    return (dayIdx + 1) % 7;
+  };
+
+  const startOffset = offsetToSaturday(firstDayIndex);
+
+  // Month name in Arabic
+  const monthNamesArabic = [
+    'يناير',
+    'فبراير',
+    'مارس',
+    'أبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر',
+  ];
+
+  // Helper to format date string YYYY-MM-DD
+  const formatDateString = (y: number, m: number, d: number) => {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
+
+  // Group tasks by date
+  const tasksByDate = useMemo(() => {
+    const map: Record<string, ScheduleTask[]> = {};
+    tasks.forEach((t) => {
+      if (!map[t.date]) map[t.date] = [];
+      map[t.date].push(t);
+    });
+    return map;
+  }, [tasks]);
+
+  // Tasks for the currently selected day
+  const selectedDayTasks = tasksByDate[selectedDateStr] || [];
+
+  // Filtered tasks for the currently selected day
+  const displayedDayTasks = useMemo(() => {
+    let list = selectedDayTasks;
+    if (taskFilter === 'mine') {
+      const myName = currentUser.name.toLowerCase();
+      list = list.filter(
+        (t) =>
+          (t.assignedAssistantName && t.assignedAssistantName.toLowerCase().includes(myName)) ||
+          (t.assignedAssistantId && t.assignedAssistantId === currentUser.id) ||
+          (t.committeeNumber && currentUser.assignedCommittees.includes(t.committeeNumber))
+      );
+    } else if (taskFilter === 'deliverables') {
+      list = list.filter((t) => !!t.deliverable);
+    }
+    return list;
+  }, [selectedDayTasks, taskFilter, currentUser]);
+
+  const myTasksCount = useMemo(() => {
+    const myName = currentUser.name.toLowerCase();
+    return selectedDayTasks.filter(
+      (t) =>
+        (t.assignedAssistantName && t.assignedAssistantName.toLowerCase().includes(myName)) ||
+        (t.assignedAssistantId && t.assignedAssistantId === currentUser.id) ||
+        (t.committeeNumber && currentUser.assignedCommittees.includes(t.committeeNumber))
+    ).length;
+  }, [selectedDayTasks, currentUser]);
+
+  const deliverablesCount = useMemo(() => {
+    return selectedDayTasks.filter((t) => !!t.deliverable).length;
+  }, [selectedDayTasks]);
+
+  // Parse Arabic day name for selected date
+  const selectedDayInfo = useMemo(() => {
+    const [y, m, d] = selectedDateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dayOfWeek = dateObj.getDay();
+    const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    return {
+      dayName: dayNames[dayOfWeek],
+      formatted: `${d} ${monthNamesArabic[m - 1]} ${y}`,
+      shortDate: `${d}/${m}`,
+      isFriday: dayOfWeek === 5,
+    };
+  }, [selectedDateStr]);
+
+  const handleOpenAddModal = (dateStr?: string) => {
+    const targetDate = dateStr || selectedDateStr;
+    setNewTaskDate(targetDate);
+    setNewTaskTitle('');
+    setNewTaskDeliverable('');
+    setNewTaskNotes('');
+    setNewTaskCommitteeNumber('');
+    setNewTaskPriority('urgent');
+    setNewTaskType('delivery');
+    setNewTaskTime('09:00 ص');
+    setNewTaskAssistantName(currentUser.name);
+    setIsAddModalOpen(true);
+  };
+
+  const handleCreateTaskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+
+    let linkedCommId: string | undefined;
+    if (newTaskCommitteeNumber !== '') {
+      const found = committees.find((c) => c.committeeNumber === Number(newTaskCommitteeNumber));
+      if (found) linkedCommId = found.id;
+    }
+
+    onAddTask({
+      title: newTaskTitle.trim(),
+      date: newTaskDate,
+      time: newTaskTime.trim() || '10:00 ص',
+      deliverable: newTaskDeliverable.trim() || undefined,
+      committeeId: linkedCommId,
+      committeeNumber: newTaskCommitteeNumber !== '' ? Number(newTaskCommitteeNumber) : undefined,
+      assignedAssistantName: newTaskAssistantName.trim() || currentUser.name,
+      type: newTaskType,
+      priority: newTaskPriority,
+      completed: false,
+      notes: newTaskNotes.trim() || undefined,
+    });
+
+    setIsAddModalOpen(false);
+  };
+
+  return (
+    <div className="space-y-6 text-right">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-l from-[#005c55] to-emerald-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="p-2 rounded-xl bg-white/20 text-white">
+              <span className="material-symbols-outlined text-2xl">calendar_month</span>
+            </span>
+            <h2 className="text-xl sm:text-2xl font-bold">
+              جدول المواعيد وأعمال اللجان والتسليمات
+            </h2>
+          </div>
+          <p className="text-xs text-teal-100 mt-1 max-w-2xl leading-relaxed">
+            التقويم الزمني لمسابقات مسجد البخاري: جدول مواعيد تسليم أوراق الامتحانات، استلام كشوف التصحيح، ومتابعة الأعمال اليومية لكل معاون.
+            اضغط على أي يوم (مثل يوم الجمعة 10/2) للاطلاع على مهام ذلك اليوم وتسليمها.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => handleOpenAddModal(selectedDateStr)}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
+          >
+            <span className="material-symbols-outlined text-xl text-emerald-600">add_task</span>
+            <span>+ إضافة عمل / تسليم جديد</span>
+          </button>
+
+          <button
+            onClick={goToToday}
+            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
+          >
+            <span className="material-symbols-outlined text-lg">today</span>
+            <span>الذهاب ليوم الجمعة (10/2)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Upcoming Days Strip (الوصول السريع للأيام ومواعيد الجمعة) */}
+      <div className="bg-white rounded-2xl border border-[#bdc9c6]/60 p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+              <span className="material-symbols-outlined text-lg">event_upcoming</span>
+            </span>
+            <div>
+              <span className="font-bold text-xs sm:text-sm text-[#0d1c2e] block">
+                مواعيد الجمعة والأيام القادمة (اضغط على أي يوم لعرض تسليماته فوراً):
+              </span>
+              <span className="text-[11px] text-[#6e7977]">
+                الجمعة 10/2 هي الموعد الأبرز للاختبارات وتسليم الدفاتر والكشوف
+              </span>
+            </div>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+            اليوم المحدد: {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          {quickDates.map((q) => {
+            const isSelected = selectedDateStr === q.dateStr;
+            const dayTasksCount = tasksByDate[q.dateStr]?.length || 0;
+            return (
+              <button
+                key={q.dateStr}
+                type="button"
+                onClick={() => {
+                  setSelectedDateStr(q.dateStr);
+                  const [y, m] = q.dateStr.split('-').map(Number);
+                  if (m - 1 !== month || y !== year) {
+                    setCurrentDate(new Date(y, m - 1, 1));
+                  }
+                }}
+                className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-2 border cursor-pointer active:scale-95 ${
+                  isSelected
+                    ? 'bg-[#005c55] text-white border-[#005c55] shadow-sm ring-2 ring-[#005c55]/30'
+                    : q.isFriday
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-950 hover:bg-emerald-100'
+                    : 'bg-[#f8f9ff] border-gray-200 text-[#0d1c2e] hover:bg-gray-100'
+                }`}
+              >
+                <span>{q.label}</span>
+                {dayTasksCount > 0 && (
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                      isSelected ? 'bg-white text-[#005c55]' : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {dayTasksCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Grid: Calendar on Right / Day Details on Left */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* RIGHT COLUMN: CALENDAR GRID (7 Cols) */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-[#bdc9c6]/60 p-5 shadow-xs space-y-4">
+          {/* Calendar Header with Navigation */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#bdc9c6]/30">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-base sm:text-lg text-[#0d1c2e]">
+                {monthNamesArabic[month]} {year}
+              </h3>
+              <span className="text-xs text-[#6e7977] font-semibold">
+                (ربيع الأول / ربيع الثاني 1448هـ)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={prevMonth}
+                className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
+                title="الشهر السابق"
+              >
+                <span className="material-symbols-outlined text-lg">chevron_right</span>
+              </button>
+              <button
+                type="button"
+                onClick={nextMonth}
+                className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
+                title="الشهر التالي"
+              >
+                <span className="material-symbols-outlined text-lg">chevron_left</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Weekday Labels (Saturday to Friday) */}
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-[#6e7977] py-1">
+            {arabicDayNames.map((d, i) => (
+              <div
+                key={d.name}
+                className={`py-1.5 rounded-lg ${
+                  i === 6 ? 'text-emerald-800 bg-emerald-50/70 font-extrabold' : ''
+                }`}
+              >
+                {d.name}
+              </div>
+            ))}
+          </div>
+
+          {/* Month Days Grid */}
+          <div className="grid grid-cols-7 gap-1.5">
+            {/* Empty slots before first day */}
+            {Array.from({ length: startOffset }).map((_, idx) => (
+              <div key={`empty-${idx}`} className="h-20 sm:h-24 rounded-xl bg-gray-50/50 border border-transparent" />
+            ))}
+
+            {/* Days of month */}
+            {Array.from({ length: daysInMonth }).map((_, idx) => {
+              const dayNum = idx + 1;
+              const dateStr = formatDateString(year, month, dayNum);
+              const dayTasks = tasksByDate[dateStr] || [];
+              const isSelected = selectedDateStr === dateStr;
+              const isFriday = (startOffset + idx) % 7 === 6;
+              const hasUrgent = dayTasks.some((t) => t.priority === 'urgent' && !t.completed);
+
+              return (
+                <button
+                  key={dateStr}
+                  type="button"
+                  onClick={() => setSelectedDateStr(dateStr)}
+                  className={`h-20 sm:h-24 p-1.5 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between relative group ${
+                    isSelected
+                      ? 'border-[#005c55] bg-[#005c55]/10 ring-2 ring-[#005c55]/40 shadow-xs'
+                      : isFriday
+                      ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-400'
+                      : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  {/* Day Number & Header */}
+                  <div className="flex items-center justify-between w-full">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs font-mono ${
+                        isSelected
+                          ? 'bg-[#005c55] text-white'
+                          : isFriday
+                          ? 'bg-emerald-200/80 text-emerald-900 font-extrabold'
+                          : 'text-[#0d1c2e]'
+                      }`}
+                    >
+                      {dayNum}
+                    </span>
+
+                    {/* Badge for tasks count */}
+                    {dayTasks.length > 0 && (
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full font-mono ${
+                          hasUrgent
+                            ? 'bg-red-500 text-white animate-pulse'
+                            : 'bg-emerald-600 text-white'
+                        }`}
+                        title={`${dayTasks.length} أعمال وتسليمات`}
+                      >
+                        {dayTasks.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Tasks Snippets */}
+                  <div className="w-full space-y-1 overflow-hidden">
+                    {dayTasks.slice(0, 2).map((t) => (
+                      <div
+                        key={t.id}
+                        className={`text-[9px] font-semibold truncate rounded px-1 py-0.5 leading-tight ${
+                          t.completed
+                            ? 'line-through text-gray-400 bg-gray-100'
+                            : t.priority === 'urgent'
+                            ? 'bg-red-50 text-red-800 border border-red-200'
+                            : 'bg-emerald-50 text-emerald-800'
+                        }`}
+                      >
+                        {t.title}
+                      </div>
+                    ))}
+                    {dayTasks.length > 2 && (
+                      <span className="text-[9px] text-gray-500 block font-mono">
+                        +{dayTasks.length - 2} أخرى...
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Calendar Legend */}
+          <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-between text-[11px] text-[#6e7977] flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>يوم الجمعة (مواعيد اللجان)</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                <span>تسليم عاجل ومهم</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+                <span>تم الإنجاز</span>
+              </span>
+            </div>
+            <span>انقر على أي يوم لمعاينة كافة أعماله</span>
+          </div>
+        </div>
+
+        {/* LEFT COLUMN: SELECTED DAY DETAILS & TASKS (5 Cols) */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-[#bdc9c6]/60 p-5 shadow-xs flex flex-col justify-between space-y-4">
+          <div>
+            {/* Selected Date Header */}
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#bdc9c6]/30">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold text-sm">
+                    <span className="material-symbols-outlined text-lg">event</span>
+                  </span>
+                  <div>
+                    <h3 className="font-bold text-base text-[#0d1c2e] leading-snug">
+                      {selectedDayInfo.dayName}، {selectedDayInfo.formatted}
+                    </h3>
+                    <span className="text-[11px] text-[#6e7977]">
+                      (الموافق: {selectedDayInfo.shortDate})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenAddModal(selectedDateStr)}
+                className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+                <span>إضافة تسليم</span>
+              </button>
+            </div>
+
+            {/* Summary Alert Box for that Day */}
+            <div
+              className={`mt-4 p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+                selectedDayTasks.length > 0
+                  ? selectedDayInfo.isFriday
+                    ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-medium'
+                    : 'bg-teal-50 border-teal-200 text-teal-950'
+                  : 'bg-gray-50 border-gray-200 text-gray-600'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-xl text-emerald-700">checklist</span>
+                <div>
+                  <span className="font-bold block text-sm">
+                    {selectedDayTasks.length > 0
+                      ? `لديك (${selectedDayTasks.length}) أعمال وتسليمات مطلوبة في هذا اليوم`
+                      : 'لا توجد تسليمات مسجلة لهذا اليوم حتى الآن'}
+                  </span>
+                  {selectedDayInfo.isFriday && (
+                    <span className="text-[11px] text-emerald-800">
+                      يوم الجمعة هو الموعد الرسمي لانعقاد اللجان الميدانية بمسجد البخاري.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {selectedDayTasks.length > 0 && (
+                <span className="text-xs font-mono font-bold bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
+                  {selectedDayTasks.filter((t) => t.completed).length} / {selectedDayTasks.length} تم
+                </span>
+              )}
+            </div>
+
+            {/* Task Filter Tabs */}
+            <div className="mt-3 flex items-center gap-1.5 border-b border-[#bdc9c6]/30 pb-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setTaskFilter('all')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  taskFilter === 'all'
+                    ? 'bg-[#005c55] text-white shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                الكل ({selectedDayTasks.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskFilter('mine')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  taskFilter === 'mine'
+                    ? 'bg-[#005c55] text-white shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                مهامي المكلف بها ({myTasksCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskFilter('deliverables')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  taskFilter === 'deliverables'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'text-gray-600 hover:bg-amber-50'
+                }`}
+              >
+                📦 تسليمات فقط ({deliverablesCount})
+              </button>
+            </div>
+
+            {/* Tasks Cards List for Selected Day */}
+            <div className="mt-3 space-y-3 max-h-[480px] overflow-y-auto pe-1">
+              {displayedDayTasks.map((task) => {
+                const linkedCommittee = task.committeeNumber
+                  ? committees.find((c) => c.committeeNumber === task.committeeNumber)
+                  : undefined;
+
+                return (
+                  <div
+                    key={task.id}
+                    className={`p-3.5 rounded-xl border transition-all space-y-2 ${
+                      task.completed
+                        ? 'bg-gray-50/80 border-gray-200 opacity-75'
+                        : task.priority === 'urgent'
+                        ? 'bg-red-50/40 border-red-200 hover:border-red-400'
+                        : 'bg-white border-[#bdc9c6]/60 hover:border-[#005c55]/50 shadow-2xs'
+                    }`}
+                  >
+                    {/* Task Title & Status Toggle */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onToggleTaskComplete(task.id)}
+                          className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-colors cursor-pointer mt-0.5 shrink-0 ${
+                            task.completed
+                              ? 'bg-emerald-600 text-white'
+                              : 'border-2 border-gray-300 hover:border-[#005c55]'
+                          }`}
+                          title={task.completed ? 'إلغاء التأشير كمكتمل' : 'تأشير كتم التسليم والإنجاز'}
+                        >
+                          {task.completed ? '✓' : ''}
+                        </button>
+
+                        <div>
+                          <h4
+                            className={`font-bold text-xs sm:text-sm text-[#0d1c2e] leading-snug ${
+                              task.completed ? 'line-through text-gray-500' : ''
+                            }`}
+                          >
+                            {task.title}
+                          </h4>
+                          <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5">
+                            <span className="font-mono">⏰ {task.time || 'صباحاً'}</span>
+                            {task.assignedAssistantName && (
+                              <>
+                                <span>•</span>
+                                <span>👤 المكلف: {task.assignedAssistantName}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+                          task.completed
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : task.priority === 'urgent'
+                            ? 'bg-red-100 text-red-800 border border-red-200'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {task.completed ? '✓ تم التسليم' : task.priority === 'urgent' ? 'عاجل اليوم' : 'مجدول'}
+                      </span>
+                    </div>
+
+                    {/* Deliverable Box ("واللي محتاج أسلمها وكده") */}
+                    {task.deliverable && (
+                      <div className="bg-[#f8f9ff] p-2.5 rounded-lg border border-[#bdc9c6]/40 text-xs">
+                        <span className="font-bold text-[#0d1c2e] block text-[11px] mb-0.5 flex items-center gap-1">
+                          <span>📦 المطلوب تسليمه:</span>
+                        </span>
+                        <p className="text-[11px] text-[#3e4947] leading-relaxed">
+                          {task.deliverable}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Notes / Linked Committee / Open Committee Action */}
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-200/50">
+                      {linkedCommittee ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenCommitteeDetails && onOpenCommitteeDetails(linkedCommittee)}
+                          className="text-[11px] text-[#005c55] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">groups</span>
+                          <span>لجنة #{linkedCommittee.committeeNumber}: {linkedCommittee.committeeName} &larr;</span>
+                        </button>
+                      ) : task.committeeNumber ? (
+                        <span className="text-[11px] text-[#005c55] font-bold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">groups</span>
+                          <span>مرتبط بلجنة #{task.committeeNumber}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">عمل عام للمسابقات</span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => onDeleteTask(task.id)}
+                        className="text-red-500 hover:text-red-700 text-[11px] font-semibold cursor-pointer"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {selectedDayTasks.length === 0 && (
+                <div className="p-8 text-center bg-[#f8f9ff] rounded-xl border border-dashed border-[#bdc9c6]/60">
+                  <span className="material-symbols-outlined text-3xl text-gray-400 mb-1 block">
+                    event_available
+                  </span>
+                  <p className="text-xs font-bold text-gray-600">
+                    لا توجد أعمال مجدولة في هذا التاريخ
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    يمكنك إضافة تسليمات جديدة لهذا اليوم باستخدام الزر أعلاه.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Footer Action */}
+          <div className="pt-3 border-t border-[#bdc9c6]/30">
+            <button
+              type="button"
+              onClick={() => handleOpenAddModal(selectedDateStr)}
+              className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-[#005c55]/40 text-[#005c55] hover:bg-[#eff4ff] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">add_circle</span>
+              <span>+ إضافة مهمة أو تسليم ليوم {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ADD TASK MODAL */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
+            <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-xl">add_task</span>
+                </span>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
+                    إضافة عمل أو تسليم مجدول في التقويم
+                  </h3>
+                  <p className="text-[11px] text-[#6e7977]">
+                    جدولة أعمال اللجان وتحديد ما يلزم تسليمه والشخص المسؤول
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTaskSubmit} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-[#0d1c2e] mb-1">
+                  اسم العمل أو المهمة <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: تسليم أوراق أسئلة لجنة 1، استلام دفاتر التصحيح..."
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#0d1c2e] mb-1">تاريخ اليوم <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    value={newTaskDate}
+                    onChange={(e) => setNewTaskDate(e.target.value)}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#0d1c2e] mb-1">وقت التسليم أو التنفيذ</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: 09:30 ص، قبل صلاة العصر..."
+                    value={newTaskTime}
+                    onChange={(e) => setNewTaskTime(e.target.value)}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#0d1c2e] mb-1">
+                  ما يلزم تسليمه أو استلامه بالتحديد ("واللي محتاج أسلمها وكده")
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="مثال: كراسات أسئلة الامتحان، كشوف درجات موقعة، تقرير الغياب، أوراق الإجابة..."
+                  value={newTaskDeliverable}
+                  onChange={(e) => setNewTaskDeliverable(e.target.value)}
+                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-[#0d1c2e] mb-1">اللجنة المرتبطة</label>
+                  <select
+                    value={newTaskCommitteeNumber}
+                    onChange={(e) => setNewTaskCommitteeNumber(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                  >
+                    <option value="">بدون لجنة (عام)</option>
+                    {committees.map((c) => (
+                      <option key={c.id} value={c.committeeNumber}>
+                        لجنة #{c.committeeNumber} ({c.committeeName})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#0d1c2e] mb-1">الأولوية</label>
+                  <select
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                  >
+                    <option value="urgent">🔴 عاجل وضروري</option>
+                    <option value="high">🟠 مرتفع</option>
+                    <option value="normal">🟢 عادي</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#0d1c2e] mb-1">المكلف / المعاون</label>
+                  <input
+                    type="text"
+                    value={newTaskAssistantName}
+                    onChange={(e) => setNewTaskAssistantName(e.target.value)}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#0d1c2e] mb-1">ملاحظات إضافية</label>
+                <textarea
+                  rows={2}
+                  placeholder="تعليمات القاعة، مكان التسليم، أرقام التواصل..."
+                  value={newTaskNotes}
+                  onChange={(e) => setNewTaskNotes(e.target.value)}
+                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-gray-600 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold cursor-pointer shadow-xs active:scale-[0.98]"
+                >
+                  حفظ العمل في التقويم
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

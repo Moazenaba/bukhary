@@ -1,0 +1,6 @@
+{
+  "name": "لجان المسابقة القرآنية - منصة التحكيم وإدارة اللجان",
+  "description": "منصة متطورة لإدارة لجان التحكيم القرآني، متابعة رصد درجات التلاوة والتجويد، وتدقيق أحكام الحفظ لحفّاظ كتاب الله تعالى.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
