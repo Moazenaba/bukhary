@@ -49,8 +49,9 @@ export function isCommitteeCeremony(c: Committee): boolean {
 }
 
 export function mapCommitteeToCourseRow(c: Committee): SummerCourseRow {
+  const safeId = c.id ? `comm-row-${c.id}` : `comm-row-num-${c.committeeNumber}`;
   return {
-    id: `comm-row-${c.id}`,
+    id: safeId,
     number: c.committeeNumber,
     sheikh_name: c.sheikhName || c.committeeName || `اللجنة رقم ${c.committeeNumber}`,
     place: c.branch || 'مسجد الإمام البخاري',
@@ -72,6 +73,7 @@ export function mapCommitteeToCourseRow(c: Committee): SummerCourseRow {
  * Synchronize existing rows with committees list:
  * - Updates existing rows linked to committees with latest stage status.
  * - Appends any new committees that do not have a row yet.
+ * - Strictly ensures all row IDs are unique to prevent React key duplication errors.
  */
 export function syncRowsWithCommittees(
   currentRows: SummerCourseRow[],
@@ -79,17 +81,32 @@ export function syncRowsWithCommittees(
 ): SummerCourseRow[] {
   if (!committees || committees.length === 0) return currentRows;
 
+  // Deduplicate initial rows by id
+  const seenIds = new Set<string>();
+  const initialDeduplicated: SummerCourseRow[] = [];
+
+  for (const r of currentRows) {
+    if (!r.id || seenIds.has(r.id)) {
+      const uniqueId = `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      seenIds.add(uniqueId);
+      initialDeduplicated.push({ ...r, id: uniqueId });
+    } else {
+      seenIds.add(r.id);
+      initialDeduplicated.push(r);
+    }
+  }
+
   const rowMap = new Map<string, SummerCourseRow>();
   const numMap = new Map<number, SummerCourseRow>();
 
-  currentRows.forEach((r) => {
+  initialDeduplicated.forEach((r) => {
     if (r.committeeId) {
       rowMap.set(r.committeeId, r);
     }
     numMap.set(r.number, r);
   });
 
-  const updatedRows = [...currentRows];
+  const updatedRows = [...initialDeduplicated];
 
   committees.forEach((c) => {
     const existing = rowMap.get(c.id) || numMap.get(c.committeeNumber);
@@ -117,8 +134,14 @@ export function syncRowsWithCommittees(
         };
       }
     } else {
-      // Add new row for this committee
-      updatedRows.push(mapCommitteeToCourseRow(c));
+      // Add new row for this committee, guaranteeing unique ID
+      const newRow = mapCommitteeToCourseRow(c);
+      let targetId = newRow.id;
+      if (seenIds.has(targetId)) {
+        targetId = `${targetId}-${Math.random().toString(36).slice(2, 6)}`;
+      }
+      seenIds.add(targetId);
+      updatedRows.push({ ...newRow, id: targetId });
     }
   });
 

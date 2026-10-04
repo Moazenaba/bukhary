@@ -23,11 +23,9 @@ import {
   INITIAL_EXAMS,
   DEFAULT_COMPETITION_BOOKS,
 } from './data/initialCommittees';
-import { INITIAL_USERS } from './data/initialAssistants';
 import { INITIAL_COURSES, INITIAL_SCHEDULE_TASKS } from './data/initialCourses';
 import { calculateCurrentStage, getCurrentFormattedDateTime } from './utils/stageUtils';
 import { SummerCourseRow } from './types/summerCourse';
-import { SereneSanctuaryView } from './components/SereneSanctuaryView';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { TopNavBar } from './components/TopNavBar';
 import { HeroStats } from './components/HeroStats';
@@ -43,33 +41,29 @@ import { CalendarScheduleView } from './components/CalendarScheduleView';
 import { AssistantsView } from './components/AssistantsView';
 import { AuthModal } from './components/AuthModal';
 import { ExportModal } from './components/ExportModal';
-import { GoogleSheetsModal } from './components/GoogleSheetsModal';
 import { HomeOverviewView } from './components/HomeOverviewView';
 import { StatisticsView } from './components/StatisticsView';
 import { SummerCourseTrackerView } from './components/SummerCourseTrackerView';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { DailyAlertsView } from './components/DailyAlertsView';
 import { Footer } from './components/Footer';
+import { CentralLoginPortal } from './components/CentralLoginPortal';
+import { useAuth, AuthService } from './services/AuthService';
+import { SYSTEM_PERMISSIONS } from './types';
 
 const STORAGE_KEY_COMMITTEES = 'bukhari_competition_committees_v2';
 const STORAGE_KEY_BOOKS = 'bukhari_saved_books_v2';
 const STORAGE_KEY_SHEETS = 'bukhari_sheets_config_v2';
 const STORAGE_KEY_EXAMS = 'bukhari_exams_v2';
-const STORAGE_KEY_USERS = 'bukhari_users_v2';
-const STORAGE_KEY_CURRENT_USER = 'bukhari_current_user_v2';
-const STORAGE_KEY_CUSTOM_PERMS = 'bukhari_custom_permissions_v2';
+const STORAGE_KEY_CUSTOM_PERMS = 'bukhari_custom_permissions_v4';
 const STORAGE_KEY_COURSES = 'bukhari_competition_courses_v2';
 const STORAGE_KEY_SCHEDULE_TASKS = 'bukhari_schedule_tasks_v2';
 
-const DEFAULT_SYSTEM_PERMISSIONS: PermissionDefinition[] = [
-  { id: 'receive_committee', label: 'استلام اللجان الميدانية' },
-  { id: 'approve_exam', label: 'اعتماد جاهزية وتوزيع الامتحان' },
-  { id: 'enter_scores', label: 'رصد وتصحيح الأسئلة غير المكتملة' },
-  { id: 'verify_sheets', label: 'مراجعة وتدقيق الكشوف والدرجات' },
-  { id: 'manage_exams', label: 'الاطلاع على نماذج الامتحانات وPDF' },
-];
+const DEFAULT_SYSTEM_PERMISSIONS: PermissionDefinition[] = SYSTEM_PERMISSIONS;
 
 export default function App() {
-  // Main view tab (Sidebar tabs) - default is Serene Sanctuary screen
-  const [activeTab, setActiveTab] = useState<NavTab>('sanctuary');
+  // Main view tab (Sidebar tabs) - default is home overview screen
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
     try {
@@ -145,46 +139,23 @@ export default function App() {
     };
   });
 
-  // Users and Assistants state with persistent LocalStorage
-  const [users, setUsers] = useState<AppUser[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_USERS);
-      if (saved) {
-        const parsed: AppUser[] = JSON.parse(saved);
-        const hasAhmed = parsed.some((u) => u.id === 'user-ast-ahmed' || u.name.includes('أحمد بن إبراهيم'));
-        if (!hasAhmed) {
-          const ahmedUser = INITIAL_USERS.find((u) => u.id === 'user-ast-ahmed');
-          if (ahmedUser) return [...parsed, ahmedUser];
-        }
-        return parsed;
-      }
-    } catch (e) {
-      console.error('Failed to load users from localStorage', e);
-    }
-    return INITIAL_USERS;
-  });
-
-  // Current active logged in user
-  const [currentUser, setCurrentUser] = useState<AppUser>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load current user', e);
-    }
-    return INITIAL_USERS[0];
-  });
+  // Centralized Authentication & RBAC Layer via AuthService
+  const {
+    currentUser,
+    users,
+    isAuthenticated,
+    quickLogin,
+    logout,
+    registerUser,
+    updateUser,
+    approveUser,
+    rejectUser,
+    deleteUser,
+    addDirectUser,
+    isSuperAdmin,
+  } = useAuth();
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-  // Persist users
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
-    } catch (e) {
-      console.error('Failed to save users', e);
-    }
-  }, [users]);
 
   // Custom permissions state with persistent LocalStorage
   const [customPermissions, setCustomPermissions] = useState<PermissionDefinition[]>(() => {
@@ -205,15 +176,6 @@ export default function App() {
       console.error('Failed to save custom permissions', e);
     }
   }, [customPermissions]);
-
-  // Persist current user
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-    } catch (e) {
-      console.error('Failed to save current user', e);
-    }
-  }, [currentUser]);
 
   // Persist committees
   useEffect(() => {
@@ -308,16 +270,23 @@ export default function App() {
   const [needsScoringFilter, setNeedsScoringFilter] = useState(false);
   const [genderFilter, setGenderFilter] = useState<'all' | 'men' | 'women'>('all');
 
-  // Enforce role-based tab restriction so assistant only accesses allowed pages
+  // Enforce granular permissions restriction so non-admin users only access allowed tabs
   useEffect(() => {
-    if (currentUser.role === 'assistant') {
-      const allowedTabs: NavTab[] = ['sanctuary', 'summer_course', 'home', 'committees'];
-      if (currentUser.permissions.includes('manage_exams')) {
-        allowedTabs.push('exams');
-      }
-      if (!allowedTabs.includes(activeTab)) {
-        setActiveTab('committees');
-      }
+    if (!currentUser) return;
+    if (currentUser.role === 'super_admin') return;
+
+    const perms = currentUser.permissions || [];
+    const allowedTabs: NavTab[] = [];
+    if (perms.includes('database_sheets')) allowedTabs.push('summer_course');
+    if (perms.includes('manage_committees')) allowedTabs.push('committees');
+    if (perms.includes('exams_pdf')) allowedTabs.push('exams');
+    if (perms.includes('manage_courses')) allowedTabs.push('courses');
+    if (perms.includes('calendar_schedule')) allowedTabs.push('calendar');
+    if (perms.includes('progress_stats')) allowedTabs.push('stats');
+    if (perms.includes('manage_assistants')) allowedTabs.push('assistants');
+
+    if (allowedTabs.length > 0 && !allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs[0]);
     }
   }, [currentUser, activeTab]);
 
@@ -581,27 +550,11 @@ export default function App() {
     permissions: AssistantPermission[],
     assignedCommittees: number[]
   ) => {
-    const nowStamp = getCurrentFormattedDateTime();
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            status: 'approved' as const,
-            permissions,
-            assignedCommittees,
-            approvedAt: nowStamp,
-            approvedBy: currentUser.name,
-          };
-        }
-        return u;
-      })
-    );
-
+    approveUser(userId, permissions, assignedCommittees);
     const approvedUser = users.find((u) => u.id === userId);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: `اعتماد معاون جديد: ${approvedUser?.name || ''}`,
+      title: `اعتماد حساب: ${approvedUser?.name || ''}`,
       description: `تم اعتماد الحساب وتحديد الصلاحيات واللجان الميدانية بنجاح.`,
       time: 'الآن',
       type: 'success',
@@ -612,10 +565,10 @@ export default function App() {
 
   // Reject assistant
   const handleRejectAssistant = (userId: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    rejectUser(userId);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: 'رفض طلب معاون',
+      title: 'رفض طلب الانضمام',
       description: 'تم رفض طلب الانضمام وحذفه من قائمة الانتظار.',
       time: 'الآن',
       type: 'info',
@@ -630,30 +583,23 @@ export default function App() {
     permissions: AssistantPermission[],
     assignedCommittees: number[]
   ) => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return { ...u, permissions, assignedCommittees };
-        }
-        return u;
-      })
-    );
+    const target = users.find((u) => u.id === userId);
+    if (target) {
+      updateUser({
+        ...target,
+        permissions,
+        assignedCommittees,
+      });
+    }
   };
 
   // Full assistant update (name, phone, email, notes, permissions, assignedCommittees)
   const handleUpdateAssistantUser = (updatedUser: AppUser) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
-    );
-
-    if (currentUser.id === updatedUser.id) {
-      setCurrentUser(updatedUser);
-    }
-
+    updateUser(updatedUser);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: `تعديل بيانات المعاون: ${updatedUser.name}`,
-      description: `تم حفظ البيانات الجديدة وصلاحيات ولجان المعاون بنجاح.`,
+      title: `تعديل بيانات المستخدم: ${updatedUser.name}`,
+      description: `تم حفظ البيانات الجديدة وصلاحيات ولجان المستخدم بنجاح.`,
       time: 'الآن',
       type: 'success',
       read: false,
@@ -750,8 +696,8 @@ export default function App() {
 
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: `إضافة تسليم جديد في التقويم`,
-      description: `تمت جدولة: ${newTask.title} ليوم ${newTask.date}.`,
+      title: `🔔 تنبيه وجدولة عمل في التقويم: ${newTask.title}`,
+      description: `تمت جدولة العمل ليوم (${newTask.date}) الساعة (${newTask.time || '10:00 ص'})، وسيظهر في شريط تذكير مهام اليوم بالأعلى.`,
       time: 'الآن',
       type: 'success',
       read: false,
@@ -783,16 +729,11 @@ export default function App() {
 
   // Add assistant direct
   const handleAddAssistantDirect = (newUserData: Omit<AppUser, 'id' | 'createdAt'>) => {
-    const newUser: AppUser = {
-      ...newUserData,
-      id: `ast-${Date.now()}`,
-      createdAt: getCurrentFormattedDateTime(),
-    };
-    setUsers((prev) => [newUser, ...prev]);
+    const newUser = addDirectUser(newUserData);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: `إضافة معاون مباشر: ${newUser.name}`,
-      description: 'تم تفعيل حساب المعاون ومنحه الصلاحيات المحددة فوراً.',
+      title: `إضافة مباشر: ${newUser.name}`,
+      description: 'تم تفعيل حساب المستخدم ومنحه الصلاحيات المحددة فوراً.',
       time: 'الآن',
       type: 'success',
       read: false,
@@ -802,28 +743,51 @@ export default function App() {
 
   // Delete assistant
   const handleDeleteAssistant = (userId: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    deleteUser(userId);
   };
 
-  // Register new assistant (pending approval)
-  const handleRegisterAssistant = (name: string, phone: string, email: string, notes?: string) => {
-    const newUser: AppUser = {
-      id: `pending-${Date.now()}`,
-      name,
-      phone,
-      email,
-      role: 'assistant',
-      status: 'pending',
-      assignedCommittees: [],
-      permissions: ['receive_committee', 'approve_exam'],
-      createdAt: getCurrentFormattedDateTime(),
-      notes,
-    };
-    setUsers((prev) => [...prev, newUser]);
+  // User login handler from Central Gateway
+  const handleLogin = (user: AppUser, rememberMe = true) => {
+    quickLogin(user, rememberMe);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: `طلب انضمام معاون جديد: ${name}`,
-      description: 'المتقدم بانتظار موافقة واعتماد المشرف العام لتفعيل حسابه.',
+      title: `تم تسجيل الدخول: ${user.name}`,
+      description: `تم التحقق من الصلاحيات والاتصال بقاعدة البيانات بنجاح (${AuthService.getRoleLabel(user.role)}).`,
+      time: 'الآن',
+      type: 'success',
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+  };
+
+  // User logout handler - Exits system to external Central Portal
+  const handleLogout = () => {
+    logout();
+  };
+
+  // Register new staff/assistant (pending approval)
+  const handleRegisterAssistant = (
+    name: string,
+    phone: string,
+    email: string,
+    notes?: string,
+    role: any = 'assistant',
+    password = '',
+    passportNumber = ''
+  ) => {
+    registerUser({
+      name,
+      passportNumber,
+      phone,
+      email,
+      notes,
+      role,
+      password,
+    });
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: `طلب انضمام جديد: ${name}`,
+      description: `المتقدم (${name} - ${passportNumber ? `جواز: ${passportNumber} - ` : ''}${email}) أتم إرسال طلبه وبانتظار تحديد الدور والصلاحيات في لوحة «المعاونون والصلاحيات».`,
       time: 'الآن',
       type: 'urgent',
       read: false,
@@ -839,8 +803,8 @@ export default function App() {
         return {
           ...c,
           receivedByAssistant: {
-            assistantId: currentUser.id,
-            assistantName: currentUser.name,
+            assistantId: currentUser?.id || 'system-user',
+            assistantName: currentUser?.name || 'معاون النظام',
             receivedAt: nowStamp,
             status: 'received' as const,
           },
@@ -855,7 +819,7 @@ export default function App() {
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `استلام لجنة #${c?.committeeNumber || ''}`,
-      description: `تم تسجيل استلام اللجنة بواسطة المعاون (${currentUser.name}) في القاعة.`,
+      description: `تم تسجيل استلام اللجنة بواسطة المعاون (${currentUser?.name || 'معاون النظام'}) في القاعة.`,
       time: 'الآن',
       type: 'success',
       read: false,
@@ -872,8 +836,8 @@ export default function App() {
         return {
           ...c,
           examApprovedBy: {
-            assistantId: currentUser.id,
-            assistantName: currentUser.name,
+            assistantId: currentUser?.id || 'system-user',
+            assistantName: currentUser?.name || 'معاون النظام',
             approvedAt: nowStamp,
           },
         };
@@ -887,7 +851,7 @@ export default function App() {
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `اعتماد جاهزية الامتحان للجنة #${c?.committeeNumber || ''}`,
-      description: `تم التأكد من أوراق الامتحان وتوزيعها بواسطة (${currentUser.name}).`,
+      description: `تم التأكد من أوراق الامتحان وتوزيعها بواسطة (${currentUser?.name || 'معاون النظام'}).`,
       time: 'الآن',
       type: 'success',
       read: false,
@@ -964,7 +928,7 @@ export default function App() {
       );
     }
 
-    if (currentUser.role === 'assistant' && assistantOnlyFilter) {
+    if (currentUser?.role === 'assistant' && assistantOnlyFilter) {
       list = list.filter((c) => currentUser.assignedCommittees.includes(c.committeeNumber));
     }
 
@@ -1004,6 +968,37 @@ export default function App() {
     return users.filter((u) => u.status === 'pending').length;
   }, [users]);
 
+  // Gatekeeper: Unauthenticated users are presented with the Central Enterprise Login Portal
+  if (!currentUser) {
+    return (
+      <CentralLoginPortal
+        users={users}
+        onLogin={handleLogin}
+        onRegisterUser={(newUser) => {
+          handleRegisterAssistant(
+            newUser.name || '',
+            newUser.phone || '',
+            newUser.email || '',
+            newUser.notes,
+            newUser.role || 'assistant',
+            newUser.password || '',
+            newUser.passportNumber || ''
+          );
+        }}
+      />
+    );
+  }
+
+  // Calculate today's tasks count from real database schedule (Centering on Monday 2026-10-05)
+  const todaysTasksCount = useMemo(() => {
+    const mondayISO = '2026-10-05';
+    const mondayTasks = scheduleTasks.filter((t) => t.date === mondayISO && !t.completed);
+    if (mondayTasks.length > 0) return mondayTasks.length;
+    const realISO = new Date().toISOString().split('T')[0];
+    const direct = scheduleTasks.filter((t) => t.date === realISO && !t.completed);
+    return direct.length;
+  }, [scheduleTasks]);
+
   return (
     <div className="bg-[#f8f9ff] text-[#0d1c2e] min-h-screen flex font-['IBM_Plex_Sans_Arabic'] text-right selection:bg-[#9cf2e8] selection:text-[#00201d]">
       {/* 1. Sidebar Navigation (التابات في الجنب) */}
@@ -1019,9 +1014,8 @@ export default function App() {
         coursesCount={courses.length}
         calendarTasksCount={scheduleTasks.filter((t) => !t.completed).length}
         pendingAssistantsCount={pendingAssistantsCount}
+        todaysTasksCount={todaysTasksCount}
         onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
-        onOpenSheetsSync={() => setIsSheetsModalOpen(true)}
-        sheetsConnected={!!sheetsConfig.webhookUrl}
         currentUser={currentUser}
       />
 
@@ -1033,11 +1027,7 @@ export default function App() {
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
           onOpenExport={() => setIsExportOpen(true)}
-          onOpenSheetsSync={() => setIsSheetsModalOpen(true)}
-          sheetsSyncStatus={{
-            isConnected: !!sheetsConfig.webhookUrl,
-            lastSynced: sheetsConfig.lastSyncedAt,
-          }}
+          onSignOut={handleLogout}
           notifications={notifications}
           onOpenNotificationCommittee={(commId) => {
             const found = committees.find((c) => c.id === commId);
@@ -1048,36 +1038,12 @@ export default function App() {
           onMarkNotificationsAsRead={handleMarkNotificationsAsRead}
           onToggleSidebar={handleToggleSidebar}
           isSidebarOpen={isSidebarOpen}
-          onSignOut={() => setActiveTab('sanctuary')}
+          todaysTasksCount={todaysTasksCount}
+          onNavigateToDailyAlerts={() => setActiveTab('daily_alerts')}
         />
 
         {/* Tab Views */}
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {activeTab === 'sanctuary' && (
-            <SereneSanctuaryView
-              currentUser={currentUser}
-              users={users}
-              onLoginSuccess={(user) => {
-                setCurrentUser(user);
-                setActiveTab('summer_course');
-              }}
-              onNavigateSummerCourse={() => setActiveTab('summer_course')}
-              onRegisterNewAssistant={(d) =>
-                handleRegisterAssistant(d.name, d.phone, d.email, d.notes)
-              }
-            />
-          )}
-
-          {activeTab === 'summer_course' && (
-            <SummerCourseTrackerView
-              committees={committees}
-              onToggleCommitteeStage={handleQuickToggleStage}
-              onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
-              onNavigateToCommittees={() => setActiveTab('committees')}
-              onOpenCommitteeDetails={handleOpenRowDetails}
-            />
-          )}
-
+        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24 lg:pb-8">
           {activeTab === 'home' && (
             <HomeOverviewView
               committees={committees}
@@ -1096,6 +1062,16 @@ export default function App() {
               }}
               onOpenDetails={(c) => setSelectedCommitteeForDetails(c)}
               onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
+            />
+          )}
+
+          {activeTab === 'summer_course' && (
+            <SummerCourseTrackerView
+              committees={committees}
+              onToggleCommitteeStage={handleQuickToggleStage}
+              onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
+              onNavigateToCommittees={() => setActiveTab('committees')}
+              onOpenCommitteeDetails={handleOpenRowDetails}
             />
           )}
 
@@ -1160,6 +1136,19 @@ export default function App() {
 
           {activeTab === 'stats' && <StatisticsView committees={committees} />}
 
+          {activeTab === 'daily_alerts' && (
+            <DailyAlertsView
+              tasks={scheduleTasks}
+              committees={committees}
+              currentUser={currentUser}
+              onToggleTaskComplete={handleToggleTaskComplete}
+              onAddTask={handleAddScheduleTask}
+              onDeleteTask={handleDeleteScheduleTask}
+              onNavigateToCalendar={() => setActiveTab('calendar')}
+              onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
+            />
+          )}
+
           {activeTab === 'committees' && (
             <>
               {/* Assistant Quick Task & Assigned Committees Bar */}
@@ -1171,7 +1160,7 @@ export default function App() {
                       <span>مرحباً بك: {currentUser.name} (معاون ميداني)</span>
                     </span>
                     <span className="text-[#3e4947] block leading-relaxed">
-                      الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'استلام اللجان'}</strong> • اللجان المسندة: <strong>{currentUser.assignedCommittees.map(c => `#${c}`).join('، ') || 'كافة اللجان'}</strong>
+                      الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'متابعة اللجان الميدانية'}</strong> • اللجان المسندة: <strong>{currentUser.assignedCommittees.map(c => `#${c}`).join('، ') || 'كافة اللجان'}</strong>
                     </span>
                   </div>
 
@@ -1341,6 +1330,15 @@ export default function App() {
           )}
         </main>
 
+        {/* Mobile App Bottom Navigation Bar (iOS / Android Native App feel) */}
+        <MobileBottomNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+          currentUser={currentUser}
+          pendingAssistantsCount={pendingAssistantsCount}
+        />
+
         {/* Footer */}
         <Footer />
       </div>
@@ -1361,9 +1359,9 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         currentUser={currentUser}
         users={users}
-        onSelectUser={(u) => setCurrentUser(u)}
+        onSelectUser={(u) => handleLogin(u)}
         onRegisterAssistant={handleRegisterAssistant}
-        onLogout={() => setCurrentUser(users.find((u) => u.role === 'super_admin') || users[0])}
+        onLogout={handleLogout}
       />
 
       <AddCommitteeModal
@@ -1395,15 +1393,6 @@ export default function App() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         committees={filteredCommittees}
-      />
-
-      <GoogleSheetsModal
-        isOpen={isSheetsModalOpen}
-        onClose={() => setIsSheetsModalOpen(false)}
-        config={sheetsConfig}
-        onSaveConfig={setSheetsConfig}
-        committees={committees}
-        onTriggerSync={() => triggerGoogleSheetsSync()}
       />
     </div>
   );

@@ -8,13 +8,15 @@ interface TopNavBarProps {
   notifications: NotificationItem[];
   onOpenNotificationCommittee?: (committeeId: string) => void;
   onMarkNotificationsAsRead: () => void;
-  onOpenSheetsSync: () => void;
-  sheetsSyncStatus: { isConnected: boolean; lastSynced?: string };
+  onOpenSheetsSync?: () => void;
+  sheetsSyncStatus?: { isConnected: boolean; lastSynced?: string };
   onToggleSidebar: () => void;
   isSidebarOpen?: boolean;
   currentUser: AppUser;
   onOpenAuthModal: () => void;
   onSignOut?: () => void;
+  todaysTasksCount?: number;
+  onNavigateToDailyAlerts?: () => void;
 }
 
 export const TopNavBar: React.FC<TopNavBarProps> = ({
@@ -30,6 +32,8 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   currentUser,
   onOpenAuthModal,
   onSignOut,
+  todaysTasksCount = 0,
+  onNavigateToDailyAlerts,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -70,53 +74,64 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
         {/* Left: Actions Cluster */}
         <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Database Connection Pill */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>قاعدة البيانات متصلة</span>
+          </div>
+
           {/* User Profile / Switcher Button */}
           <button
             onClick={onOpenAuthModal}
             className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-[#bdc9c6]/60 bg-[#f8f9ff] hover:bg-[#eff4ff] text-[#0d1c2e] text-xs font-semibold transition-all cursor-pointer shadow-2xs"
-            title="تبديل الحساب أو تسجيل الدخول"
+            title="تبديل الصلاحية أو استعراض بيانات الحساب"
           >
-            <span className="w-6 h-6 rounded-lg bg-[#005c55] text-white flex items-center justify-center text-xs font-bold shrink-0">
-              {currentUser.role === 'super_admin' ? '👑' : '👤'}
+            <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+              currentUser.role === 'super_admin' ? 'bg-emerald-700 text-white' :
+              currentUser.role === 'committee_head' ? 'bg-blue-700 text-white' :
+              currentUser.role === 'teacher' ? 'bg-indigo-700 text-white' :
+              currentUser.role === 'auditor' ? 'bg-purple-700 text-white' :
+              'bg-amber-600 text-white'
+            }`}>
+              {currentUser.role === 'super_admin' ? '👑' :
+               currentUser.role === 'committee_head' ? '👨‍🏫' :
+               currentUser.role === 'teacher' ? '📖' :
+               currentUser.role === 'auditor' ? '🔍' : '👤'}
             </span>
             <div className="text-right hidden sm:block">
               <span className="text-[11px] font-bold block leading-none truncate max-w-[130px]">
                 {currentUser.name.split(' ')[0]} {currentUser.name.split(' ')[1] || ''}
               </span>
-              <span className="text-[9px] text-[#005c55] font-semibold leading-none">
-                {currentUser.role === 'super_admin' ? 'المشرف العام' : 'معاون معتمد'}
+              <span className={`text-[10px] font-semibold leading-none ${
+                currentUser.role === 'super_admin' ? 'text-emerald-700 font-bold' :
+                currentUser.role === 'committee_head' ? 'text-blue-700 font-bold' :
+                currentUser.role === 'teacher' ? 'text-indigo-700 font-bold' :
+                currentUser.role === 'auditor' ? 'text-purple-700 font-bold' :
+                'text-amber-700 font-bold'
+              }`}>
+                {currentUser.role === 'super_admin' ? 'مدير النظام' :
+                 currentUser.role === 'committee_head' ? 'رئيس لجنة' :
+                 currentUser.role === 'teacher' ? 'معلم مقرأة' :
+                 currentUser.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
               </span>
             </div>
             <span className="material-symbols-outlined text-xs text-[#6e7977]">expand_more</span>
           </button>
 
-          {/* Sign Out Button */}
+          {/* Sign Out Button (Central Service Exit) */}
           {onSignOut && (
             <button
               onClick={onSignOut}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-600 hover:text-rose-700 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
-              title="تسجيل الخروج والعودة لصفحة الدخول"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              title="تسجيل الخروج والرجوع لبوابة الدخول الخارجية"
             >
-              <span className="material-symbols-outlined text-sm text-rose-600">logout</span>
-              <span className="hidden md:inline">خروج</span>
+              <span className="material-symbols-outlined text-base">logout</span>
+              <span className="hidden sm:inline">تسجيل الخروج</span>
             </button>
           )}
 
-          {/* Google Sheets Link Button (Admin only) */}
-          {currentUser.role === 'super_admin' && (
-            <button
-              onClick={onOpenSheetsSync}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
-              title="مزامنة بيانات اللجان مع ملف Google Sheets"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="material-symbols-outlined text-sm">table_chart</span>
-              <span className="hidden md:inline">Google Sheets</span>
-            </button>
-          )}
-
-          {/* New Committee Button (Visible only to super_admin) */}
-          {currentUser.role === 'super_admin' && (
+          {/* New Committee Button (Visible to super_admin or user with add_new_committee permission) */}
+          {(currentUser.role === 'super_admin' || currentUser.permissions.includes('add_new_committee')) && (
             <button
               onClick={onOpenNewCommittee}
               className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-[#005c55] shadow-xs active:scale-[0.98] transition-all cursor-pointer"
@@ -134,6 +149,19 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer hidden sm:flex"
             >
               <span className="material-symbols-outlined text-lg">file_download</span>
+            </button>
+          )}
+
+          {/* Quick subtle pill for Today's tasks if any */}
+          {todaysTasksCount > 0 && onNavigateToDailyAlerts && (
+            <button
+              type="button"
+              onClick={onNavigateToDailyAlerts}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              title={`يوجد ${todaysTasksCount} أعمال وتنبيهات مجدولة اليوم - اضغط لفتح شاشة التنبيهات والمهام اليومية`}
+            >
+              <span className="material-symbols-outlined text-sm text-amber-700 animate-bounce">notifications_active</span>
+              <span className="font-mono text-[11px] font-black">{todaysTasksCount} مهام اليوم</span>
             </button>
           )}
 

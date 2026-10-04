@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppUser } from '../types';
 
-export type NavTab = 'sanctuary' | 'summer_course' | 'home' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats';
+export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -15,9 +15,8 @@ interface SidebarProps {
   coursesCount?: number;
   calendarTasksCount?: number;
   pendingAssistantsCount?: number;
+  todaysTasksCount?: number;
   onOpenNewCommittee: () => void;
-  onOpenSheetsSync: () => void;
-  sheetsConnected: boolean;
   currentUser: AppUser;
 }
 
@@ -33,83 +32,108 @@ export const Sidebar: React.FC<SidebarProps> = ({
   coursesCount = 0,
   calendarTasksCount = 0,
   pendingAssistantsCount = 0,
+  todaysTasksCount = 0,
   onOpenNewCommittee,
-  onOpenSheetsSync,
-  sheetsConnected,
   currentUser,
 }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
-  const hasExamsPermission = isSuperAdmin || currentUser.permissions.includes('manage_exams');
+  const perms = currentUser.permissions || [];
 
-  const navItems = [
+  // Grouped and sorted navigation tabs in the most logical operational order
+  const navSections: Array<{
+    title: string;
+    items: Array<{
+      id: NavTab;
+      label: string;
+      icon: string;
+      badge: string | number | null;
+      isPendingBadge?: boolean;
+      highlight?: boolean;
+      visible: boolean;
+    }>;
+  }> = [
     {
-      id: 'sanctuary' as NavTab,
-      label: 'تسجيل الدخول للنظام',
-      icon: 'lock',
-      badge: 'بوابة الدخول',
-      highlight: true,
-      visible: true,
+      title: 'العمليات الميدانية والكشوفات',
+      items: [
+        {
+          id: 'summer_course',
+          label: 'قاعدة البيانات والكشوفات',
+          icon: 'table_chart',
+          badge: 'الكشوفات',
+          highlight: true,
+          visible: isSuperAdmin || perms.includes('database_sheets'),
+        },
+        {
+          id: 'committees',
+          label: 'إدارة اللجان الميدانية',
+          icon: 'groups',
+          badge: isSuperAdmin ? committeesCount : currentUser.assignedCommittees.length || committeesCount,
+          visible: isSuperAdmin || perms.includes('manage_committees'),
+        },
+        {
+          id: 'exams',
+          label: 'الامتحانات ونماذج PDF',
+          icon: 'description',
+          badge: examsCount,
+          visible: isSuperAdmin || perms.includes('exams_pdf'),
+        },
+      ],
     },
     {
-      id: 'summer_course' as NavTab,
-      label: 'قاعدة البيانات والكشوفات',
-      icon: 'table_chart',
-      badge: 'الكشوفات',
-      highlight: true,
-      visible: true,
+      title: 'المواعيد والتنظيم',
+      items: [
+        {
+          id: 'calendar',
+          label: 'الجدول وتقويم المواعيد',
+          icon: 'calendar_month',
+          badge: calendarTasksCount > 0 ? calendarTasksCount : null,
+          visible: isSuperAdmin || perms.includes('calendar_schedule'),
+        },
+        {
+          id: 'courses',
+          label: 'إضافة وإدارة الدورات',
+          icon: 'event_repeat',
+          badge: coursesCount,
+          visible: isSuperAdmin || perms.includes('manage_courses'),
+        },
+      ],
     },
     {
-      id: 'home' as NavTab,
-      label: 'الرئيسية',
-      icon: 'home',
-      badge: null,
-      visible: true,
+      title: 'الكادر والإحصائيات',
+      items: [
+        {
+          id: 'assistants',
+          label: 'المعاونون والصلاحيات',
+          icon: 'badge',
+          badge: pendingAssistantsCount > 0 ? `${pendingAssistantsCount} معلق` : null,
+          isPendingBadge: pendingAssistantsCount > 0,
+          visible: isSuperAdmin || perms.includes('manage_assistants'),
+        },
+        {
+          id: 'stats',
+          label: 'حساب ونسبة الإنجاز',
+          icon: 'donut_large',
+          badge: null,
+          visible: isSuperAdmin || perms.includes('progress_stats'),
+        },
+        {
+          id: 'daily_alerts',
+          label: 'التنبيهات والمهام اليومية',
+          icon: 'notifications_active',
+          badge: todaysTasksCount > 0 ? `${todaysTasksCount} اليوم` : null,
+          isPendingBadge: todaysTasksCount > 0,
+          visible: true,
+        },
+      ],
     },
-    {
-      id: 'committees' as NavTab,
-      label: isSuperAdmin ? 'إدارة اللجان' : 'لجان الاختبار والتصحيح',
-      icon: 'groups',
-      badge: isSuperAdmin ? committeesCount : currentUser.assignedCommittees.length || committeesCount,
-      visible: true,
-    },
-    {
-      id: 'assistants' as NavTab,
-      label: 'المعاونون والصلاحيات',
-      icon: 'badge',
-      badge: pendingAssistantsCount > 0 ? `${pendingAssistantsCount} معلق` : null,
-      isPendingBadge: pendingAssistantsCount > 0,
-      visible: isSuperAdmin, // ONLY Super Admin sees this!
-    },
-    {
-      id: 'exams' as NavTab,
-      label: 'الامتحانات ونماذج PDF',
-      icon: 'description',
-      badge: examsCount,
-      highlight: true,
-      visible: hasExamsPermission, // Only if has permission
-    },
-    {
-      id: 'courses' as NavTab,
-      label: 'إضافة وإدارة الدورات',
-      icon: 'event_repeat',
-      badge: coursesCount,
-      visible: isSuperAdmin || currentUser.permissions.includes('manage_courses'), // Only Super Admin or if permitted
-    },
-    {
-      id: 'calendar' as NavTab,
-      label: 'جدول التقويم والمواعيد',
-      icon: 'calendar_month',
-      badge: calendarTasksCount > 0 ? calendarTasksCount : null,
-      visible: true, // Everyone needs the calendar & schedule
-    },
-    {
-      id: 'stats' as NavTab,
-      label: 'حساب نسبة الإنجاز',
-      icon: 'donut_large',
-      badge: null,
-      visible: isSuperAdmin, // Stats only for admin
-    },
-  ].filter((item) => item.visible);
+  ];
+
+  const totalVisibleCount = navSections.reduce(
+    (acc, sec) => acc + sec.items.filter((i) => i.visible).length,
+    0
+  );
+
+  const canAddNewCommittee = isSuperAdmin || perms.includes('add_new_committee');
 
   const handleSelectTab = (tab: NavTab) => {
     setActiveTab(tab);
@@ -118,11 +142,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile Drawer Backdrop */}
       {isOpenMobile && (
         <div
           onClick={() => setIsOpenMobile(false)}
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-xs"
+          className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-xs transition-opacity duration-300"
         />
       )}
 
@@ -130,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {!isOpenDesktop && (
         <button
           onClick={onToggleSidebar}
-          className="hidden lg:flex fixed top-20 right-0 z-40 items-center gap-2 px-3 py-2.5 bg-[#005c55] hover:bg-[#04332e] text-white rounded-l-xl shadow-2xl transition-all hover:pr-4 cursor-pointer font-bold text-xs border border-white/20 active:scale-95 animate-fadeIn"
+          className="hidden lg:flex fixed top-20 right-0 z-40 items-center gap-2 px-3 py-2.5 bg-[#005c55] hover:bg-[#004742] text-white rounded-l-2xl shadow-xl transition-all hover:pr-4 cursor-pointer font-bold text-xs border border-white/20 active:scale-95 animate-fadeIn"
           title="فتح القائمة الجانبية (Slide bar)"
         >
           <span className="material-symbols-outlined text-lg">menu_open</span>
@@ -140,36 +164,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:sticky top-0 right-0 h-screen bg-white border-l border-[#bdc9c6]/40 flex flex-col z-50 transition-all duration-300 ease-in-out text-right shadow-lg lg:shadow-none ${
+        className={`fixed lg:sticky top-0 right-0 h-screen bg-white text-slate-800 border-l border-slate-200/90 flex flex-col z-50 transition-all duration-300 ease-in-out text-right shadow-2xl lg:shadow-none ${
           isOpenDesktop
             ? 'lg:w-64 sm:lg:w-72 lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto'
             : 'lg:w-0 lg:overflow-hidden lg:border-none lg:opacity-0 lg:pointer-events-none'
         } ${
           isOpenMobile
-            ? 'translate-x-0 w-64 sm:w-72 opacity-100 pointer-events-auto'
+            ? 'translate-x-0 w-72 sm:w-80 opacity-100 pointer-events-auto'
             : 'max-lg:translate-x-full max-lg:pointer-events-none'
         }`}
       >
         {/* Brand Header */}
-        <div className="p-4 sm:p-5 border-b border-[#bdc9c6]/30 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#005c55] to-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
               <span className="material-symbols-outlined text-2xl">mosque</span>
             </div>
             <div className="overflow-hidden">
-              <h1 className="font-bold text-base text-[#005c55] leading-tight truncate">
-                مسجد البخاري
+              <h1 className="font-black text-base text-slate-900 leading-tight truncate tracking-tight">
+                مسجد الإمام البخاري
               </h1>
-              <p className="text-[11px] text-[#6e7977] font-medium truncate">
-                مسابقات متون العقيدة والتوحيد
+              <p className="text-[11px] text-[#005c55] font-extrabold truncate mt-0.5">
+                الدورات والمسابقات 1448هـ
               </p>
             </div>
           </div>
 
-          {/* Close button on desktop and mobile */}
+          {/* Close button (Mobile Drawer & Desktop Toggle) */}
           <button
             onClick={onToggleSidebar}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
             title="إغلاق القائمة الجانبية"
             aria-label="إغلاق القائمة الجانبية"
           >
@@ -177,114 +201,125 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
-          <div className="px-3 pb-2 text-[10px] font-bold text-[#6e7977] tracking-wider uppercase">
-            {isSuperAdmin ? 'لوحة تحكم المشرف العام' : 'لوحة مهام المعاون'}
+        {/* User Identity Card (Clean, Light & Eye-friendly) */}
+        <div className="p-3 bg-gradient-to-l from-emerald-50/80 to-slate-50 border-b border-slate-200/70 shrink-0">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200 shrink-0"></span>
+              <span className="font-extrabold text-slate-900 truncate text-xs">
+                {currentUser.name}
+              </span>
+            </div>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border shrink-0 ${
+              isSuperAdmin 
+                ? 'bg-emerald-100 text-emerald-900 border-emerald-300' 
+                : 'bg-blue-50 text-blue-900 border-blue-200'
+            }`}>
+              {isSuperAdmin ? 'مدير النظام' : 'معاون معتمد'}
+            </span>
           </div>
+          <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500 font-semibold">
+            <span>الصلاحيات المتاحة:</span>
+            <span className="font-mono font-bold text-[#005c55] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+              {isSuperAdmin ? 'كاملة (8/8)' : `${perms.length} أقسام`}
+            </span>
+          </div>
+        </div>
 
-          {navItems.map((item) => {
-            const isActive = activeTab === item.id;
+        {/* Navigation Tabs (Organized, Categorized, Ordered) */}
+        <div className="flex-1 py-3 px-3 space-y-4 overflow-y-auto">
+          {navSections.map((section, sIdx) => {
+            const visibleSectionItems = section.items.filter((item) => item.visible);
+            if (visibleSectionItems.length === 0) return null;
+
             return (
-              <button
-                key={item.id}
-                onClick={() => handleSelectTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#005c55] text-white shadow-xs'
-                    : 'text-[#3e4947] hover:bg-[#eff4ff] hover:text-[#005c55]'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={`material-symbols-outlined text-xl ${
-                      isActive ? 'text-white' : 'text-[#6e7977]'
-                    }`}
-                  >
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
+              <div key={sIdx} className="space-y-1.5">
+                <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600/40"></span>
+                  <span>{section.title}</span>
                 </div>
 
-                {item.badge !== null ? (
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
-                      isActive
-                        ? 'bg-white/20 text-white'
-                        : (item as any).isPendingBadge
-                        ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
-                        : item.highlight
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        : 'bg-gray-100 text-[#0d1c2e]'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                ) : item.highlight ? (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                ) : null}
-              </button>
+                <div className="space-y-1">
+                  {visibleSectionItems.map((item) => {
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleSelectTab(item.id)}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-gradient-to-l from-[#005c55] to-emerald-700 text-white shadow-sm font-extrabold'
+                            : 'text-slate-700 hover:bg-slate-100/90 hover:text-[#005c55]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`material-symbols-outlined text-xl ${
+                              isActive ? 'text-white' : 'text-slate-400 group-hover:text-[#005c55]'
+                            }`}
+                          >
+                            {item.icon}
+                          </span>
+                          <span>{item.label}</span>
+                        </div>
+
+                        {item.badge !== null ? (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
+                              isActive
+                                ? 'bg-white/20 text-white'
+                                : item.isPendingBadge
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 font-black animate-pulse'
+                                : item.highlight
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        ) : item.highlight ? (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
 
-          {/* Quick Actions for Super Admin */}
-          {isSuperAdmin && (
-            <>
-              <div className="pt-5 px-3 pb-2 text-[10px] font-bold text-[#6e7977] tracking-wider uppercase">
-                إجراءات سريعة
-              </div>
-
-              {/* Add Committee Action */}
+          {/* Quick Action: Add New Committee */}
+          {canAddNewCommittee && (
+            <div className="pt-2 border-t border-slate-100">
               <button
+                type="button"
                 onClick={() => {
                   onOpenNewCommittee();
                   setIsOpenMobile(false);
                 }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#eff4ff] text-[#005c55] hover:bg-[#9cf2e8]/40 border border-[#9cf2e8]/60 transition-all cursor-pointer shadow-2xs"
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[#005c55] transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
               >
                 <span className="material-symbols-outlined text-lg">add_circle</span>
                 <span>+ إضافة لجنة جديدة</span>
               </button>
-            </>
+            </div>
           )}
 
-          {/* Assistant Info Banner in Sidebar */}
-          {!isSuperAdmin && (
-            <div className="mt-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-right space-y-1.5">
-              <span className="font-bold text-[#005c55] block flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">badge</span>
-                <span>صلاحياتك الحالية:</span>
-              </span>
-              <div className="text-[11px] text-emerald-900 leading-relaxed">
-                {currentUser.permissions.length > 0
-                  ? currentUser.permissions.join('، ')
-                  : 'استلام اللجان الميدانية'}
-              </div>
-              <div className="pt-1.5 border-t border-emerald-200/60 text-[10px] text-[#6e7977]">
-                اللجان المسندة: {currentUser.assignedCommittees.map((c) => `#${c}`).join('، ') || 'جميع لجان القاعة'}
-              </div>
+          {/* If non-admin has no granted tabs */}
+          {totalVisibleCount === 0 && (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs text-center space-y-1">
+              <span className="material-symbols-outlined text-2xl text-amber-500 block mb-1">lock</span>
+              <p className="font-bold">لا توجد أقسام مفعلة لك حالياً</p>
+              <p className="text-[11px] text-slate-500">يرجى مراجعة فضيلة المشرف العام لمنحك الصلاحيات المناسبة.</p>
             </div>
           )}
         </div>
 
-        {/* Footer / Google Sheets status (Admin only) */}
-        {isSuperAdmin && (
-          <div className="p-3 border-t border-[#bdc9c6]/30 bg-[#f8f9ff]">
-            <button
-              onClick={() => {
-                onOpenSheetsSync();
-                setIsOpenMobile(false);
-              }}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#bdc9c6]/40 hover:border-emerald-500 text-xs transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2 text-[#0d1c2e] font-semibold text-[11px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>قاعدة Google Sheets</span>
-              </div>
-              <span className="material-symbols-outlined text-[#6e7977] text-sm">open_in_new</span>
-            </button>
-          </div>
-        )}
+        {/* Footer info (Clean, subtle) */}
+        <div className="p-3 border-t border-slate-100 bg-slate-50 text-[11px] text-slate-500 text-center font-medium shrink-0">
+          <span>مسجد الإمام البخاري © 1448هـ / 2026م</span>
+        </div>
       </aside>
     </>
   );

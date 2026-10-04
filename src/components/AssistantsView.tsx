@@ -37,6 +37,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [activeTab, setActiveTab] = useState<'approved' | 'pending' | 'permissions'>('approved');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Custom permission input state
@@ -48,14 +49,14 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [newEmail, setNewEmail] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newPermissions, setNewPermissions] = useState<AssistantPermission[]>([
-    'receive_committee',
-    'approve_exam',
+    'database_sheets',
+    'manage_committees',
   ]);
   const [newAssignedCommittees, setNewAssignedCommittees] = useState<number[]>([]);
 
   // Filtering
-  const approvedUsers = users.filter((u) => u.role === 'assistant' && u.status === 'approved');
-  const pendingUsers = users.filter((u) => u.role === 'assistant' && u.status === 'pending');
+  const approvedUsers = users.filter((u) => u.role !== 'super_admin' && u.status === 'approved');
+  const pendingUsers = users.filter((u) => u.status === 'pending');
 
   const filteredApproved = approvedUsers.filter((u) => {
     if (!searchQuery.trim()) return true;
@@ -352,30 +353,50 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     {/* Assistant Header with Edit Button */}
                     <div className="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-[#bdc9c6]/30">
                       <div className="flex items-center gap-3">
-                        <span className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm shrink-0">
-                          <span className="material-symbols-outlined text-xl">person</span>
+                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                          user.role === 'committee_head' ? 'bg-blue-100 text-blue-800' :
+                          user.role === 'teacher' ? 'bg-indigo-100 text-indigo-800' :
+                          user.role === 'auditor' ? 'bg-purple-100 text-purple-800' :
+                          'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          <span className="material-symbols-outlined text-xl">
+                            {user.role === 'auditor' ? 'policy' : user.role === 'teacher' ? 'school' : 'person'}
+                          </span>
                         </span>
                         <div>
-                          <h4 className="font-bold text-sm text-[#0d1c2e] leading-snug">
-                            {user.name}
-                          </h4>
-                          <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-sm text-[#0d1c2e] leading-snug">
+                              {user.name}
+                            </h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              user.role === 'committee_head' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                              user.role === 'teacher' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
+                              user.role === 'auditor' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                              'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}>
+                              {user.role === 'committee_head' ? 'رئيس لجنة' :
+                               user.role === 'teacher' ? 'معلم ومقرئ' :
+                               user.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5 flex-wrap">
+                            {user.passportNumber && (
+                              <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300 text-slate-800 text-[10px]">
+                                🛂 {user.passportNumber}
+                              </span>
+                            )}
                             <span className="font-mono">📞 {user.phone}</span>
                             <span>•</span>
                             <span>✉️ {user.email}</span>
+                            {user.password && (
+                              <>
+                                <span>•</span>
+                                <span className="text-emerald-700 font-mono text-[10px]">🔑 {user.password}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
-
-                      {/* EDIT ASSISTANT BUTTON (المشرف يعدل الاسم ورقم الجوال والصلاحيات) */}
-                      <button
-                        onClick={() => setEditingUser(user)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                        title="تعديل بيانات المعاون (الاسم، الجوال، اللجان، والصلاحيات)"
-                      >
-                        <span className="material-symbols-outlined text-sm text-amber-700">edit</span>
-                        <span>تعديل البيانات والصلاحيات</span>
-                      </button>
                     </div>
 
                     {/* Notes / Bio */}
@@ -518,21 +539,32 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   </div>
 
                   {/* Footer Actions */}
-                  <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-between text-xs mt-3">
-                    <span className="text-[11px] text-[#6e7977]">
-                      اعتمد في: {user.approvedAt || user.createdAt}
+                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs mt-3 flex-wrap gap-2">
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      تاريخ الاعتماد: {user.approvedAt || user.createdAt}
                     </span>
 
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`هل أنت متأكد من حذف حساب المعاون "${user.name}"؟`)) {
-                          onDeleteAssistant(user.id);
-                        }
-                      }}
-                      className="text-red-500 hover:text-red-700 font-semibold p-1 cursor-pointer"
-                    >
-                      حذف المعاون
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingUser(user)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="تعديل بيانات المعاون والصلاحيات واللجان"
+                      >
+                        <span className="material-symbols-outlined text-sm text-amber-700">edit</span>
+                        <span>تعديل الصلاحيات</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setUserToDelete(user)}
+                        className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 font-bold px-2.5 py-1.5 rounded-xl hover:bg-rose-50 border border-rose-200 transition-colors cursor-pointer active:scale-95"
+                        title="حذف هذا المعاون"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete_outline</span>
+                        <span>حذف المعاون</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -576,8 +608,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       </span>
                       <div>
                         <h4 className="font-bold text-sm text-[#0d1c2e]">{user.name}</h4>
-                        <div className="text-[11px] text-[#6e7977] mt-0.5">
-                          <span>📞 {user.phone}</span> • <span>✉️ {user.email}</span>
+                        <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5">
+                          <span className="font-mono text-emerald-900 font-bold">📞 {user.phone}</span>
                         </div>
                       </div>
                     </div>
@@ -589,7 +621,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
                   <p className="text-xs text-[#3e4947] bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/30 mb-3.5 leading-relaxed">
                     <strong className="text-[#0d1c2e]">بيان الطلب: </strong>
-                    {user.notes || 'طلب انضمام جديد للعمل كمعاون ميداني في لجان مسجد البخاري.'}
+                    {user.notes || 'طلب انضمام جديد للعمل في لجان مسجد البخاري.'}
                   </p>
 
                   <div className="text-[11px] text-[#6e7977] mb-3">
@@ -599,19 +631,37 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </div>
 
                 {/* Approval & Reject buttons */}
-                <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-between gap-2">
+                <div className="pt-3 border-t border-[#bdc9c6]/30 flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    onClick={() =>
+                      setEditingUser({
+                        ...user,
+                        status: 'approved',
+                        role: user.role || 'assistant',
+                        permissions: user.permissions.length > 0 ? user.permissions : ['database_sheets', 'manage_committees'],
+                        assignedCommittees: user.assignedCommittees.length > 0 ? user.assignedCommittees : [1],
+                      })
+                    }
+                    className="flex-1 py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98] transition-all"
+                    title="فتح نافذة اختيار الدور وتحديد الصلاحيات واللجان للمتقدم"
+                  >
+                    <span className="material-symbols-outlined text-sm">how_to_reg</span>
+                    <span>✓ قبول وتحديد الدور والصلاحيات</span>
+                  </button>
+
                   <button
                     onClick={() =>
                       onApproveAssistant(
                         user.id,
-                        ['receive_committee', 'approve_exam'],
-                        [1, 2] // Default assign to first committees
+                        ['database_sheets', 'manage_committees'],
+                        [1]
                       )
                     }
-                    className="flex-1 py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98] transition-all"
+                    className="py-2 px-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+                    title="قبول فوري بصلاحيات معاون ميداني"
                   >
-                    <span className="material-symbols-outlined text-sm">verified</span>
-                    <span>✓ قبول واعتماد المعاون</span>
+                    <span className="material-symbols-outlined text-sm">done_all</span>
+                    <span>قبول فوري</span>
                   </button>
 
                   <button
@@ -623,7 +673,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     className="py-2 px-3 rounded-xl border border-red-300 text-red-600 hover:bg-red-50 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
                   >
                     <span className="material-symbols-outlined text-sm">close</span>
-                    <span>رفض الطلب</span>
+                    <span>رفض</span>
                   </button>
                 </div>
               </div>
@@ -669,42 +719,49 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             </div>
 
             <form onSubmit={handleEditSubmit} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
-                  اسم المعاون <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={editingUser.name}
-                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
-                  required
-                />
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-[#0d1c2e] mb-1">
-                    رقم الهاتف / الجوال (يمكنك تعديله في أي وقت)
+                    اسم المعاون / العضو <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="tel"
-                    value={editingUser.phone}
-                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
+                    type="text"
+                    value={editingUser.name}
+                    onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">البريد الإلكتروني</label>
+                  <label className="block font-bold text-[#0d1c2e] mb-1">
+                    رقم الهاتف / الجوال <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="email"
-                    value={editingUser.email}
-                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    type="tel"
+                    value={editingUser.phone}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-mono text-left font-bold"
+                    required
                   />
                 </div>
+              </div>
+
+              {/* Role Selection by Super Admin */}
+              <div>
+                <label className="block font-bold text-[#0d1c2e] mb-1">
+                  الدور الوظيفي في المنظومة (يحدده المشرف العام) <span className="text-red-500">*</span>:
+                </label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
+                  className="w-full bg-emerald-50 border border-emerald-300 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-bold text-emerald-950"
+                >
+                  <option value="assistant">معاون ميداني تنفيذي (استلام وتجهيز اللجان وتوزيع الامتحانات)</option>
+                  <option value="teacher">معلم ومقرئ معتمد (اختبار الطلاب ورصد وتصحيح الدرجات)</option>
+                  <option value="committee_head">رئيس لجنة واختبارات (إشراف ميداني واعتماد جاهزية وتدقيق)</option>
+                  <option value="auditor">مراجع ومدقق جودة (رقابي وإحصائي)</option>
+                </select>
               </div>
 
               {/* Permissions Checklist in Edit Modal */}
@@ -780,20 +837,33 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 />
               </div>
 
-              <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditingUser(null)}
-                  className="px-4 py-2 rounded-xl text-gray-600 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    setUserToDelete(editingUser);
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  إلغاء
+                  <span className="material-symbols-outlined text-base">delete</span>
+                  <span>حذف هذا المعاون</span>
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer shadow-xs active:scale-[0.98]"
-                >
-                  حفظ التعديلات فوراً
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 hover:bg-slate-50 font-bold text-xs cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs cursor-pointer shadow-xs active:scale-[0.98]"
+                  >
+                    حفظ التعديلات فوراً
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -944,6 +1014,61 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* DELETE CONFIRMATION MODAL (No window.confirm!) */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right animate-fadeIn">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-rose-200 overflow-hidden">
+            <div className="p-5 bg-rose-50 border-b border-rose-100 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                <span className="material-symbols-outlined text-2xl">delete_forever</span>
+              </span>
+              <div>
+                <h3 className="font-extrabold text-base text-rose-950">
+                  تأكيد حذف حساب المعاون
+                </h3>
+                <p className="text-xs text-rose-700 mt-0.5">
+                  هذا الإجراء سيقوم بمسح الحساب وسحب كافة الصلاحيات
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-3 text-xs text-slate-700">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="font-bold text-slate-900 text-sm">{userToDelete.name}</p>
+                <p className="text-slate-500 text-[11px] mt-1">الهاتف: {userToDelete.phone || 'غير مسجل'}</p>
+                <p className="text-slate-500 text-[11px]">اسم الدخول: {userToDelete.email}</p>
+              </div>
+              <p className="text-rose-600 font-bold text-xs leading-relaxed">
+                ⚠️ هل أنت متأكد تماماً من رغبتك في حذف هذا الحساب نهائياً من قاعدة بيانات المسجد؟
+              </p>
+            </div>
+
+            <div className="px-5 py-4 bg-slate-50 border-t border-slate-200/80 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-200/80 font-bold text-xs cursor-pointer transition-colors"
+              >
+                تراجع وإلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteAssistant(userToDelete.id);
+                  if (editingUser?.id === userToDelete.id) {
+                    setEditingUser(null);
+                  }
+                  setUserToDelete(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md shadow-rose-900/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base">delete</span>
+                <span>نعم، حذف الحساب فوراً</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

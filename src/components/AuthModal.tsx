@@ -54,8 +54,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const superAdminUser = users.find((u) => u.role === 'super_admin') || users[0];
-  const approvedAssistants = users.filter((u) => u.role === 'assistant' && u.status === 'approved');
-  const pendingAssistants = users.filter((u) => u.role === 'assistant' && u.status === 'pending');
+  const approvedStaff = users.filter((u) => u.role !== 'super_admin' && u.status === 'approved');
+  const pendingUsers = users.filter((u) => u.status === 'pending');
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto text-right">
@@ -64,14 +64,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="px-5 py-4 bg-gradient-to-l from-[#005c55] to-emerald-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-2xl">lock_person</span>
+              <span className="material-symbols-outlined text-2xl">admin_panel_settings</span>
             </span>
             <div>
               <h3 className="font-bold text-base sm:text-lg">
-                بوابة الدخول وصلاحيات اللجان
+                إدارة الحسابات وصلاحيات المنظومة
               </h3>
               <p className="text-[11px] text-teal-100">
-                تسجيل دخول المشرف العام، المعاونين، أو تقديم طلب انضمام جديد
+                الحساب النشط، تبديل الصلاحيات المعتمدة، أو تسجيل الخروج
               </p>
             </div>
           </div>
@@ -94,7 +94,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 : 'border-transparent text-[#6e7977] hover:text-[#0d1c2e]'
             }`}
           >
-            تبديل الحساب وتسجيل الدخول
+            تبديل الحساب النشط
           </button>
 
           <button
@@ -105,16 +105,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 : 'border-transparent text-[#6e7977] hover:text-[#0d1c2e]'
             }`}
           >
-            + تسجيل حساب معاون جديد (طلب اعتماد)
+            + تقديم طلب اعتماد حساب جديد
           </button>
         </div>
 
         <div className="p-5">
-          {/* MODE 1: SWITCH / LOGIN ACCOUNT */}
+          {/* MODE 1: SWITCH / CURRENT ACCOUNT */}
           {mode === 'switch' && (
             <div className="space-y-4 text-xs">
               {/* Current Active Account Box */}
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-emerald-800 font-bold block mb-0.5">
                     الحساب المسجل به حالياً:
@@ -123,19 +123,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {currentUser.name}
                   </span>
                   <span className="text-[11px] text-emerald-700 font-medium">
-                    {currentUser.role === 'super_admin' ? '👑 المشرف العام (مدير النظام بكامل الصلاحيات)' : 'معاون معتمد'}
+                    {currentUser.role === 'super_admin' ? '👑 المشرف العام (مدير النظام بكامل الصلاحيات)' :
+                     currentUser.role === 'committee_head' ? '👨‍🏫 رئيس لجنة واختبارات' :
+                     currentUser.role === 'teacher' ? '📖 معلم ومقرئ معتمد' :
+                     currentUser.role === 'auditor' ? '🔍 مراجع ومدقق جودة' : '👤 معاون ميداني معتمد'}
                   </span>
                 </div>
 
-                <span className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-1 rounded-full">
-                  نشط الآن
-                </span>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className="text-xs bg-emerald-600 text-white font-bold px-2.5 py-0.5 rounded-full">
+                    نشط الآن
+                  </span>
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      onClose();
+                    }}
+                    className="text-[11px] text-rose-600 hover:text-rose-800 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xs">logout</span>
+                    <span>تسجيل الخروج للبوابة</span>
+                  </button>
+                </div>
               </div>
 
-              {/* 1. Super Admin Account Quick Switch */}
+              {/* 1. Super Admin Account */}
               <div>
                 <span className="font-bold text-[#0d1c2e] block mb-2 text-xs flex items-center gap-1">
-                  <span>👑 حساب المشرف العام (الكبير):</span>
+                  <span>👑 حساب المشرف العام:</span>
                 </span>
 
                 <button
@@ -164,49 +179,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
 
                   <span className="text-xs font-bold text-[#005c55] bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                    دخول كمشرف عام
+                    دخول كمشرف
                   </span>
                 </button>
               </div>
 
-              {/* 2. Approved Assistants List Quick Switch */}
+              {/* 2. Staff and Assistants */}
               <div className="pt-2">
                 <span className="font-bold text-[#0d1c2e] block mb-2 text-xs flex items-center gap-1">
-                  <span>👥 المعاونون المعتمدون (دخول بصلاحيات محددة):</span>
+                  <span>👥 المعلمون والمعاونون والمدققون:</span>
                 </span>
 
-                <div className="space-y-2">
-                  {approvedAssistants.map((assistant) => {
-                    const isSelected = currentUser.id === assistant.id;
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {approvedStaff.map((staff) => {
+                    const isSelected = currentUser.id === staff.id;
                     return (
                       <button
-                        key={assistant.id}
+                        key={staff.id}
                         onClick={() => {
-                          onSelectUser(assistant);
+                          onSelectUser(staff);
                           onClose();
                         }}
-                        className={`w-full p-3 rounded-xl border text-right flex items-center justify-between transition-all cursor-pointer ${
+                        className={`w-full p-2.5 rounded-xl border text-right flex items-center justify-between transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-[#005c55]/10 border-[#005c55] text-[#005c55] font-bold'
                             : 'bg-white border-[#bdc9c6]/60 hover:bg-[#eff4ff]'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                            <span className="material-symbols-outlined text-base">person</span>
+                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
+                            staff.role === 'committee_head' ? 'bg-blue-100 text-blue-800' :
+                            staff.role === 'teacher' ? 'bg-indigo-100 text-indigo-800' :
+                            staff.role === 'auditor' ? 'bg-purple-100 text-purple-800' :
+                            'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            <span className="material-symbols-outlined text-base">
+                              {staff.role === 'auditor' ? 'policy' : 'person'}
+                            </span>
                           </span>
                           <div>
                             <span className="font-bold text-xs block text-[#0d1c2e]">
-                              {assistant.name}
+                              {staff.name}
                             </span>
                             <span className="text-[10px] text-[#6e7977]">
-                              اللجان المسندة: {assistant.assignedCommittees.map((c) => `#${c}`).join('، ') || 'بدون إسناد'}
+                              {staff.role === 'committee_head' ? 'رئيس لجنة' :
+                               staff.role === 'teacher' ? 'معلم مقرأة' :
+                               staff.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
+                              {staff.assignedCommittees.length > 0 && ` • لجان: ${staff.assignedCommittees.map(c => `#${c}`).join(', ')}`}
                             </span>
                           </div>
                         </div>
 
                         <span className="text-[11px] font-semibold text-[#005c55] bg-white border border-[#bdc9c6] px-2 py-0.5 rounded-lg">
-                          دخول كمعاون
+                          تبديل
                         </span>
                       </button>
                     );
@@ -214,15 +239,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* 3. Pending Assistants Notice */}
-              {pendingAssistants.length > 0 && (
+              {/* 3. Pending Notice */}
+              {pendingUsers.length > 0 && (
                 <div className="pt-2">
                   <div className="p-3 bg-amber-50 rounded-xl border border-amber-300 text-amber-900 text-xs">
                     <span className="font-bold block mb-1">
-                      ⚠️ طلبات معاونين معلقة ({pendingAssistants.length}):
+                      ⚠️ طلبات انضمام معلقة ({pendingUsers.length}):
                     </span>
                     <p className="text-[11px] leading-relaxed">
-                      هناك طلبات انضمام لمعاونين بانتظار موافقة المشرف العام من تبويب «المعاونون والصلاحيات». لا يمكنهم تسجيل الدخول الفعلي حتى يتم اعتمادهم.
+                      هناك طلبات انضمام بانتظار موافقة المشرف العام من تبويب «المعاونون والصلاحيات». لا يمكنهم تسجيل الدخول الفعلي حتى يتم اعتمادهم.
                     </p>
                   </div>
                 </div>

@@ -73,7 +73,15 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed;
+          const seen = new Set<string>();
+          return parsed.map((item, i) => {
+            let itemId = item.id || `row-${i}-${Date.now()}`;
+            if (seen.has(itemId)) {
+              itemId = `${itemId}-${i}-${Math.random().toString(36).slice(2, 6)}`;
+            }
+            seen.add(itemId);
+            return { ...item, id: itemId };
+          });
         }
       }
     } catch (e) {
@@ -993,13 +1001,14 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRows.map((row) => {
+                {filteredRows.map((row, rIdx) => {
                   const isStruck = row.struck_out;
                   const isUncertain = row.uncertain;
+                  const rowKey = row.id ? `${row.id}-${rIdx}` : `comm-row-${rIdx}`;
 
                   return (
                     <tr
-                      key={row.id}
+                      key={rowKey}
                       className={`transition-colors duration-150 group ${
                         isUncertain
                           ? 'bg-amber-50/80 hover:bg-amber-100/60'

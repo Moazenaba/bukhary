@@ -213,21 +213,143 @@ export interface ScheduleTask {
   notes?: string;
 }
 
-export type UserRole = 'super_admin' | 'assistant';
+export type UserRole =
+  | 'super_admin'      // المشرف العام / مدير النظام (صلاحيات كاملة)
+  | 'committee_head'   // رئيس لجنة / مشرف عام على لجان
+  | 'teacher'          // معلم / عضو هيئة التدريس
+  | 'assistant'        // معاون ميداني / إداري
+  | 'auditor';         // مراجع ومدقق جودة (استعراض وتقارير)
+
+export interface RoleDefinition {
+  role: UserRole;
+  title: string;
+  shortLabel: string;
+  badgeClass: string;
+  icon: string;
+  description: string;
+}
+
+export const SYSTEM_ROLES: RoleDefinition[] = [
+  {
+    role: 'super_admin',
+    title: 'المشرف العام (مدير النظام)',
+    shortLabel: 'مدير النظام',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    icon: 'verified_user',
+    description: 'صلاحيات إدارية وفنية كاملة، إدارة المستخدمين، اللجان، الامتحانات، وإعدادات الربط بقواعد البيانات.',
+  },
+  {
+    role: 'committee_head',
+    title: 'رئيس لجنة واختبارات (معلم)',
+    shortLabel: 'رئيس لجنة',
+    badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
+    icon: 'school',
+    description: 'إشراف على لجان مقرأة معينة، اعتماد نماذج الأسئلة، مراجعة وتدقيق الكشوف وتوزيع الطلاب.',
+  },
+  {
+    role: 'teacher',
+    title: 'معلم / عضو هيئة تدريس',
+    shortLabel: 'معلم مقرأة',
+    badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    icon: 'person_raised_hand',
+    description: 'تصحيح الأسئلة، رصد درجات الطلاب، تقييم الحفظ والأداء في اللجان.',
+  },
+  {
+    role: 'assistant',
+    title: 'معاون ميداني / تنفيذي',
+    shortLabel: 'معاون معتمد',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+    icon: 'assignment_ind',
+    description: 'استلام وتجهيز اللجان الميدانية، متابعة حضور الطلاب، ورصد الدرجات الميدانية.',
+  },
+  {
+    role: 'auditor',
+    title: 'مراجع ومدقق جودة (رقابي)',
+    shortLabel: 'مدقق ومراقب',
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-300',
+    icon: 'policy',
+    description: 'صلاحية قراءة ومتابعة شاملة لجميع السجلات، التقارير الإحصائية، وسجلات التدقيق الميداني.',
+  },
+];
+
 export type AssistantStatus = 'pending' | 'approved' | 'rejected';
 
 export type AssistantPermission = string;
 
+export type SystemPermissionId =
+  | 'database_sheets'
+  | 'manage_committees'
+  | 'add_new_committee'
+  | 'exams_pdf'
+  | 'manage_courses'
+  | 'calendar_schedule'
+  | 'progress_stats'
+  | 'manage_assistants';
+
 export interface PermissionDefinition {
-  id: string;
+  id: SystemPermissionId | string;
   label: string;
+  description?: string;
+  icon?: string;
   isCustom?: boolean;
 }
+
+export const SYSTEM_PERMISSIONS: PermissionDefinition[] = [
+  {
+    id: 'database_sheets',
+    label: 'قاعدة البيانات والكشوفات',
+    description: 'فتح واستعراض كشوفات قاعدة البيانات الميدانية والطلاب',
+    icon: 'table_chart',
+  },
+  {
+    id: 'manage_committees',
+    label: 'إدارة اللجان',
+    description: 'متابعة وإدارة لجان الاختبارات الميدانية وسير المراحل',
+    icon: 'groups',
+  },
+  {
+    id: 'add_new_committee',
+    label: 'إضافة لجنة جديدة',
+    description: 'صلاحية إنشاء وإضافة لجان جديدة في المنظومة',
+    icon: 'add_circle',
+  },
+  {
+    id: 'exams_pdf',
+    label: 'الامتحانات ونماذج الـ PDF',
+    description: 'بنك الامتحانات، نماذج الأسئلة، وطباعة وتصدير PDF',
+    icon: 'description',
+  },
+  {
+    id: 'manage_courses',
+    label: 'إضافة الدورات',
+    description: 'إضافة وإدارة الدورات العلمية الصيفية وتحديد الدورة النشطة',
+    icon: 'event_repeat',
+  },
+  {
+    id: 'calendar_schedule',
+    label: 'الجدول وتقويم المواعيد',
+    description: 'تقويم المواعيد وجدول مهام التسليم والاستلام الميداني',
+    icon: 'calendar_month',
+  },
+  {
+    id: 'progress_stats',
+    label: 'حساب ونسبة الإنجاز',
+    description: 'لوحة الإحصائيات الشاملة ونسب إنجاز اللجان',
+    icon: 'donut_large',
+  },
+  {
+    id: 'manage_assistants',
+    label: 'المعاونون والصلاحيات',
+    description: 'مراجعة طلبات الانضمام والتحكم في صلاحيات المستخدمين',
+    icon: 'badge',
+  },
+];
 
 export interface AppUser {
   id: string;
   name: string;
   phone: string;
+  passportNumber?: string; // رقم الجواز أو الهوية
   email: string;
   password?: string;
   role: UserRole;

@@ -424,78 +424,18 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Assistant Duties Card (استلام المعاون للجنة واعتماد جاهزية الامتحان) */}
-          <div className="bg-gradient-to-l from-emerald-50/60 to-teal-50/40 p-4 rounded-xl border border-teal-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-xs text-[#005c55] flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base">badge</span>
-                <span>مهام المعاون الميداني (استلام اللجنة وجاهزية الامتحان):</span>
+          {/* Exam Readiness Info (if approved) */}
+          {committee.examApprovedBy && (
+            <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-blue-700">verified</span>
+                <span>جاهزية وتوزيع الامتحان معتمدة بواسطة: <strong>{committee.examApprovedBy.assistantName}</strong></span>
               </span>
-              <span className="text-[11px] text-[#6e7977]">
-                صلاحيات من المشرف العام
+              <span className="text-[11px] text-blue-700 font-mono">
+                {committee.examApprovedBy.approvedAt}
               </span>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {/* 1. Committee Receipt */}
-              <div className="bg-white p-3 rounded-xl border border-[#bdc9c6]/50 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-[#6e7977] block font-semibold">استلام اللجنة:</span>
-                  {committee.receivedByAssistant ? (
-                    <div>
-                      <span className="font-bold text-emerald-800 text-xs block">
-                        ✓ تم الاستلام: {committee.receivedByAssistant.assistantName}
-                      </span>
-                      <span className="text-[10px] text-emerald-700">
-                        {committee.receivedByAssistant.receivedAt}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 font-medium">لم يتم الاستلام الميداني بعد</span>
-                  )}
-                </div>
-
-                {!committee.receivedByAssistant && onReceiveCommittee && (
-                  <button
-                    type="button"
-                    onClick={() => onReceiveCommittee(committee.id)}
-                    className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
-                  >
-                    تسجيل الاستلام
-                  </button>
-                )}
-              </div>
-
-              {/* 2. Exam Readiness Approval */}
-              <div className="bg-white p-3 rounded-xl border border-[#bdc9c6]/50 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-[#6e7977] block font-semibold">اعتماد جاهزية الامتحان:</span>
-                  {committee.examApprovedBy ? (
-                    <div>
-                      <span className="font-bold text-blue-800 text-xs block">
-                        ✓ معتمد بواسطة: {committee.examApprovedBy.assistantName}
-                      </span>
-                      <span className="text-[10px] text-blue-700">
-                        {committee.examApprovedBy.approvedAt}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 font-medium">بانتظار فحص وتوزيع أوراق الامتحان</span>
-                  )}
-                </div>
-
-                {!committee.examApprovedBy && onApproveExamReadiness && (
-                  <button
-                    type="button"
-                    onClick={() => onApproveExamReadiness(committee.id)}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
-                  >
-                    اعتماد الامتحان
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Section: Stages Progression with Special Scoring & Aggregation Details */}
           <div className="space-y-3">

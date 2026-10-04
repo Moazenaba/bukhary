@@ -20,26 +20,26 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   onDeleteTask,
   onOpenCommitteeDetails,
 }) => {
-  // Current view date (year and month). Default to September / October 2026
-  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 9, 2)); // 2026-10-02 (يوم الجمعة 2 أكتوبر 2026)
-  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-10-02'); // Defaults to الجمعة 10/2 as requested
+  // Current view date (year and month). Defaults to October 2026 (Monday 5 October 2026)
+  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 9, 5));
+  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-10-05');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'mine' | 'deliverables'>('all');
 
   // Quick switcher days
   const quickDates = [
-    { dateStr: '2026-10-02', label: 'الجمعة 10/2 (مواعيد اللجان والتسليمات)', isFriday: true },
-    { dateStr: '2026-10-03', label: 'السبت 10/3', isFriday: false },
-    { dateStr: '2026-10-04', label: 'الأحد 10/4', isFriday: false },
-    { dateStr: '2026-10-05', label: 'الاثنين 10/5', isFriday: false },
+    { dateStr: '2026-10-05', label: 'اليوم (الاثنين 10/5)', isFriday: false },
     { dateStr: '2026-10-06', label: 'الثلاثاء 10/6', isFriday: false },
-    { dateStr: '2026-10-09', label: 'الجمعة 10/9 (القادمة)', isFriday: true },
-    { dateStr: '2026-10-16', label: 'الجمعة 10/16', isFriday: true },
+    { dateStr: '2026-10-07', label: 'الأربعاء 10/7', isFriday: false },
+    { dateStr: '2026-10-08', label: 'الخميس 10/8', isFriday: false },
+    { dateStr: '2026-10-09', label: 'الجمعة 10/9 (التسليمات الكبرى)', isFriday: true },
+    { dateStr: '2026-10-10', label: 'السبت 10/10', isFriday: false },
+    { dateStr: '2026-10-02', label: 'الجمعة السابقة 10/2', isFriday: true },
   ];
 
   // New task form state
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDate, setNewTaskDate] = useState('2026-10-02');
+  const [newTaskDate, setNewTaskDate] = useState('2026-10-05');
   const [newTaskTime, setNewTaskTime] = useState('10:00 ص');
   const [newTaskDeliverable, setNewTaskDeliverable] = useState('');
   const [newTaskCommitteeNumber, setNewTaskCommitteeNumber] = useState<number | ''>('');
@@ -59,9 +59,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     setCurrentDate(new Date(year, month + 1, 1));
   };
   const goToToday = () => {
-    const today = new Date(2026, 9, 2);
+    const today = new Date(2026, 9, 5);
     setCurrentDate(today);
-    setSelectedDateStr('2026-10-02');
+    setSelectedDateStr('2026-10-05');
   };
 
   // Days in month calculation
