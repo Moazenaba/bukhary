@@ -26,6 +26,8 @@ import {
 import { INITIAL_USERS } from './data/initialAssistants';
 import { INITIAL_COURSES, INITIAL_SCHEDULE_TASKS } from './data/initialCourses';
 import { calculateCurrentStage, getCurrentFormattedDateTime } from './utils/stageUtils';
+import { SummerCourseRow } from './types/summerCourse';
+import { SereneSanctuaryView } from './components/SereneSanctuaryView';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { TopNavBar } from './components/TopNavBar';
 import { HeroStats } from './components/HeroStats';
@@ -44,6 +46,7 @@ import { ExportModal } from './components/ExportModal';
 import { GoogleSheetsModal } from './components/GoogleSheetsModal';
 import { HomeOverviewView } from './components/HomeOverviewView';
 import { StatisticsView } from './components/StatisticsView';
+import { SummerCourseTrackerView } from './components/SummerCourseTrackerView';
 import { Footer } from './components/Footer';
 
 const STORAGE_KEY_COMMITTEES = 'bukhari_competition_committees_v2';
@@ -65,9 +68,32 @@ const DEFAULT_SYSTEM_PERMISSIONS: PermissionDefinition[] = [
 ];
 
 export default function App() {
-  // Main view tab (Sidebar tabs)
-  const [activeTab, setActiveTab] = useState<NavTab>('committees');
+  // Main view tab (Sidebar tabs) - default is Serene Sanctuary screen
+  const [activeTab, setActiveTab] = useState<NavTab>('sanctuary');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('bukhari_sidebar_desktop_open');
+      if (saved !== null) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return true;
+  });
+
+  const handleToggleSidebar = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileSidebarOpen((prev) => !prev);
+    } else {
+      setIsSidebarOpen((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem('bukhari_sidebar_desktop_open', JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+    }
+  };
 
   // Committees state with persistent LocalStorage
   const [committees, setCommittees] = useState<Committee[]>(() => {
@@ -280,11 +306,12 @@ export default function App() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'committeeNumber' | 'book'>('newest');
   const [assistantOnlyFilter, setAssistantOnlyFilter] = useState(false);
   const [needsScoringFilter, setNeedsScoringFilter] = useState(false);
+  const [genderFilter, setGenderFilter] = useState<'all' | 'men' | 'women'>('all');
 
   // Enforce role-based tab restriction so assistant only accesses allowed pages
   useEffect(() => {
     if (currentUser.role === 'assistant') {
-      const allowedTabs: NavTab[] = ['home', 'committees'];
+      const allowedTabs: NavTab[] = ['sanctuary', 'summer_course', 'home', 'committees'];
       if (currentUser.permissions.includes('manage_exams')) {
         allowedTabs.push('exams');
       }
@@ -322,6 +349,11 @@ export default function App() {
           committees: currentList.map((c) => ({
             number: c.committeeNumber,
             name: c.committeeName,
+            type: c.isWomenCommittee ? 'لجنة نسائية' : '-',
+            sheikhName: c.sheikhName || '',
+            sheikhPhone: c.sheikhPhone || '',
+            sheikhCountry: c.sheikhCountry || '',
+            studentsCount: c.studentsCount || 0,
             book: c.competitionBook,
             branch: c.branch,
             association: c.associationName || '',
@@ -379,11 +411,89 @@ export default function App() {
   // Save changes from CommitteeDetailModal
   const handleSaveCommittee = (updated: Committee) => {
     setCommittees((prev) => {
-      const newList = prev.map((c) => (c.id === updated.id ? updated : c));
+      const exists = prev.some((c) => c.id === updated.id);
+      const newList = exists
+        ? prev.map((c) => (c.id === updated.id ? updated : c))
+        : [updated, ...prev];
       triggerGoogleSheetsSync(newList);
       return newList;
     });
     setSelectedCommitteeForDetails(updated);
+  };
+
+  // Open full committee details from summer course tracker row (seamless DB sync)
+  const handleOpenRowDetails = (row: SummerCourseRow) => {
+    // 1. Check if committee already exists in committees by ID or committeeNumber
+    let matched = committees.find(
+      (c) => (row.committeeId && c.id === row.committeeId) || c.committeeNumber === row.number
+    );
+
+    if (!matched) {
+      // Create and persist the linked committee into database / state so it's fully linked!
+      const activeCourse = courses.find((crs) => crs.status === 'active') || courses[0];
+      const newComm: Committee = {
+        id: row.committeeId || `comm-row-${row.id}`,
+        committeeNumber: row.number,
+        committeeName: row.sheikh_name ? `لجنة ${row.sheikh_name}` : `لجنة #${row.number}`,
+        sheikhName: row.sheikh_name || '',
+        sheikhPhone: '',
+        sheikhCountry: 'مصر',
+        studentsCount: row.students_count || 0,
+        branch: row.place || 'مسجد الإمام البخاري',
+        competitionBook: row.book || '',
+        courseId: activeCourse?.id || 'course-summer-1448',
+        members: ['المشرف العام'],
+        generalNotes: row.notes || '',
+        stages: {
+          registration: { completed: true, completedAt: getCurrentFormattedDateTime().split(' - ')[0] },
+          exam: { completed: row.delivered },
+          scoring: { completed: row.corrected },
+          aggregation: { completed: false },
+          review: { completed: row.reviewed },
+          sheet: { completed: false },
+          accreditation: { completed: false },
+          announcement: { completed: row.announced },
+          ceremony: { completed: row.ceremony },
+        },
+        createdDate: getCurrentFormattedDateTime().split(' - ')[0],
+        createdAtTime: getCurrentFormattedDateTime().split(' - ')[1] || '',
+      };
+
+      handleAddCommittee(newComm, row.book);
+      matched = newComm;
+    } else {
+      // Sync any updated fields like studentsCount or stages or sheikhName if modified in row
+      let needsSync = false;
+      const updatedComm: Committee = { ...matched };
+
+      if (row.students_count !== undefined && matched.studentsCount !== row.students_count) {
+        updatedComm.studentsCount = row.students_count;
+        needsSync = true;
+      }
+      if (row.sheikh_name && matched.sheikhName !== row.sheikh_name) {
+        updatedComm.sheikhName = row.sheikh_name;
+        needsSync = true;
+      }
+      if (row.book && matched.competitionBook !== row.book) {
+        updatedComm.competitionBook = row.book;
+        needsSync = true;
+      }
+      if (row.place && matched.branch !== row.place) {
+        updatedComm.branch = row.place;
+        needsSync = true;
+      }
+      if (row.notes && matched.generalNotes !== row.notes) {
+        updatedComm.generalNotes = row.notes;
+        needsSync = true;
+      }
+
+      if (needsSync) {
+        handleSaveCommittee(updatedComm);
+        matched = updatedComm;
+      }
+    }
+
+    setSelectedCommitteeForDetails(matched);
   };
 
   // Add new committee
@@ -825,19 +935,28 @@ export default function App() {
       });
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (c) =>
-          String(c.committeeNumber).includes(q) ||
-          c.committeeName.toLowerCase().includes(q) ||
-          c.competitionBook.toLowerCase().includes(q) ||
-          c.branch.toLowerCase().includes(q) ||
-          (c.associationName && c.associationName.toLowerCase().includes(q)) ||
-          c.members.some((m) => m.toLowerCase().includes(q)) ||
-          (c.generalNotes && c.generalNotes.toLowerCase().includes(q))
-      );
-    }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        list = list.filter(
+          (c) =>
+            String(c.committeeNumber).includes(q) ||
+            c.committeeName.toLowerCase().includes(q) ||
+            c.competitionBook.toLowerCase().includes(q) ||
+            c.branch.toLowerCase().includes(q) ||
+            (c.associationName && c.associationName.toLowerCase().includes(q)) ||
+            c.members.some((m) => m.toLowerCase().includes(q)) ||
+            (c.sheikhName && c.sheikhName.toLowerCase().includes(q)) ||
+            (c.sheikhPhone && c.sheikhPhone.toLowerCase().includes(q)) ||
+            (c.sheikhCountry && c.sheikhCountry.toLowerCase().includes(q)) ||
+            (c.generalNotes && c.generalNotes.toLowerCase().includes(q))
+        );
+      }
+
+      if (genderFilter === 'women') {
+        list = list.filter((c) => c.isWomenCommittee);
+      } else if (genderFilter === 'men') {
+        list = list.filter((c) => !c.isWomenCommittee);
+      }
 
     if (selectedCourseFilter !== 'all') {
       list = list.filter(
@@ -893,6 +1012,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         isOpenMobile={isMobileSidebarOpen}
         setIsOpenMobile={setIsMobileSidebarOpen}
+        isOpenDesktop={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
         committeesCount={committees.length}
         examsCount={exams.length}
         coursesCount={courses.length}
@@ -905,7 +1026,7 @@ export default function App() {
       />
 
       {/* 2. Main Content Canvas */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden transition-all duration-300">
         {/* Top Header */}
         <TopNavBar
           currentUser={currentUser}
@@ -925,11 +1046,38 @@ export default function App() {
             }
           }}
           onMarkNotificationsAsRead={handleMarkNotificationsAsRead}
-          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          onToggleSidebar={handleToggleSidebar}
+          isSidebarOpen={isSidebarOpen}
+          onSignOut={() => setActiveTab('sanctuary')}
         />
 
         {/* Tab Views */}
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {activeTab === 'sanctuary' && (
+            <SereneSanctuaryView
+              currentUser={currentUser}
+              users={users}
+              onLoginSuccess={(user) => {
+                setCurrentUser(user);
+                setActiveTab('summer_course');
+              }}
+              onNavigateSummerCourse={() => setActiveTab('summer_course')}
+              onRegisterNewAssistant={(d) =>
+                handleRegisterAssistant(d.name, d.phone, d.email, d.notes)
+              }
+            />
+          )}
+
+          {activeTab === 'summer_course' && (
+            <SummerCourseTrackerView
+              committees={committees}
+              onToggleCommitteeStage={handleQuickToggleStage}
+              onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
+              onNavigateToCommittees={() => setActiveTab('committees')}
+              onOpenCommitteeDetails={handleOpenRowDetails}
+            />
+          )}
+
           {activeTab === 'home' && (
             <HomeOverviewView
               committees={committees}
@@ -1091,6 +1239,11 @@ export default function App() {
                 selectedCourseId={selectedCourseFilter}
                 setSelectedCourseId={(id) => {
                   setSelectedCourseFilter(id);
+                  setCurrentPage(1);
+                }}
+                genderFilter={genderFilter}
+                setGenderFilter={(g) => {
+                  setGenderFilter(g);
                   setCurrentPage(1);
                 }}
               />

@@ -38,6 +38,12 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
   const [courseId, setCourseId] = useState<string>(
     committee.courseId || courses.find((c) => c.status === 'active')?.id || 'course-summer-1447'
   );
+  // البيانات الجديدة
+  const [isWomenCommittee, setIsWomenCommittee] = useState<boolean>(committee.isWomenCommittee || false);
+  const [sheikhName, setSheikhName] = useState<string>(committee.sheikhName || '');
+  const [sheikhPhone, setSheikhPhone] = useState<string>(committee.sheikhPhone || '');
+  const [sheikhCountry, setSheikhCountry] = useState<string>(committee.sheikhCountry || '');
+  const [studentsCount, setStudentsCount] = useState<number | ''>(committee.studentsCount ?? '');
   const [isSavedToast, setIsSavedToast] = useState(false);
 
   // Scoring state
@@ -153,6 +159,11 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
       generalNotes,
       courseId,
       courseName: selCourse?.name || committee.courseName || 'دورة الصيف 1447هـ',
+      sheikhName: sheikhName.trim() || undefined,
+      sheikhPhone: sheikhPhone.trim() || undefined,
+      sheikhCountry: sheikhCountry.trim() || undefined,
+      studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
+      isWomenCommittee,
       stages: updatedStages,
       scoringDetails,
       aggregationDetails,
@@ -255,6 +266,11 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
       generalNotes,
       courseId,
       courseName: selCourse?.name || committee.courseName || 'دورة الصيف 1447هـ',
+      sheikhName: sheikhName.trim() || undefined,
+      sheikhPhone: sheikhPhone.trim() || undefined,
+      sheikhCountry: sheikhCountry.trim() || undefined,
+      studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
+      isWomenCommittee,
       stages,
       scoringDetails,
       aggregationDetails,
@@ -286,6 +302,18 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                 >
                   {currentStatus.emoji} {currentStatus.label}
                 </span>
+
+                {isWomenCommittee && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                    🧕 لجنة نسائية
+                  </span>
+                )}
+
+                {studentsCount !== '' && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-800 border border-blue-200 font-mono">
+                    👥 {studentsCount} {isWomenCommittee ? 'طالبة' : 'طالباً'}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[#3e4947] mt-0.5">
                 {committee.competitionBook} • {committee.branch}
@@ -339,6 +367,57 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                 </span>
               )}
             </div>
+
+            {/* عدد الطلاب باللجنة */}
+            <div>
+              <span className="text-[#6e7977] block font-semibold mb-0.5">عدد الطلاب باللجنة:</span>
+              <span className="font-bold font-mono text-[#0d1c2e]">
+                {studentsCount ? `${studentsCount} ${isWomenCommittee ? 'طالبة' : 'طالباً'}` : 'غير محدد'}
+              </span>
+            </div>
+
+            {/* تصنيف اللجنة في حال كانت نسائية فقط */}
+            {isWomenCommittee && (
+              <div>
+                <span className="text-[#6e7977] block font-semibold mb-0.5">التصنيف:</span>
+                <span className="font-bold text-rose-700 inline-flex items-center gap-1">
+                  <span>🧕</span>
+                  <span>لجنة نسائية</span>
+                </span>
+              </div>
+            )}
+
+            {/* بيانات الشيخ المرسل إليه */}
+            <div>
+              <span className="text-[#6e7977] block font-semibold mb-0.5">الشيخ المرسل إليه:</span>
+              <span className="font-bold text-[#005c55]">
+                {sheikhName || 'لم يُحدد'}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[#6e7977] block font-semibold mb-0.5">رقم هاتف الشيخ:</span>
+              {sheikhPhone ? (
+                <a
+                  href={`tel:${sheikhPhone}`}
+                  className="font-bold font-mono text-[#005c55] hover:underline inline-flex items-center gap-1"
+                  dir="ltr"
+                >
+                  <span>📞</span>
+                  <span>{sheikhPhone}</span>
+                </a>
+              ) : (
+                <span className="text-gray-400">غير مسجل</span>
+              )}
+            </div>
+
+            <div>
+              <span className="text-[#6e7977] block font-semibold mb-0.5">البلد التي منها الشيخ:</span>
+              <span className="font-bold text-[#0d1c2e]">
+                {sheikhCountry || 'غير محدد'}
+              </span>
+            </div>
+
             <div className="sm:col-span-3 pt-2 border-t border-[#bdc9c6]/20">
               <span className="text-[#6e7977] font-semibold">أعضاء اللجنة: </span>
               <span className="font-bold text-[#0d1c2e]">{committee.members.join(' — ')}</span>
@@ -936,6 +1015,93 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
             </div>
           </div>
 
+          {/* Section: Sheikh, Students & Committee Type Edit */}
+          {currentUser?.role === 'super_admin' && (
+            <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">person_pin</span>
+                  <span>تعديل بيانات الشيخ المرسل إليه، عدد الطلاب، ونوع اللجنة:</span>
+                </span>
+                <span className="text-[11px] text-[#6e7977]">
+                  (اضغط حفظ بالأسفل لاعتماد التعديلات)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                    عدد الطلاب في اللجنة
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={studentsCount}
+                    onChange={(e) =>
+                      setStudentsCount(e.target.value === '' ? '' : parseInt(e.target.value) || 0)
+                    }
+                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                  />
+                </div>
+
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg border border-[#bdc9c6] bg-white hover:bg-gray-50 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isWomenCommittee}
+                      onChange={(e) => setIsWomenCommittee(e.target.checked)}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 accent-rose-700 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-[#0d1c2e] flex items-center gap-1">
+                      <span>🧕</span>
+                      <span>لجنة نسائية (اختياري)</span>
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                    اسم الشيخ المرسل إليه
+                  </label>
+                  <input
+                    type="text"
+                    value={sheikhName}
+                    onChange={(e) => setSheikhName(e.target.value)}
+                    placeholder=""
+                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#005c55]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                    رقم هاتف الشيخ
+                  </label>
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={sheikhPhone}
+                    onChange={(e) => setSheikhPhone(e.target.value)}
+                    placeholder=""
+                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:border-[#005c55] text-right"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                    البلد التي منها الشيخ
+                  </label>
+                  <input
+                    type="text"
+                    value={sheikhCountry}
+                    onChange={(e) => setSheikhCountry(e.target.value)}
+                    placeholder=""
+                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#005c55]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Section: General Notes for the Committee */}
           <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 space-y-2">
             <div className="flex items-center justify-between">
@@ -950,7 +1116,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
               rows={3}
               value={generalNotes}
               onChange={(e) => setGeneralNotes(e.target.value)}
-              placeholder="اكتب أي ملاحظات أو تنبيهات أو قرارات خاصة بهذه اللجنة..."
+              placeholder=""
               className="w-full bg-white border border-[#bdc9c6] rounded-xl p-3 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] leading-relaxed"
             />
           </div>

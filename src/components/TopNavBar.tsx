@@ -10,9 +10,11 @@ interface TopNavBarProps {
   onMarkNotificationsAsRead: () => void;
   onOpenSheetsSync: () => void;
   sheetsSyncStatus: { isConnected: boolean; lastSynced?: string };
-  onToggleMobileSidebar: () => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen?: boolean;
   currentUser: AppUser;
   onOpenAuthModal: () => void;
+  onSignOut?: () => void;
 }
 
 export const TopNavBar: React.FC<TopNavBarProps> = ({
@@ -23,9 +25,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onMarkNotificationsAsRead,
   onOpenSheetsSync,
   sheetsSyncStatus,
-  onToggleMobileSidebar,
+  onToggleSidebar,
+  isSidebarOpen = true,
   currentUser,
   onOpenAuthModal,
+  onSignOut,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -33,14 +37,20 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   return (
     <header className="bg-white border-b border-[#bdc9c6]/50 shadow-xs sticky top-0 z-30">
       <div className="w-full px-4 sm:px-6 py-2.5 flex items-center justify-between mx-auto">
-        {/* Right: Hamburger button for mobile + Title */}
+        {/* Right: Toggle button for sidebar (desktop & mobile) + Title */}
         <div className="flex items-center gap-3">
           <button
-            onClick={onToggleMobileSidebar}
-            className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] lg:hidden cursor-pointer"
+            onClick={onToggleSidebar}
+            className="p-2 sm:px-3 rounded-xl text-[#005c55] bg-[#005c55]/10 hover:bg-[#005c55]/20 cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
+            title={isSidebarOpen ? "إغلاق القائمة الجانبية (Slide bar)" : "فتح القائمة الجانبية (Slide bar)"}
             aria-label="القائمة الجانبية"
           >
-            <span className="material-symbols-outlined text-2xl">menu</span>
+            <span className="material-symbols-outlined text-2xl">
+              {isSidebarOpen ? "menu_open" : "menu"}
+            </span>
+            <span className="hidden sm:inline text-xs font-bold">
+              {isSidebarOpen ? "إغلاق القائمة" : "فتح القائمة"}
+            </span>
           </button>
 
           <div className="flex items-center gap-3">
@@ -48,11 +58,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               <span className="material-symbols-outlined text-xl">mosque</span>
             </div>
             <div>
-              <span className="text-[17px] sm:text-[19px] font-bold text-[#005c55] block leading-tight">
-                مسابقات مسجد البخاري
+              <span className="text-[16px] sm:text-[18px] font-extrabold text-[#005c55] block leading-tight">
+                مسجد الإمام البخاري 1448هـ / 2026م
               </span>
-              <span className="text-[11px] text-[#6e7977] block font-medium">
-                متون العقيدة والتوحيد والكتب الشرعية
+              <span className="text-[11px] text-[#0f766e] block font-bold">
+                متابعة الدورة العلمية الصيفية - المتون العلمية
               </span>
             </div>
           </div>
@@ -79,6 +89,18 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             </div>
             <span className="material-symbols-outlined text-xs text-[#6e7977]">expand_more</span>
           </button>
+
+          {/* Sign Out Button */}
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-600 hover:text-rose-700 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+              title="تسجيل الخروج والعودة لصفحة الدخول"
+            >
+              <span className="material-symbols-outlined text-sm text-rose-600">logout</span>
+              <span className="hidden md:inline">خروج</span>
+            </button>
+          )}
 
           {/* Google Sheets Link Button (Admin only) */}
           {currentUser.role === 'super_admin' && (

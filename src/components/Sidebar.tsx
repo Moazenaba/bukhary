@@ -1,13 +1,15 @@
 import React from 'react';
 import { AppUser } from '../types';
 
-export type NavTab = 'home' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats';
+export type NavTab = 'sanctuary' | 'summer_course' | 'home' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats';
 
 interface SidebarProps {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   isOpenMobile: boolean;
   setIsOpenMobile: (open: boolean) => void;
+  isOpenDesktop?: boolean;
+  onToggleSidebar?: () => void;
   committeesCount: number;
   examsCount: number;
   coursesCount?: number;
@@ -24,6 +26,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   isOpenMobile,
   setIsOpenMobile,
+  isOpenDesktop = true,
+  onToggleSidebar = () => {},
   committeesCount,
   examsCount,
   coursesCount = 0,
@@ -38,6 +42,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const hasExamsPermission = isSuperAdmin || currentUser.permissions.includes('manage_exams');
 
   const navItems = [
+    {
+      id: 'sanctuary' as NavTab,
+      label: 'تسجيل الدخول للنظام',
+      icon: 'lock',
+      badge: 'بوابة الدخول',
+      highlight: true,
+      visible: true,
+    },
+    {
+      id: 'summer_course' as NavTab,
+      label: 'قاعدة البيانات والكشوفات',
+      icon: 'table_chart',
+      badge: 'الكشوفات',
+      highlight: true,
+      visible: true,
+    },
     {
       id: 'home' as NavTab,
       label: 'الرئيسية',
@@ -106,32 +126,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
+      {/* Floating Toggle Button when Desktop Sidebar is closed */}
+      {!isOpenDesktop && (
+        <button
+          onClick={onToggleSidebar}
+          className="hidden lg:flex fixed top-20 right-0 z-40 items-center gap-2 px-3 py-2.5 bg-[#005c55] hover:bg-[#04332e] text-white rounded-l-xl shadow-2xl transition-all hover:pr-4 cursor-pointer font-bold text-xs border border-white/20 active:scale-95 animate-fadeIn"
+          title="فتح القائمة الجانبية (Slide bar)"
+        >
+          <span className="material-symbols-outlined text-lg">menu_open</span>
+          <span>القائمة الجانبية</span>
+        </button>
+      )}
+
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:sticky top-0 right-0 h-screen w-64 sm:w-72 bg-white border-l border-[#bdc9c6]/40 flex flex-col z-50 transition-transform duration-200 ease-in-out text-right ${
-          isOpenMobile ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+        className={`fixed lg:sticky top-0 right-0 h-screen bg-white border-l border-[#bdc9c6]/40 flex flex-col z-50 transition-all duration-300 ease-in-out text-right shadow-lg lg:shadow-none ${
+          isOpenDesktop
+            ? 'lg:w-64 sm:lg:w-72 lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto'
+            : 'lg:w-0 lg:overflow-hidden lg:border-none lg:opacity-0 lg:pointer-events-none'
+        } ${
+          isOpenMobile
+            ? 'translate-x-0 w-64 sm:w-72 opacity-100 pointer-events-auto'
+            : 'max-lg:translate-x-full max-lg:pointer-events-none'
         }`}
       >
         {/* Brand Header */}
-        <div className="p-5 border-b border-[#bdc9c6]/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+        <div className="p-4 sm:p-5 border-b border-[#bdc9c6]/30 flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs shrink-0">
               <span className="material-symbols-outlined text-2xl">mosque</span>
             </div>
-            <div>
-              <h1 className="font-bold text-base text-[#005c55] leading-tight">
+            <div className="overflow-hidden">
+              <h1 className="font-bold text-base text-[#005c55] leading-tight truncate">
                 مسجد البخاري
               </h1>
-              <p className="text-[11px] text-[#6e7977] font-medium">
+              <p className="text-[11px] text-[#6e7977] font-medium truncate">
                 مسابقات متون العقيدة والتوحيد
               </p>
             </div>
           </div>
 
-          {/* Close button on mobile */}
+          {/* Close button on desktop and mobile */}
           <button
-            onClick={() => setIsOpenMobile(false)}
-            className="p-1 rounded-lg text-gray-400 hover:text-gray-700 lg:hidden"
+            onClick={onToggleSidebar}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            title="إغلاق القائمة الجانبية"
+            aria-label="إغلاق القائمة الجانبية"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>

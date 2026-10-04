@@ -160,6 +160,14 @@ export interface Committee {
   generalNotes: string;          // ملاحظات نصية حرة عامة خاصة باللجنة
   courseId?: string;             // الدورة التابعة لها
   courseName?: string;           // اسم الدورة (مثال: دورة الصيف، دورة الشتاء)
+  
+  // البيانات الجديدة للشيخ واللجنة والطلاب
+  sheikhName?: string;           // اسم الشيخ المرسل إليه
+  sheikhPhone?: string;          // رقم هاتف الشيخ
+  sheikhCountry?: string;        // البلد التي منها الشيخ
+  studentsCount?: number;        // عدد الطلاب في اللجنة
+  isWomenCommittee?: boolean;    // اختيار لجنة نسائية أو لا (true: نسائية / false: رجال)
+
   stages: Record<StageKey, CommitteeStageRecord>;
   scoringDetails?: ScoringStageDetails;          // تفاصيل وحالة تصحيح الأسئلة
   aggregationDetails?: AggregationStageDetails;  // تفاصيل تجميع الدرجات

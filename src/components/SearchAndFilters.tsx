@@ -12,6 +12,8 @@ interface SearchAndFiltersProps {
   courses?: Course[];
   selectedCourseId?: string | 'all';
   setSelectedCourseId?: (id: string | 'all') => void;
+  genderFilter?: 'all' | 'men' | 'women';
+  setGenderFilter?: (g: 'all' | 'men' | 'women') => void;
 }
 
 export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
@@ -25,6 +27,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   courses = [],
   selectedCourseId = 'all',
   setSelectedCourseId,
+  genderFilter = 'all',
+  setGenderFilter,
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -80,8 +84,28 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             </div>
           </div>
 
-          {/* Controls: Course Filter & Sort Controls */}
+          {/* Controls: Women Filter, Course Filter & Sort Controls */}
           <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
+            {/* Optional Women-Only Committees Filter Toggle */}
+            {setGenderFilter && (
+              <button
+                type="button"
+                onClick={() => setGenderFilter(genderFilter === 'women' ? 'all' : 'women')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  genderFilter === 'women'
+                    ? 'bg-rose-700 text-white border-rose-700 shadow-xs ring-2 ring-rose-200'
+                    : 'bg-white border-[#bdc9c6]/70 text-[#3e4947] hover:bg-rose-50 hover:border-rose-300'
+                }`}
+                title={genderFilter === 'women' ? 'إلغاء التصفية وعرض كافة اللجان' : 'تصفية اللجان النسائية فقط'}
+              >
+                <span>🧕</span>
+                <span>اللجان النسائية</span>
+                {genderFilter === 'women' && (
+                  <span className="text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-mono">مفعل ✓</span>
+                )}
+              </button>
+            )}
+
             {/* Course Filter Dropdown */}
             {courses.length > 0 && setSelectedCourseId && (
               <div className="flex items-center gap-1.5 bg-[#f8f9ff] border border-[#bdc9c6]/70 rounded-xl px-2.5 py-1.5">

@@ -37,6 +37,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   const [competitionBook, setCompetitionBook] = useState('');
   const [generalNotes, setGeneralNotes] = useState('');
 
+  // البيانات الجديدة المطلوبة
+  const [isWomenCommittee, setIsWomenCommittee] = useState<boolean>(false);
+  const [sheikhName, setSheikhName] = useState<string>('');
+  const [sheikhPhone, setSheikhPhone] = useState<string>('');
+  const [sheikhCountry, setSheikhCountry] = useState<string>('');
+  const [studentsCount, setStudentsCount] = useState<number | ''>(20);
+
   // Inline quick course creation state
   const [isCreatingInline, setIsCreatingInline] = useState(false);
   const [quickCourseName, setQuickCourseName] = useState('');
@@ -204,6 +211,11 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
       createdAtTime: currentFormattedTime.split(' - ')[1] || 'الآن',
       courseId: selectedCourseId || selectedCourse?.id || 'course-summer-1447',
       courseName: courses.find((c) => c.id === selectedCourseId)?.name || selectedCourse?.name || 'دورة الصيف 1447هـ',
+      sheikhName: sheikhName.trim() || undefined,
+      sheikhPhone: sheikhPhone.trim() || undefined,
+      sheikhCountry: sheikhCountry.trim() || undefined,
+      studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
+      isWomenCommittee,
       scoringDetails: {
         scorerName: finalMembers[0] || 'الشيخ المصحح',
         scoringReviewerName: finalMembers[1] || 'الشيخ مراجع التصحيح',
@@ -254,7 +266,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="مثال: لجنة الأصول الثلاثة، أو لجنة قاعة 1"
+                placeholder=""
                 value={committeeName}
                 onChange={(e) => setCommitteeName(e.target.value)}
                 className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
@@ -346,6 +358,156 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
             </div>
           </div>
 
+          {/* عدد الطلاب في اللجنة + خيار لجنة نسائية (اختياري) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gradient-to-l from-slate-50 to-emerald-50/40 rounded-xl border border-[#bdc9c6]/50">
+            {/* عدد الطلاب في اللجنة */}
+            <div>
+              <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
+                عدد الطلاب في اللجنة
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  placeholder=""
+                  value={studentsCount}
+                  onChange={(e) =>
+                    setStudentsCount(e.target.value === '' ? '' : parseInt(e.target.value) || 0)
+                  }
+                  className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                />
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStudentsCount((prev) => Math.max(1, (Number(prev) || 0) - 1))
+                    }
+                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer text-[#0d1c2e]"
+                    title="إنقاص طالب"
+                  >
+                    -1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStudentsCount((prev) => (Number(prev) || 0) + 1)
+                    }
+                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer text-[#0d1c2e]"
+                    title="زيادة طالب"
+                  >
+                    +1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStudentsCount((prev) => (Number(prev) || 0) + 5)
+                    }
+                    className="px-2 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-[11px] font-bold cursor-pointer text-[#005c55]"
+                    title="زيادة 5 طلاب"
+                  >
+                    +5
+                  </button>
+                </div>
+              </div>
+              <span className="text-[10px] text-[#6e7977] mt-1 block">
+                {studentsCount ? `${studentsCount} ${isWomenCommittee ? 'طالبة مسجلة' : 'طالباً مسجلاً'}` : 'لم يُحدد'}
+              </span>
+            </div>
+
+            {/* خيار: لجنة نسائية (اختياري) */}
+            <div className="flex flex-col justify-center">
+              <label className="text-xs font-bold text-[#0d1c2e] mb-1.5 block">
+                تخصيص نسائي (اختياري)
+              </label>
+              <label
+                className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                  isWomenCommittee
+                    ? 'bg-rose-50/80 border-rose-300 ring-2 ring-rose-200'
+                    : 'bg-white border-[#bdc9c6] hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isWomenCommittee}
+                  onChange={(e) => setIsWomenCommittee(e.target.checked)}
+                  className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 accent-rose-700 cursor-pointer"
+                />
+                <div className="flex items-center gap-1.5 select-none">
+                  <span className="text-base">🧕</span>
+                  <div>
+                    <span className="text-xs font-bold text-[#0d1c2e] block leading-tight">
+                      لجنة نسائية
+                    </span>
+                    <span className="text-[10px] text-[#6e7977] block">
+                      (تفعيل في حال كانت اللجنة مخصصة للطالبات / الأخوات)
+                    </span>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* بيانات الشيخ المرسل إليه */}
+          <div className="bg-[#f8f9ff] border border-[#bdc9c6]/60 p-3.5 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">person_pin</span>
+                <span>بيانات الشيخ المرسل إليه:</span>
+              </span>
+              <span className="text-[10px] text-[#6e7977]">
+                (المسؤول عن تسليم واستلام الاختبارات)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* اسم الشيخ المرسل إليه */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  اسم الشيخ المرسل إليه
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder=""
+                    value={sheikhName}
+                    onChange={(e) => setSheikhName(e.target.value)}
+                    className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55]"
+                  />
+                </div>
+              </div>
+
+              {/* رقم هاتف الشيخ */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  رقم هاتف الشيخ
+                </label>
+                <input
+                  type="tel"
+                  dir="ltr"
+                  placeholder=""
+                  value={sheikhPhone}
+                  onChange={(e) => setSheikhPhone(e.target.value)}
+                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] text-right font-mono"
+                />
+              </div>
+
+              {/* البلد التي منها الشيخ */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  البلد التي منها الشيخ
+                </label>
+                <input
+                  type="text"
+                  placeholder=""
+                  value={sheikhCountry}
+                  onChange={(e) => setSheikhCountry(e.target.value)}
+                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55]"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* 2. رقم اللجنة + المرحلة الأولية */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -407,7 +569,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                   </span>
                   <input
                     type="text"
-                    placeholder={`اسم الشيخ / العضو ${idx + 1}`}
+                    placeholder=""
                     value={member}
                     onChange={(e) => handleMemberChange(idx, e.target.value)}
                     className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55]"
@@ -435,7 +597,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="مثال: جمعية مسجد البخاري"
+                placeholder=""
                 value={associationName}
                 onChange={(e) => setAssociationName(e.target.value)}
                 className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
@@ -448,7 +610,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="مثال: فرع الكبار، فرع الناشئة، فرع الطلاب..."
+                placeholder=""
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
                 className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
@@ -470,7 +632,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               <input
                 type="text"
                 list="competition-books-list"
-                placeholder="مثال: مسابقة كتاب الأصول الثلاثة، كتاب التوحيد، القواعد الأربع..."
+                placeholder=""
                 value={competitionBook}
                 onChange={(e) => setCompetitionBook(e.target.value)}
                 className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
@@ -505,7 +667,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
             </label>
             <textarea
               rows={2}
-              placeholder="اكتب أي ملاحظة أو توجيه خاص بهذه اللجنة..."
+              placeholder=""
               value={generalNotes}
               onChange={(e) => setGeneralNotes(e.target.value)}
               className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"

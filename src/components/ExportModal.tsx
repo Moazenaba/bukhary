@@ -22,6 +22,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     const headers = [
       'رقم اللجنة',
       'اسم اللجنة',
+      'التصنيف النسائي',
+      'الشيخ المرسل إليه',
+      'هاتف الشيخ',
+      'بلد الشيخ',
+      'عدد الطلاب',
       'الكتاب المقرر / مسار المسابقة',
       'الفرع',
       'اسم الجمعية',
@@ -44,6 +49,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       return [
         `#${c.committeeNumber}`,
         `"${c.committeeName}"`,
+        `"${c.isWomenCommittee ? 'لجنة نسائية' : '-'}"`,
+        `"${c.sheikhName || '-'}"`,
+        `"${c.sheikhPhone || '-'}"`,
+        `"${c.sheikhCountry || '-'}"`,
+        `"${c.studentsCount || 0}"`,
         `"${c.competitionBook}"`,
         `"${c.branch}"`,
         `"${c.associationName || '-'}"`,
@@ -157,8 +167,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   <tr>
                     <th className="p-2">رقم اللجنة</th>
                     <th className="p-2">اسم اللجنة</th>
+                    <th className="p-2">النوع</th>
+                    <th className="p-2">الشيخ المرسل إليه</th>
+                    <th className="p-2">الطلاب</th>
                     <th className="p-2">الكتاب المقرر</th>
-                    <th className="p-2">الفرع</th>
                     <th className="p-2">الحالة الحالية</th>
                   </tr>
                 </thead>
@@ -169,8 +181,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       <tr key={c.id}>
                         <td className="p-2 font-mono font-bold">#{c.committeeNumber}</td>
                         <td className="p-2 font-semibold">{c.committeeName}</td>
+                        <td className="p-2">
+                          {c.isWomenCommittee ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-100 text-rose-800">
+                              🧕 نسائية
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 font-mono">-</span>
+                          )}
+                        </td>
+                        <td className="p-2 text-xs text-[#005c55] font-semibold truncate max-w-[140px]">
+                          {c.sheikhName || '-'}
+                        </td>
+                        <td className="p-2 font-mono font-bold">{c.studentsCount || 0}</td>
                         <td className="p-2 text-[#005c55]">{c.competitionBook}</td>
-                        <td className="p-2">{c.branch}</td>
                         <td className="p-2 font-bold">{status.emoji} {status.label}</td>
                       </tr>
                     );

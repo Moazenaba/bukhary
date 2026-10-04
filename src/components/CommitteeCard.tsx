@@ -64,20 +64,34 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
             </div>
           </div>
 
-          {/* Current Status Badge */}
-          <span
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-semibold border ${currentStatus.badgeClass}`}
-          >
-            <span>{currentStatus.emoji}</span>
-            <span>{currentStatus.label}</span>
-          </span>
+          {/* Badges: Status & Optional Women Badge */}
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {committee.isWomenCommittee && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                <span>🧕</span>
+                <span>لجنة نسائية</span>
+              </span>
+            )}
+
+            <span
+              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-semibold border ${currentStatus.badgeClass}`}
+            >
+              <span>{currentStatus.emoji}</span>
+              <span>{currentStatus.label}</span>
+            </span>
+          </div>
         </div>
 
-        {/* Book & Track Badge */}
-        <div className="mb-3">
+        {/* Book & Track Badge + Students Count */}
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#eff4ff] text-[#005c55] border border-[#9cf2e8]/60 max-w-full truncate">
             <span className="material-symbols-outlined text-sm">menu_book</span>
             <span className="truncate">{committee.competitionBook}</span>
+          </span>
+
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg font-bold bg-blue-50 text-blue-900 border border-blue-200 font-mono text-[11px]">
+            <span className="material-symbols-outlined text-sm text-blue-700">groups</span>
+            <span>{committee.studentsCount || 0} {committee.isWomenCommittee ? 'طالبة' : 'طالباً'}</span>
           </span>
         </div>
 
@@ -111,6 +125,36 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                 الجمعية:
               </span>
               <span className="font-medium text-[#005c55]">{committee.associationName}</span>
+            </div>
+          )}
+
+          {/* Sheikh Recipient if exists */}
+          {committee.sheikhName && (
+            <div className="flex items-center justify-between pt-1 border-t border-[#bdc9c6]/20">
+              <span className="text-[#3e4947] font-semibold flex items-center gap-1 shrink-0">
+                <span className="material-symbols-outlined text-sm text-[#005c55]">person_pin</span>
+                الشيخ المرسل إليه:
+              </span>
+              <div className="flex items-center gap-1.5 text-left truncate max-w-[200px]">
+                <span className="font-bold text-[#005c55] text-[11px] truncate">
+                  {committee.sheikhName}
+                  {committee.sheikhCountry && (
+                    <span className="text-[#6e7977] font-normal text-[10px] mr-1">
+                      ({committee.sheikhCountry})
+                    </span>
+                  )}
+                </span>
+                {committee.sheikhPhone && (
+                  <a
+                    href={`tel:${committee.sheikhPhone}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
+                    title={`اتصال: ${committee.sheikhPhone}`}
+                  >
+                    📞
+                  </a>
+                )}
+              </div>
             </div>
           )}
 

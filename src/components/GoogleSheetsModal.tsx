@@ -56,18 +56,17 @@ function doPost(e) {
     sheet.clear();
     // Headers
     sheet.appendRow([
-      "رقم اللجنة", "اسم اللجنة", "أعضاء اللجنة", "الفرع", "الجمعية",
-      "الكتاب المقرر", "الحالة الحالية", "وقت التسجيل", "وقت الامتحان",
-      "وقت التصحيح", "وقت التجميع", "وقت كتابة الكشف", "وقت المراجعة",
+      "رقم اللجنة", "اسم اللجنة", "نوع اللجنة", "الشيخ المرسل إليه", "هاتف الشيخ", "بلد الشيخ", "عدد الطلاب",
+      "أعضاء اللجنة", "الفرع", "الجمعية", "الكتاب المقرر", "الحالة الحالية",
+      "وقت التسجيل", "وقت الامتحان", "وقت التصحيح", "وقت التجميع", "وقت كتابة الكشف", "وقت المراجعة",
       "وقت إعلان النتيجة", "وقت الحفل", "الملاحظات العامة"
     ]);
     data.committees.forEach(function(c) {
       sheet.appendRow([
-        c.number, c.name, c.members, c.branch, c.association || "",
-        c.book, c.currentStage, c.tRegistration || "", c.tExam || "",
-        c.tScoring || "", c.tAggregation || "", c.tSheet || "",
-        c.tReview || "", c.tAnnouncement || "", c.tCeremony || "",
-        c.notes || ""
+        c.number, c.name, c.type || "-", c.sheikhName || "", c.sheikhPhone || "", c.sheikhCountry || "", c.studentsCount || 0,
+        c.members, c.branch, c.association || "", c.book, c.currentStage,
+        c.tRegistration || "", c.tExam || "", c.tScoring || "", c.tAggregation || "", c.tSheet || "",
+        c.tReview || "", c.tAnnouncement || "", c.tCeremony || "", c.notes || ""
       ]);
     });
     return ContentService.createTextOutput("SUCCESS").setMimeType(ContentService.MimeType.TEXT);
