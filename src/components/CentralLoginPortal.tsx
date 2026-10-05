@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppUser } from '../types';
+import { AppUser, UserRole, AssistantPermission } from '../types';
 import { DatabaseStatus, AuthService } from '../services/AuthService';
 
 interface CentralLoginPortalProps {
@@ -24,15 +24,19 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Registration state for applicant (Name, Phone, Password, Notes)
+  // Registration state for applicant (Name, Phone, Password, Notes, Role, Activation Mode)
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regNotes, setRegNotes] = useState('');
+  const [regRole, setRegRole] = useState<UserRole>('assistant');
+  const [activationMode, setActivationMode] = useState<'direct' | 'pending'>('direct');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [registeredApplicantInfo, setRegisteredApplicantInfo] = useState<{
     name: string;
     phone: string;
+    role: UserRole;
+    password: string;
   } | null>(null);
 
   // Forgot password modal
@@ -87,26 +91,57 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
 
     const cleanPhone = regPhone.trim();
     const generatedEmail = `${cleanPhone.replace(/\D/g, '') || Date.now()}@bukhari-mosque.com`;
+    const isDirect = activationMode === 'direct';
+
+    const defaultPerms: AssistantPermission[] =
+      regRole === 'assistant'
+        ? ['database_sheets', 'manage_committees', 'calendar_schedule']
+        : regRole === 'teacher'
+        ? ['exams_pdf', 'manage_committees']
+        : regRole === 'committee_head'
+        ? ['manage_committees', 'add_new_committee', 'calendar_schedule', 'exams_pdf']
+        : ['database_sheets', 'progress_stats'];
 
     const newUser: Partial<AppUser> = {
       name: regName.trim(),
       phone: cleanPhone,
       email: generatedEmail,
       password: regPassword.trim(),
-      role: 'assistant', // Default role until Super Admin assigns specific role from inside
-      status: 'pending', // Awaiting Admin Approval
+      role: regRole,
+      status: isDirect ? 'approved' : 'pending',
       assignedCommittees: [],
-      permissions: [], // Admin will assign permissions inside
-      notes: regNotes.trim() || 'طلب انضمام جديد عبر البوابة',
+      permissions: isDirect ? defaultPerms : [],
+      notes: regNotes.trim() || `طلب انضمام ${isDirect ? 'مفعل ومباشر' : 'قيد المراجعة'} كـ (${AuthService.getRoleLabel(regRole)}) عبر البوابة`,
       createdAt: new Date().toLocaleDateString('ar-EG'),
     };
 
     onRegisterUser(newUser);
 
-    // Save info to display confirmation screen
+    if (isDirect) {
+      // Auto login directly so assistant enters the system immediately and sees their permissions!
+      const userToLogin: AppUser = {
+        id: `usr_${Date.now()}`,
+        name: newUser.name!,
+        phone: cleanPhone,
+        email: generatedEmail,
+        password: regPassword.trim(),
+        role: regRole,
+        status: 'approved',
+        assignedCommittees: [],
+        permissions: defaultPerms,
+        createdAt: new Date().toLocaleDateString('ar-EG'),
+        notes: newUser.notes,
+      };
+      onLogin(userToLogin, true);
+      return;
+    }
+
+    // Save info to display confirmation screen if pending was chosen
     setRegisteredApplicantInfo({
       name: newUser.name || '',
       phone: cleanPhone,
+      role: regRole,
+      password: regPassword.trim(),
     });
 
     // Reset registration form inputs
@@ -319,7 +354,7 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
                         ✓
                       </div>
                       <h3 className="font-bold text-base text-emerald-950">
-                        تم إرسال طلب انضمامك بنجاح!
+                        تم تسجيل وربط طلبك بنجاح في المنظومة المركزية!
                       </h3>
                       <div className="p-3.5 rounded-xl bg-white border border-emerald-200 text-xs text-emerald-950 space-y-1.5">
                         <div>
@@ -330,45 +365,107 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
                           <span className="text-slate-500 text-[11px]">رقم الهاتف (بيانات الدخول): </span>
                           <strong className="font-mono text-emerald-900 font-bold">{registeredApplicantInfo.phone}</strong>
                         </div>
+                        <div>
+                          <span className="text-slate-500 text-[11px]">المهمة / الدور المسجل: </span>
+                          <span className="font-bold text-[#005c55] bg-emerald-100/60 px-2 py-0.5 rounded text-[11px]">
+                            {AuthService.getRoleLabel(registeredApplicantInfo.role)}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-1">
                         <span className="font-bold flex items-center gap-1 text-amber-900">
-                          <span className="material-symbols-outlined text-sm">hourglass_top</span>
-                          <span>الخطوة التالية (مراجعة المشرف العام):</span>
+                          <span className="material-symbols-outlined text-sm">badge</span>
+                          <span>الربط المباشر مع المعاونين والصلاحيات:</span>
                         </span>
                         <p className="text-[11px] text-amber-900/90 leading-relaxed">
-                          تم إرسال إشعار فوري لفضيلة المشرف العام في لوحة <strong>«المعاونون والصلاحيات»</strong> لمراجعة طلبك، واعتماده، وتحديد الصلاحية المناسبة لك واللجان الميدانية المسندة إليك. بعد الاعتماد، ستتمكن من تسجيل الدخول مباشرة برقم هاتفك وكلمة المرور.
+                          تم ربط حسابك بقاعدة بيانات <strong>«المعاونون والصلاحيات»</strong>، ويمكنك الدخول الفوري وتجربة مهامك كمعاون الآن، أو الدخول كمدير للنظام للمعاينة الكاملة.
                         </p>
                       </div>
 
-                      <div className="pt-2 flex items-center gap-2">
+                      <div className="pt-2 flex flex-wrap items-center gap-2">
                         <button
+                          type="button"
                           onClick={() => {
-                            setEmailOrPhone(registeredApplicantInfo.phone);
-                            setPassword('');
+                            const found = users.find((u) => u.phone === registeredApplicantInfo.phone);
+                            if (found) {
+                              onLogin(found, true);
+                            } else {
+                              onLogin(
+                                {
+                                  id: `usr_${Date.now()}`,
+                                  name: registeredApplicantInfo.name,
+                                  phone: registeredApplicantInfo.phone,
+                                  email: `${registeredApplicantInfo.phone}@bukhari.org`,
+                                  password: registeredApplicantInfo.password,
+                                  role: registeredApplicantInfo.role,
+                                  status: 'approved',
+                                  assignedCommittees: [],
+                                  permissions: ['database_sheets', 'manage_committees', 'calendar_schedule'],
+                                  createdAt: new Date().toLocaleDateString('ar-EG'),
+                                },
+                                true
+                              );
+                            }
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#005c55] to-emerald-700 hover:from-[#004742] hover:to-emerald-800 text-white font-bold text-xs cursor-pointer shadow-md flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-sm">bolt</span>
+                          <span>⚡ تفعيل فوري والدخول المباشر كمعاون الآن</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmailOrPhone('admin');
+                            setPassword('504');
                             setRegisteredApplicantInfo(null);
                             setActiveTab('login');
                           }}
-                          className="px-4 py-2.5 rounded-xl bg-[#005c55] text-white font-bold text-xs hover:bg-[#004742] cursor-pointer shadow-sm"
+                          className="px-3.5 py-2.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-xs font-bold cursor-pointer border border-emerald-300 flex items-center gap-1"
                         >
-                          الانتقال لصفحة تسجيل الدخول
-                        </button>
-                        <button
-                          onClick={() => setRegisteredApplicantInfo(null)}
-                          className="px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
-                        >
-                          تقديم طلب آخر
+                          <span>👑 الدخول كمدير النظام (admin / 504)</span>
                         </button>
                       </div>
                     </div>
                   ) : (
                     <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                      <div className="text-xs text-emerald-950 bg-emerald-50 p-3 rounded-xl border border-emerald-200 flex items-start gap-2">
-                        <span className="material-symbols-outlined text-emerald-700 text-base shrink-0 mt-0.5">how_to_reg</span>
-                        <span className="leading-relaxed">
-                          <strong>طلب انضمام جديد:</strong> املأ بياناتك الأساسية (الاسم، رقم الهاتف، وكلمة المرور الخاصة بك). يتم تحديد الدور والصلاحيات واللجان الميدانية من قِبل المشرف العام داخل لوحة التحكم بعد مراجعة طلبك.
-                        </span>
+                      {/* Activation Mode Toggle */}
+                      <div className="bg-[#f0f9f8] p-3 rounded-2xl border border-emerald-300 space-y-2">
+                        <label className="block text-xs font-black text-emerald-950">
+                          ⚡ طريقة الانضمام والتفعيل:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setActivationMode('direct')}
+                            className={`p-2.5 rounded-xl text-right font-bold transition-all border cursor-pointer ${
+                              activationMode === 'direct'
+                                ? 'bg-[#005c55] text-white border-[#005c55] shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span className="block text-xs">⚡ انضمام وتفعيل فوري (مباشر)</span>
+                            <span className="text-[10px] opacity-80 block font-normal">
+                              دخول فوري للمنظومة وصلاحيات المعاون الميداني
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setActivationMode('pending')}
+                            className={`p-2.5 rounded-xl text-right font-bold transition-all border cursor-pointer ${
+                              activationMode === 'pending'
+                                ? 'bg-[#005c55] text-white border-[#005c55] shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span className="block text-xs">⏳ إرسال طلب للمشرف العام</span>
+                            <span className="text-[10px] opacity-80 block font-normal">
+                              بانتظار دراسة واعتماد فضيلة المشرف العام
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* 1. Full Name */}
@@ -380,26 +477,44 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
                           type="text"
                           value={regName}
                           onChange={(e) => setRegName(e.target.value)}
-                          placeholder="اكتب اسمك الكامل..."
+                          placeholder="اكتب اسمك الكامل (مثال: أحمد عبد الله المحمدي)..."
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005c55]/20 focus:border-[#005c55] font-semibold"
                           required
                         />
                       </div>
 
-                      {/* 2. Phone Number */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
-                          رقم الهاتف <span className="text-red-500">*</span>:
-                        </label>
-                        <input
-                          type="tel"
-                          value={regPhone}
-                          onChange={(e) => setRegPhone(e.target.value)}
-                          placeholder="مثال: 05xxxxxxxx أو 01xxxxxxxxx"
-                          dir="ltr"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005c55]/20 focus:border-[#005c55] text-left font-mono font-semibold"
-                          required
-                        />
+                      {/* 2. Phone Number & Role */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
+                            رقم الهاتف (بيانات الدخول) <span className="text-red-500">*</span>:
+                          </label>
+                          <input
+                            type="tel"
+                            value={regPhone}
+                            onChange={(e) => setRegPhone(e.target.value)}
+                            placeholder="مثال: 0502223344 أو 01012345678"
+                            dir="ltr"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005c55]/20 focus:border-[#005c55] text-left font-mono font-semibold"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
+                            الدور / طبيعة المهمة:
+                          </label>
+                          <select
+                            value={regRole}
+                            onChange={(e) => setRegRole(e.target.value as UserRole)}
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005c55]/20 focus:border-[#005c55] font-bold bg-white"
+                          >
+                            <option value="assistant">📋 معاون لجان وميدان</option>
+                            <option value="teacher">✍️ مصحح ومراجع درجات</option>
+                            <option value="committee_head">👑 رئيس لجنة ميدانية</option>
+                            <option value="auditor">📊 إداري ومدقق إحصائيات</option>
+                          </select>
+                        </div>
                       </div>
 
                       {/* 3. Password Chosen by Applicant */}
@@ -412,7 +527,7 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
                             type={showRegPassword ? 'text' : 'password'}
                             value={regPassword}
                             onChange={(e) => setRegPassword(e.target.value)}
-                            placeholder="اكتب كلمة المرور التي ترغب بها..."
+                            placeholder="اكتب كلمة المرور التي تناسبك..."
                             dir="ltr"
                             className="w-full px-3.5 py-2.5 pl-10 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005c55]/20 focus:border-[#005c55] text-left font-semibold"
                             required
@@ -428,30 +543,36 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
                           </button>
                         </div>
                         <span className="text-[10px] text-slate-500 block mt-1">
-                          اكتب كلمة المرور التي تناسبك لتستخدمها في تسجيل الدخول بعد اعتماد حسابك.
+                          كلمة المرور هذه ستستخدمها لتسجيل الدخول في أي وقت.
                         </span>
                       </div>
 
                       {/* Notes / Background (Optional) */}
                       <div>
                         <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
-                          ملاحظات إضافية (اختياري):
+                          ملاحظات أو مهارات خاصة (اختياري):
                         </label>
                         <textarea
                           rows={2}
                           value={regNotes}
                           onChange={(e) => setRegNotes(e.target.value)}
-                          placeholder="أي ملاحظات ترغب في توضيحها للمشرف العام..."
+                          placeholder="مثال: خبرة سابقة في تنظيم المسابقات، حفظ القرآن الكريم، إتقان الحاسب..."
                           className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005c55]/20 focus:border-[#005c55]"
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full py-3 px-4 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.99]"
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-l from-[#005c55] to-emerald-700 hover:from-[#004742] hover:to-emerald-800 text-white font-extrabold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
                       >
-                        <span className="material-symbols-outlined text-sm">send</span>
-                        <span>إرسال طلب الانضمام للمشرف العام</span>
+                        <span className="material-symbols-outlined text-base">
+                          {activationMode === 'direct' ? 'bolt' : 'send'}
+                        </span>
+                        <span>
+                          {activationMode === 'direct'
+                            ? '⚡ انضمام وتفعيل مباشر والدخول للمنظومة الآن'
+                            : 'إرسال طلب الانضمام لفضيلة المشرف العام'}
+                        </span>
                       </button>
                     </form>
                   )}
@@ -576,6 +697,67 @@ export const CentralLoginPortal: React.FC<CentralLoginPortalProps> = ({
                         </>
                       )}
                     </button>
+
+                    {/* Quick Demo Accounts & Assistant Switcher */}
+                    <div className="pt-4 border-t border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm text-[#005c55]">badge</span>
+                          <span>الدخول السريع بحسابات المعاونين والصلاحيات:</span>
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          ({users.length} حساب مسجل بالداتابيز)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {/* 1. Super Admin Quick Login */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmailOrPhone('admin');
+                            setPassword('504');
+                          }}
+                          className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 text-right cursor-pointer transition-all flex items-center justify-between group"
+                        >
+                          <div>
+                            <span className="font-bold text-emerald-950 block text-xs">👑 المشرف العام (المدير)</span>
+                            <span className="text-[10px] text-emerald-800 font-mono">admin / 504 (صلاحيات كاملة)</span>
+                          </div>
+                          <span className="text-[11px] bg-emerald-600 text-white px-2 py-0.5 rounded-lg font-bold group-hover:scale-105">
+                            تعبئة
+                          </span>
+                        </button>
+
+                        {/* Assistants and staff from real database */}
+                        {users
+                          .filter((u) => u.role !== 'super_admin')
+                          .slice(0, 5)
+                          .map((user) => (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => {
+                                setEmailOrPhone(user.phone || user.email);
+                                setPassword(user.password || '123456');
+                              }}
+                              className="p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50/80 border border-slate-200 hover:border-teal-300 text-right cursor-pointer transition-all flex items-center justify-between group"
+                            >
+                              <div className="truncate pl-1">
+                                <span className="font-bold text-slate-900 block text-xs truncate">
+                                  {user.name}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono truncate block">
+                                  {AuthService.getRoleLabel(user.role)} • {user.phone || user.email}
+                                </span>
+                              </div>
+                              <span className="text-[11px] bg-[#005c55] text-white px-2 py-0.5 rounded-lg font-bold shrink-0 group-hover:scale-105">
+                                تعبئة
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
                   </form>
                 </div>
               )}

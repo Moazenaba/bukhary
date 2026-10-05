@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppUser } from '../types';
 
-export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts';
+export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts' | 'ceremonies';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -16,6 +16,7 @@ interface SidebarProps {
   calendarTasksCount?: number;
   pendingAssistantsCount?: number;
   todaysTasksCount?: number;
+  ceremoniesCount?: number;
   onOpenNewCommittee: () => void;
   currentUser: AppUser;
 }
@@ -33,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   calendarTasksCount = 0,
   pendingAssistantsCount = 0,
   todaysTasksCount = 0,
+  ceremoniesCount = 0,
   onOpenNewCommittee,
   currentUser,
 }) => {
@@ -82,6 +84,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'المواعيد والتنظيم',
       items: [
+        {
+          id: 'ceremonies',
+          label: 'الحفلات والتكريم',
+          icon: 'celebration',
+          badge: ceremoniesCount > 0 ? `${ceremoniesCount} حفل` : null,
+          highlight: true,
+          visible: true,
+        },
         {
           id: 'calendar',
           label: 'الجدول وتقويم المواعيد',

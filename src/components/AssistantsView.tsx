@@ -177,6 +177,89 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         </div>
       </div>
 
+      {/* Alert Banner for Pending Join Requests from Login Portal */}
+      {pendingUsers.length > 0 && (
+        <div className="bg-gradient-to-l from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-400 p-4 rounded-2xl shadow-sm text-right space-y-3 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-amber-950 font-black text-sm">
+              <span className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-lg">notification_important</span>
+              </span>
+              <div>
+                <span className="block leading-tight">
+                  يوجد ({pendingUsers.length}) طلب انضمام جديد مسجل عبر بوابة الدخول بانتظار الاعتماد وتفعيل الصلاحيات!
+                </span>
+                <span className="text-[11px] text-amber-800 font-normal">
+                  سجل المعاونون بياناتهم وبانتظار اعتماد فضيلتكم للبدء في استلام اللجان الميدانية.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  pendingUsers.forEach((u) => {
+                    onApproveAssistant(
+                      u.id,
+                      ['database_sheets', 'manage_committees', 'calendar_schedule'],
+                      []
+                    );
+                  });
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs cursor-pointer shadow-xs shrink-0 flex items-center gap-1 active:scale-95 transition-all"
+              >
+                <span>✓ اعتماد فوري لجميع الطلبات وتفعيل الصلاحيات</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('pending')}
+                className="px-3 py-2 rounded-xl bg-white border border-amber-300 hover:bg-amber-100/50 text-amber-950 font-bold text-xs cursor-pointer"
+              >
+                عرض في تبويب الطلبات
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+            {pendingUsers.map((pUser) => (
+              <div
+                key={pUser.id}
+                className="bg-white p-3 rounded-xl border border-amber-300 shadow-2xs text-xs flex items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="font-bold text-slate-900 block text-xs">{pUser.name}</span>
+                  <span className="text-[10px] text-slate-500 font-mono block">{pUser.phone}</span>
+                  <span className="text-[10px] text-[#005c55] font-semibold">{pUser.notes}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onApproveAssistant(
+                        pUser.id,
+                        ['database_sheets', 'manage_committees', 'calendar_schedule'],
+                        []
+                      )
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 cursor-pointer shadow-2xs"
+                  >
+                    اعتماد
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRejectAssistant(pUser.id)}
+                    className="px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-[11px] font-bold cursor-pointer"
+                  >
+                    رفض
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stats Cluster */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-xl border border-[#bdc9c6]/40 shadow-xs flex items-center justify-between">

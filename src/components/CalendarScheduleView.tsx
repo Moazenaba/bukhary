@@ -9,6 +9,18 @@ interface CalendarScheduleViewProps {
   onToggleTaskComplete: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
+  onUpdateCommitteeCeremony?: (
+    committeeId: string,
+    ceremonyInfo: {
+      date: string;
+      time: string;
+      place: string;
+      notes?: string;
+      completed: boolean;
+      honoredCount?: number;
+      attendingSheikhs?: string[];
+    }
+  ) => void;
 }
 
 export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
@@ -19,12 +31,27 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   onToggleTaskComplete,
   onDeleteTask,
   onOpenCommitteeDetails,
+  onUpdateCommitteeCeremony,
 }) => {
   // Current view date (year and month). Defaults to October 2026 (Monday 5 October 2026)
   const [currentDate, setCurrentDate] = useState(() => new Date(2026, 9, 5));
   const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-10-05');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'mine' | 'deliverables'>('all');
+
+  // Delivery / Task Mode: manual delivery vs ceremony
+  const [deliveryMode, setDeliveryMode] = useState<'manual' | 'ceremony'>('manual');
+
+  // Ceremony specific states
+  const [ceremonyCommitteeId, setCeremonyCommitteeId] = useState<string>('');
+  const [ceremonyCommitteeNumber, setCeremonyCommitteeNumber] = useState<number | ''>('');
+  const [ceremonyHonoredCount, setCeremonyHonoredCount] = useState<number | ''>(15);
+  const [ceremonySheikhs, setCeremonySheikhs] = useState<string[]>([]);
+  const [ceremonyNewSheikhInput, setCeremonyNewSheikhInput] = useState<string>('');
+  const [ceremonyDate, setCeremonyDate] = useState<string>('2026-10-05');
+  const [ceremonyTime, setCeremonyTime] = useState<string>('4 العصر');
+  const [ceremonyPlace, setCeremonyPlace] = useState<string>('مسجد الإمام البخاري');
+  const [ceremonyNotes, setCeremonyNotes] = useState<string>('');
 
   // Quick switcher days
   const quickDates = [
@@ -169,6 +196,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   const handleOpenAddModal = (dateStr?: string) => {
     const targetDate = dateStr || selectedDateStr;
+    setDeliveryMode('manual');
     setNewTaskDate(targetDate);
     setNewTaskTitle('');
     setNewTaskDeliverable('');
@@ -181,8 +209,94 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     setIsAddModalOpen(true);
   };
 
+  const handleOpenAddCeremonyModal = (dateStr?: string) => {
+    const targetDate = dateStr || selectedDateStr;
+    setDeliveryMode('ceremony');
+    setCeremonyDate(targetDate);
+    const firstComm = committees[0];
+    if (firstComm) {
+      setCeremonyCommitteeId(firstComm.id);
+      setCeremonyCommitteeNumber(firstComm.committeeNumber);
+      setCeremonyHonoredCount(firstComm.ceremonyDetails?.honoredStudentsCount ?? firstComm.studentsCount ?? 15);
+      setCeremonySheikhs(
+        firstComm.ceremonyDetails?.attendingSheikhs?.length
+          ? [...firstComm.ceremonyDetails.attendingSheikhs]
+          : firstComm.sheikhName
+          ? [firstComm.sheikhName]
+          : ['الشيخ المشرف']
+      );
+      setCeremonyPlace(firstComm.ceremonyDetails?.ceremonyPlace || firstComm.branch || 'مسجد الإمام البخاري');
+      setCeremonyTime(firstComm.ceremonyDetails?.ceremonyTime || '4 العصر');
+      setCeremonyNotes(firstComm.ceremonyDetails?.notes || '');
+    }
+    setIsAddModalOpen(true);
+  };
+
+  const handleAddCeremonySheikh = () => {
+    const trimmed = ceremonyNewSheikhInput.trim();
+    if (!trimmed) return;
+    if (!ceremonySheikhs.includes(trimmed)) {
+      setCeremonySheikhs([...ceremonySheikhs, trimmed]);
+    }
+    setCeremonyNewSheikhInput('');
+  };
+
+  const handleRemoveCeremonySheikh = (idx: number) => {
+    setCeremonySheikhs(ceremonySheikhs.filter((_, i) => i !== idx));
+  };
+
   const handleCreateTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (deliveryMode === 'ceremony') {
+      const selectedComm =
+        committees.find(
+          (c) => c.id === ceremonyCommitteeId || c.committeeNumber === Number(ceremonyCommitteeNumber)
+        ) || committees[0];
+
+      const commId = selectedComm?.id || ceremonyCommitteeId || `comm-${Date.now()}`;
+      const commNum =
+        selectedComm?.committeeNumber ||
+        (ceremonyCommitteeNumber !== '' ? Number(ceremonyCommitteeNumber) : 1);
+      const sheikhs =
+        ceremonySheikhs.length > 0
+          ? ceremonySheikhs
+          : selectedComm?.sheikhName
+          ? [selectedComm.sheikhName]
+          : ['الشيخ المشرف'];
+      const count =
+        ceremonyHonoredCount !== '' ? Number(ceremonyHonoredCount) : selectedComm?.studentsCount || 15;
+
+      if (onUpdateCommitteeCeremony && selectedComm) {
+        onUpdateCommitteeCeremony(selectedComm.id, {
+          date: ceremonyDate,
+          time: ceremonyTime.trim() || '4 العصر',
+          place: ceremonyPlace.trim() || selectedComm.branch || 'مسجد الإمام البخاري',
+          notes: ceremonyNotes.trim(),
+          completed: false,
+          honoredCount: count,
+          attendingSheikhs: sheikhs,
+        });
+      }
+
+      onAddTask({
+        title: `🎉 حفل تكريم وتوزيع جوائز: لجنة #${commNum} (${selectedComm?.sheikhName || selectedComm?.committeeName || 'المكرمين'})`,
+        date: ceremonyDate,
+        time: ceremonyTime.trim() || '4 العصر',
+        deliverable: `تجهيز شهادات التكريم لعدد (${count}) طالباً مكرماً + دروع التكريم + حضور المشايخ: (${sheikhs.join('، ')})`,
+        committeeId: commId,
+        committeeNumber: commNum,
+        assignedAssistantName: newTaskAssistantName.trim() || currentUser.name,
+        type: 'ceremony',
+        priority: 'urgent',
+        completed: false,
+        notes: `مكان الحفل: ${ceremonyPlace.trim() || 'مسجد البخاري'}. ${ceremonyNotes.trim() || ''}`,
+      });
+
+      setIsAddModalOpen(false);
+      return;
+    }
+
     if (!newTaskTitle.trim()) return;
 
     let linkedCommId: string | undefined;
@@ -481,14 +595,26 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleOpenAddModal(selectedDateStr)}
-                className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-              >
-                <span className="material-symbols-outlined text-sm">add</span>
-                <span>إضافة تسليم</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddCeremonyModal(selectedDateStr)}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs active:scale-95"
+                  title="إضافة ميعاد حفل تكريم وتوزيع جوائز للجنة في هذا اليوم"
+                >
+                  <span className="text-sm">🎉</span>
+                  <span>إضافة حفلة</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddModal(selectedDateStr)}
+                  className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-sm">add</span>
+                  <span>إضافة تسليم</span>
+                </button>
+              </div>
             </div>
 
             {/* Summary Alert Box for that Day */}
@@ -728,109 +854,335 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               </button>
             </div>
 
+            {/* Delivery / Task Type Selector */}
+            <div className="p-3 bg-slate-50 border-b border-[#bdc9c6]/40 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDeliveryMode('manual')}
+                className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
+                  deliveryMode === 'manual'
+                    ? 'bg-[#005c55] text-white border-[#005c55] shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">inventory_2</span>
+                <span>تسليم يدوي / استلام أوراق ومهام</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeliveryMode('ceremony')}
+                className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
+                  deliveryMode === 'ceremony'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-600 shadow-xs'
+                    : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-50'
+                }`}
+              >
+                <span>🎉</span>
+                <span>إضافة حفل وتكريم لجنة</span>
+              </button>
+            </div>
+
             <form onSubmit={handleCreateTaskSubmit} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
-                  اسم العمل أو المهمة <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="مثال: تسليم أوراق أسئلة لجنة 1، استلام دفاتر التصحيح..."
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
-                  required
-                />
-              </div>
+              {deliveryMode === 'ceremony' ? (
+                /* CEREMONY FORM FIELDS */
+                <div className="space-y-4">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 flex items-start gap-2">
+                    <span className="text-lg">🎉</span>
+                    <p className="text-[11px] leading-relaxed">
+                      <strong>جدولة حفل تكريم:</strong> ستسجل في قاعدة بيانات اللجنة الميدانية وتظهر تلقائياً في شاشة الحفلات والتنبيهات اليومية والتقويم.
+                    </p>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">تاريخ اليوم <span className="text-red-500">*</span></label>
-                  <input
-                    type="date"
-                    value={newTaskDate}
-                    onChange={(e) => setNewTaskDate(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
-                    required
-                  />
+                  {/* Select Committee */}
+                  <div>
+                    <label className="block font-bold text-[#0d1c2e] mb-1">
+                      اللجنة المراد إقامة وتوثيق الحفل لها <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={ceremonyCommitteeId || ceremonyCommitteeNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const found = committees.find(
+                          (c) => c.id === val || c.committeeNumber === Number(val)
+                        );
+                        if (found) {
+                          setCeremonyCommitteeId(found.id);
+                          setCeremonyCommitteeNumber(found.committeeNumber);
+                          setCeremonyHonoredCount(
+                            found.ceremonyDetails?.honoredStudentsCount ?? found.studentsCount ?? 15
+                          );
+                          setCeremonySheikhs(
+                            found.ceremonyDetails?.attendingSheikhs?.length
+                              ? [...found.ceremonyDetails.attendingSheikhs]
+                              : found.sheikhName
+                              ? [found.sheikhName]
+                              : ['الشيخ المشرف']
+                          );
+                          setCeremonyPlace(
+                            found.ceremonyDetails?.ceremonyPlace || found.branch || 'مسجد الإمام البخاري'
+                          );
+                        }
+                      }}
+                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
+                      required
+                    >
+                      {committees.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          لجنة #{c.committeeNumber} - {c.committeeName} ({c.competitionBook}) - الشيخ:{' '}
+                          {c.sheikhName || 'المشرف'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 1. عدد الطلاب الذين سيتم تكريمهم */}
+                  <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-200 space-y-1">
+                    <label className="block font-bold text-[#0d1c2e]">
+                      🏆 عدد الطلاب الذين سيتم تكريمهم (الناجحين فقط) <span className="text-red-500">*</span>:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={ceremonyHonoredCount}
+                      onChange={(e) =>
+                        setCeremonyHonoredCount(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                      placeholder="اكتب عدد الطلاب الذين سيتم تكريمهم..."
+                      className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
+                      required
+                    />
+                    <span className="text-[10px] text-slate-500 block leading-tight">
+                      * يحدد عدد المكرمين يدوياً نظراً لاحتمالية رسوب أو غياب بعض الطلاب وعدم تكريمهم جميعاً.
+                    </span>
+                  </div>
+
+                  {/* 2. موعد الحفل بالتاريخ والوقت (يكتبه بيده) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                        📅 موعد الحفل بالتاريخ <span className="text-red-500">*</span>:
+                      </label>
+                      <input
+                        type="date"
+                        value={ceremonyDate}
+                        onChange={(e) => setCeremonyDate(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-mono font-bold"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                        ⏰ موعد الحفل بالوقت (اكتبه بيدك) <span className="text-red-500">*</span>:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثال: 4 العصر، 4 المغرب، 08:30 م..."
+                        value={ceremonyTime}
+                        onChange={(e) => setCeremonyTime(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. أسماء المشايخ الذين سيحضرون الحفل (إضافة أكثر من شيخ) */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-[#005c55]">person_add</span>
+                        <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
+                      </label>
+                      <span className="text-[11px] font-bold text-slate-500 font-mono">
+                        ({ceremonySheikhs.length}) مشايخ مضافين
+                      </span>
+                    </div>
+
+                    {/* Chips */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {ceremonySheikhs.map((sheikh, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 shadow-2xs"
+                        >
+                          <span>{sheikh}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCeremonySheikh(idx)}
+                            className="w-4 h-4 rounded-full hover:bg-rose-100 hover:text-rose-700 flex items-center justify-center cursor-pointer text-slate-400"
+                            title="حذف الشيخ"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Add new sheikh input + button */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={ceremonyNewSheikhInput}
+                        onChange={(e) => setCeremonyNewSheikhInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCeremonySheikh();
+                          }
+                        }}
+                        placeholder="اكتب اسم الشيخ واضغط إضافة عضو آخر..."
+                        className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCeremonySheikh}
+                        className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        <span>+ إضافة عضو آخر</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4. مكان إقامة الحفل وملاحظات */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">📍 مكان إقامة الحفل:</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: القاعة الكبرى بمسجد البخاري..."
+                        value={ceremonyPlace}
+                        onChange={(e) => setCeremonyPlace(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">📝 ملاحظات وترتيبات:</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: تجهيز أجهزة الصوت والدروع والشهادات..."
+                        value={ceremonyNotes}
+                        onChange={(e) => setCeremonyNotes(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600"
+                      />
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                /* MANUAL DELIVERY FORM FIELDS */
+                <div className="space-y-4">
+                  <div>
+                    <label className="block font-bold text-[#0d1c2e] mb-1">
+                      اسم العمل أو المهمة <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="مثال: تسليم أوراق أسئلة لجنة 1، استلام دفاتر التصحيح..."
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">وقت التسليم أو التنفيذ</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: 09:30 ص، قبل صلاة العصر..."
-                    value={newTaskTime}
-                    onChange={(e) => setNewTaskTime(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                        تاريخ اليوم <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={newTaskDate}
+                        onChange={(e) => setNewTaskDate(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                        وقت التسليم أو التنفيذ
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثال: 09:30 ص، قبل صلاة العصر..."
+                        value={newTaskTime}
+                        onChange={(e) => setNewTaskTime(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-[#0d1c2e] mb-1">
+                      ما يلزم تسليمه أو استلامه بالتحديد ("واللي محتاج أسلمها وكده")
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="مثال: كراسات أسئلة الامتحان، كشوف درجات موقعة، تقرير الغياب، أوراق الإجابة..."
+                      value={newTaskDeliverable}
+                      onChange={(e) => setNewTaskDeliverable(e.target.value)}
+                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">اللجنة المرتبطة</label>
+                      <select
+                        value={newTaskCommitteeNumber}
+                        onChange={(e) =>
+                          setNewTaskCommitteeNumber(e.target.value ? Number(e.target.value) : '')
+                        }
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                      >
+                        <option value="">بدون لجنة (عام)</option>
+                        {committees.map((c) => (
+                          <option key={c.id} value={c.committeeNumber}>
+                            لجنة #{c.committeeNumber} ({c.committeeName})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">الأولوية</label>
+                      <select
+                        value={newTaskPriority}
+                        onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                      >
+                        <option value="urgent">🔴 عاجل وضروري</option>
+                        <option value="high">🟠 مرتفع</option>
+                        <option value="normal">🟢 عادي</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#0d1c2e] mb-1">المكلف / المعاون</label>
+                      <input
+                        type="text"
+                        value={newTaskAssistantName}
+                        onChange={(e) => setNewTaskAssistantName(e.target.value)}
+                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-[#0d1c2e] mb-1">ملاحظات إضافية</label>
+                    <textarea
+                      rows={2}
+                      placeholder="تعليمات القاعة، مكان التسليم، أرقام التواصل..."
+                      value={newTaskNotes}
+                      onChange={(e) => setNewTaskNotes(e.target.value)}
+                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                    />
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
-                  ما يلزم تسليمه أو استلامه بالتحديد ("واللي محتاج أسلمها وكده")
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="مثال: كراسات أسئلة الامتحان، كشوف درجات موقعة، تقرير الغياب، أوراق الإجابة..."
-                  value={newTaskDeliverable}
-                  onChange={(e) => setNewTaskDeliverable(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">اللجنة المرتبطة</label>
-                  <select
-                    value={newTaskCommitteeNumber}
-                    onChange={(e) => setNewTaskCommitteeNumber(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
-                  >
-                    <option value="">بدون لجنة (عام)</option>
-                    {committees.map((c) => (
-                      <option key={c.id} value={c.committeeNumber}>
-                        لجنة #{c.committeeNumber} ({c.committeeName})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">الأولوية</label>
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
-                  >
-                    <option value="urgent">🔴 عاجل وضروري</option>
-                    <option value="high">🟠 مرتفع</option>
-                    <option value="normal">🟢 عادي</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">المكلف / المعاون</label>
-                  <input
-                    type="text"
-                    value={newTaskAssistantName}
-                    onChange={(e) => setNewTaskAssistantName(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">ملاحظات إضافية</label>
-                <textarea
-                  rows={2}
-                  placeholder="تعليمات القاعة، مكان التسليم، أرقام التواصل..."
-                  value={newTaskNotes}
-                  onChange={(e) => setNewTaskNotes(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
-                />
-              </div>
+              )}
 
               <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
                 <button
@@ -842,9 +1194,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold cursor-pointer shadow-xs active:scale-[0.98]"
+                  className={`px-5 py-2 rounded-xl text-white font-bold cursor-pointer shadow-xs active:scale-[0.98] ${
+                    deliveryMode === 'ceremony'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700'
+                      : 'bg-[#005c55] hover:bg-[#1b6b51]'
+                  }`}
                 >
-                  حفظ العمل في التقويم
+                  {deliveryMode === 'ceremony' ? 'حفظ وتثبيت الحفل في المنظومة' : 'حفظ العمل في التقويم'}
                 </button>
               </div>
             </form>

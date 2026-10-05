@@ -46,6 +46,7 @@ import { StatisticsView } from './components/StatisticsView';
 import { SummerCourseTrackerView } from './components/SummerCourseTrackerView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { DailyAlertsView } from './components/DailyAlertsView';
+import { CeremoniesView } from './components/CeremoniesView';
 import { Footer } from './components/Footer';
 import { CentralLoginPortal } from './components/CentralLoginPortal';
 import { useAuth, AuthService } from './services/AuthService';
@@ -261,6 +262,62 @@ export default function App() {
     }
   }, [scheduleTasks]);
 
+  // Auto-complete ceremonies in the database if the ceremony day has passed (< 2026-10-05)
+  useEffect(() => {
+    const todayISO = '2026-10-05';
+
+    // 1. Check if any committee has an uncompleted ceremony whose scheduled date has passed
+    const needsCommitteeUpdate = committees.some((c) => {
+      const task = scheduleTasks.find(
+        (t) => t.type === 'ceremony' && t.committeeNumber === c.committeeNumber
+      );
+      return task && task.date && task.date < todayISO && !c.stages.ceremony?.completed;
+    });
+
+    if (needsCommitteeUpdate) {
+      setCommittees((prev) =>
+        prev.map((c) => {
+          const task = scheduleTasks.find(
+            (t) => t.type === 'ceremony' && t.committeeNumber === c.committeeNumber
+          );
+          if (task && task.date && task.date < todayISO && !c.stages.ceremony?.completed) {
+            return {
+              ...c,
+              stages: {
+                ...c.stages,
+                ceremony: {
+                  completed: true,
+                  completedAt: `${task.date} (تم الحفل تلقائياً لانقضاء موعد الحفل)`,
+                },
+              },
+            };
+          }
+          return c;
+        })
+      );
+    }
+
+    // 2. Check if any ceremony schedule task has passed and is not yet marked completed
+    const needsTaskUpdate = scheduleTasks.some((t) => {
+      return t.type === 'ceremony' && t.date && t.date < todayISO && !t.completed;
+    });
+
+    if (needsTaskUpdate) {
+      setScheduleTasks((prev) =>
+        prev.map((t) => {
+          if (t.type === 'ceremony' && t.date && t.date < todayISO && !t.completed) {
+            return {
+              ...t,
+              completed: true,
+              completedAt: `${t.date} (انقضى موعد الحفل)`,
+            };
+          }
+          return t;
+        })
+      );
+    }
+  }, [committees, scheduleTasks]);
+
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<'all' | StageKey>('all');
@@ -388,6 +445,43 @@ export default function App() {
       return newList;
     });
     setSelectedCommitteeForDetails(updated);
+
+    // Sync ceremony details with schedule tasks if ceremonyDate is set
+    const cDetails = updated.ceremonyDetails;
+    if (cDetails && cDetails.ceremonyDate) {
+      const cDate = cDetails.ceremonyDate;
+      const cTime = cDetails.ceremonyTime || '4 العصر';
+      const cPlace = cDetails.ceremonyPlace || updated.branch || 'مسجد البخاري';
+      const cNotes = cDetails.notes || '';
+      const cCount = cDetails.honoredStudentsCount ?? updated.studentsCount ?? 15;
+      const cSheikhs = cDetails.attendingSheikhs || [];
+
+      setScheduleTasks((prev) => {
+        const existingTaskIndex = prev.findIndex(
+          (t) => t.type === 'ceremony' && t.committeeNumber === updated.committeeNumber
+        );
+        const ceremonyTask: ScheduleTask = {
+          id: existingTaskIndex >= 0 ? prev[existingTaskIndex].id : `task-ceremony-${Date.now()}`,
+          title: `🎉 حفل تكريم وتوزيع جوائز: لجنة #${updated.committeeNumber} (${updated.sheikhName || updated.committeeName})`,
+          date: cDate,
+          time: cTime,
+          type: 'ceremony',
+          priority: 'urgent',
+          committeeNumber: updated.committeeNumber,
+          assignedAssistantName: 'لجنة الاحتفالات والجوائز',
+          deliverable: `تجهيز شهادات التقدير لعدد (${cCount}) طالباً مكرماً + دروع التكريم + حضور المشايخ: (${cSheikhs.join('، ') || 'المشايخ الضيوف'})`,
+          notes: `مكان الحفل: ${cPlace}. ${cNotes}`,
+          completed: updated.stages?.ceremony?.completed || false,
+        };
+
+        if (existingTaskIndex >= 0) {
+          const copy = [...prev];
+          copy[existingTaskIndex] = ceremonyTask;
+          return copy;
+        }
+        return [ceremonyTask, ...prev];
+      });
+    }
   };
 
   // Open full committee details from summer course tracker row (seamless DB sync)
@@ -727,6 +821,63 @@ export default function App() {
     setScheduleTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
 
+  // Update committee ceremony details & sync with database
+  const handleUpdateCommitteeCeremony = (
+    committeeId: string,
+    ceremonyInfo: {
+      date: string;
+      time: string;
+      place: string;
+      notes?: string;
+      completed: boolean;
+      honoredCount?: number;
+      attendingSheikhs?: string[];
+    }
+  ) => {
+    setCommittees((prev) =>
+      prev.map((c) => {
+        if (c.id === committeeId) {
+          return {
+            ...c,
+            associationName: ceremonyInfo.place || c.associationName,
+            ceremonyDetails: {
+              honoredStudentsCount: ceremonyInfo.honoredCount ?? c.ceremonyDetails?.honoredStudentsCount ?? c.studentsCount ?? 15,
+              attendingSheikhs:
+                ceremonyInfo.attendingSheikhs ||
+                c.ceremonyDetails?.attendingSheikhs ||
+                (c.sheikhName ? [c.sheikhName] : ['الشيخ المشرف']),
+              ceremonyDate: ceremonyInfo.date,
+              ceremonyTime: ceremonyInfo.time,
+              ceremonyPlace: ceremonyInfo.place,
+              notes: ceremonyInfo.notes,
+            },
+            stages: {
+              ...c.stages,
+              ceremony: {
+                completed: ceremonyInfo.completed,
+                completedAt: ceremonyInfo.completed
+                  ? `${ceremonyInfo.date} ${ceremonyInfo.time}`
+                  : c.stages.ceremony?.completedAt,
+              },
+            },
+          };
+        }
+        return c;
+      })
+    );
+
+    const comm = committees.find((c) => c.id === committeeId);
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: `🎉 جدولة حفل لجنة #${comm?.committeeNumber || ''}`,
+      description: `تم تحديد موعد حفل التكريم ليوم (${ceremonyInfo.date}) في (${ceremonyInfo.place}) وإدراجه في المهام والتقويم.`,
+      time: 'الآن',
+      type: 'success',
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+  };
+
   // Add assistant direct
   const handleAddAssistantDirect = (newUserData: Omit<AppUser, 'id' | 'createdAt'>) => {
     const newUser = addDirectUser(newUserData);
@@ -765,7 +916,7 @@ export default function App() {
     logout();
   };
 
-  // Register new staff/assistant (pending approval)
+  // Register new staff/assistant (instantly connected to assistants and permissions)
   const handleRegisterAssistant = (
     name: string,
     phone: string,
@@ -773,9 +924,13 @@ export default function App() {
     notes?: string,
     role: any = 'assistant',
     password = '',
-    passportNumber = ''
+    passportNumber = '',
+    status: any = 'approved',
+    permissions?: any[],
+    assignedCommittees?: number[]
   ) => {
-    registerUser({
+    const isApproved = status === 'approved';
+    const created = registerUser({
       name,
       passportNumber,
       phone,
@@ -783,16 +938,22 @@ export default function App() {
       notes,
       role,
       password,
+      status: isApproved ? 'approved' : 'pending',
+      permissions,
+      assignedCommittees,
     });
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: `طلب انضمام جديد: ${name}`,
-      description: `المتقدم (${name} - ${passportNumber ? `جواز: ${passportNumber} - ` : ''}${email}) أتم إرسال طلبه وبانتظار تحديد الدور والصلاحيات في لوحة «المعاونون والصلاحيات».`,
+      title: isApproved ? `انضمام معاون معتمد: ${name}` : `طلب انضمام جديد: ${name}`,
+      description: isApproved
+        ? `المعاون (${name} - ${phone}) تم تسجيله واعتماده فوراً وربطه بقاعدة بيانات المعاونين ومنحه الصلاحيات الميدانية.`
+        : `المتقدم (${name} - ${phone}) أتم إرسال طلبه وبانتظار دراسته واعتماده في لوحة «المعاونون والصلاحيات».`,
       time: 'الآن',
-      type: 'urgent',
+      type: isApproved ? 'success' : 'urgent',
       read: false,
     };
     setNotifications((prev) => [newNotif, ...prev]);
+    return created;
   };
 
   // Assistant: Receive Committee
@@ -968,6 +1129,16 @@ export default function App() {
     return users.filter((u) => u.status === 'pending').length;
   }, [users]);
 
+  // Calculate today's tasks count from real database schedule (Centering on Monday 2026-10-05)
+  const todaysTasksCount = useMemo(() => {
+    const mondayISO = '2026-10-05';
+    const mondayTasks = scheduleTasks.filter((t) => t.date === mondayISO && !t.completed);
+    if (mondayTasks.length > 0) return mondayTasks.length;
+    const realISO = new Date().toISOString().split('T')[0];
+    const direct = scheduleTasks.filter((t) => t.date === realISO && !t.completed);
+    return direct.length;
+  }, [scheduleTasks]);
+
   // Gatekeeper: Unauthenticated users are presented with the Central Enterprise Login Portal
   if (!currentUser) {
     return (
@@ -982,22 +1153,15 @@ export default function App() {
             newUser.notes,
             newUser.role || 'assistant',
             newUser.password || '',
-            newUser.passportNumber || ''
+            newUser.passportNumber || '',
+            newUser.status || 'approved',
+            newUser.permissions,
+            newUser.assignedCommittees
           );
         }}
       />
     );
   }
-
-  // Calculate today's tasks count from real database schedule (Centering on Monday 2026-10-05)
-  const todaysTasksCount = useMemo(() => {
-    const mondayISO = '2026-10-05';
-    const mondayTasks = scheduleTasks.filter((t) => t.date === mondayISO && !t.completed);
-    if (mondayTasks.length > 0) return mondayTasks.length;
-    const realISO = new Date().toISOString().split('T')[0];
-    const direct = scheduleTasks.filter((t) => t.date === realISO && !t.completed);
-    return direct.length;
-  }, [scheduleTasks]);
 
   return (
     <div className="bg-[#f8f9ff] text-[#0d1c2e] min-h-screen flex font-['IBM_Plex_Sans_Arabic'] text-right selection:bg-[#9cf2e8] selection:text-[#00201d]">
@@ -1015,6 +1179,7 @@ export default function App() {
         calendarTasksCount={scheduleTasks.filter((t) => !t.completed).length}
         pendingAssistantsCount={pendingAssistantsCount}
         todaysTasksCount={todaysTasksCount}
+        ceremoniesCount={committees.filter((c) => c.stages.ceremony?.completed).length}
         onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
         currentUser={currentUser}
       />
@@ -1068,8 +1233,18 @@ export default function App() {
           {activeTab === 'summer_course' && (
             <SummerCourseTrackerView
               committees={committees}
+              courses={courses}
+              currentUser={currentUser}
               onToggleCommitteeStage={handleQuickToggleStage}
               onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
+              onUpdateCommitteeCourse={(committeeId, courseId, courseName) => {
+                setCommittees((prev) =>
+                  prev.map((c) =>
+                    c.id === committeeId ? { ...c, courseId, courseName } : c
+                  )
+                );
+              }}
+              onAddCourse={handleAddCourse}
               onNavigateToCommittees={() => setActiveTab('committees')}
               onOpenCommitteeDetails={handleOpenRowDetails}
             />
@@ -1131,10 +1306,27 @@ export default function App() {
               onToggleTaskComplete={handleToggleTaskComplete}
               onDeleteTask={handleDeleteScheduleTask}
               onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
+              onUpdateCommitteeCeremony={handleUpdateCommitteeCeremony}
             />
           )}
 
           {activeTab === 'stats' && <StatisticsView committees={committees} />}
+
+          {activeTab === 'ceremonies' && (
+            <CeremoniesView
+              committees={committees}
+              scheduleTasks={scheduleTasks}
+              currentUser={currentUser}
+              onUpdateCommitteeCeremony={handleUpdateCommitteeCeremony}
+              onToggleCommitteeStage={handleQuickToggleStage}
+              onAddTask={handleAddScheduleTask}
+              onDeleteTask={handleDeleteScheduleTask}
+              onToggleTaskComplete={handleToggleTaskComplete}
+              onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
+              onNavigateToDailyAlerts={() => setActiveTab('daily_alerts')}
+              onNavigateToCalendar={() => setActiveTab('calendar')}
+            />
+          )}
 
           {activeTab === 'daily_alerts' && (
             <DailyAlertsView
@@ -1146,6 +1338,8 @@ export default function App() {
               onDeleteTask={handleDeleteScheduleTask}
               onNavigateToCalendar={() => setActiveTab('calendar')}
               onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
+              onNavigateToCeremonies={() => setActiveTab('ceremonies')}
+              onUpdateCommitteeCeremony={handleUpdateCommitteeCeremony}
             />
           )}
 

@@ -129,6 +129,15 @@ export interface AggregationStageDetails {
   notes?: string;
 }
 
+export interface CeremonyStageDetails {
+  honoredStudentsCount?: number;   // عدد الطلاب المكرمين يدوياً
+  attendingSheikhs: string[];      // أسماء المشايخ الحاضرين للحفل (إمكانية إضافة أكثر من شيخ)
+  ceremonyDate?: string;           // موعد الحفل بالتاريخ
+  ceremonyTime?: string;           // موعد الحفل بالوقت يكتبه بيده (مثال: 4 العصر، 4 المغرب)
+  ceremonyPlace?: string;          // مكان الحفل
+  notes?: string;                  // ملاحظات وترتيبات خاصة
+}
+
 export interface CommitteeStageRecord {
   completed: boolean;
   completedAt?: string; // Exact date & time formatted
@@ -171,6 +180,7 @@ export interface Committee {
   stages: Record<StageKey, CommitteeStageRecord>;
   scoringDetails?: ScoringStageDetails;          // تفاصيل وحالة تصحيح الأسئلة
   aggregationDetails?: AggregationStageDetails;  // تفاصيل تجميع الدرجات
+  ceremonyDetails?: CeremonyStageDetails;        // تفاصيل مرحلة الحفل والتكريم
   receivedByAssistant?: CommitteeReceiptInfo;    // توثيق استلام المعاون للجنة
   examApprovedBy?: CommitteeExamApprovalInfo;    // توثيق اعتماد المعاون لجاهزية الامتحان
   createdDate: string;
@@ -194,7 +204,7 @@ export interface Course {
 }
 
 export type TaskPriority = 'urgent' | 'high' | 'normal';
-export type TaskType = 'delivery' | 'receive' | 'exam' | 'scoring' | 'review' | 'general';
+export type TaskType = 'delivery' | 'receive' | 'exam' | 'scoring' | 'review' | 'ceremony' | 'general';
 
 export interface ScheduleTask {
   id: string;

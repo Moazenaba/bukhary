@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { Committee, StageKey, STAGES_LIST, QuestionScoringItem, ScoringStageDetails, AggregationStageDetails, AppUser, Course } from '../types';
+import {
+  Committee,
+  StageKey,
+  STAGES_LIST,
+  QuestionScoringItem,
+  ScoringStageDetails,
+  AggregationStageDetails,
+  CeremonyStageDetails,
+  AppUser,
+  Course,
+} from '../types';
 import {
   calculateCurrentStage,
   getCurrentFormattedDateTime,
@@ -72,7 +82,52 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
   // State to expand/collapse special stage details
   const [isScoringExpanded, setIsScoringExpanded] = useState(true);
   const [isAggregationExpanded, setIsAggregationExpanded] = useState(true);
+  const [isCeremonyExpanded, setIsCeremonyExpanded] = useState(true);
   const [newScorerInputs, setNewScorerInputs] = useState<Record<string, string>>({});
+  const [newSheikhInput, setNewSheikhInput] = useState('');
+
+  // Ceremony stage state
+  const [ceremonyDetails, setCeremonyDetails] = useState<CeremonyStageDetails>(() => {
+    return (
+      committee.ceremonyDetails || {
+        honoredStudentsCount: committee.studentsCount || 15,
+        attendingSheikhs: committee.sheikhName ? [committee.sheikhName] : ['الشيخ المشرف'],
+        ceremonyDate: committee.stages.ceremony?.completedAt?.split(' ')[0] || '2026-10-05',
+        ceremonyTime: '4 العصر',
+        ceremonyPlace: committee.associationName || 'القاعة الكبرى - مسجد الإمام البخاري',
+        notes: '',
+      }
+    );
+  });
+
+  const handleAddSheikh = () => {
+    const trimmed = newSheikhInput.trim();
+    if (!trimmed) return;
+    if (!ceremonyDetails.attendingSheikhs.includes(trimmed)) {
+      const updated: CeremonyStageDetails = {
+        ...ceremonyDetails,
+        attendingSheikhs: [...ceremonyDetails.attendingSheikhs, trimmed],
+      };
+      setCeremonyDetails(updated);
+      onSaveCommittee({
+        ...committee,
+        ceremonyDetails: updated,
+      });
+    }
+    setNewSheikhInput('');
+  };
+
+  const handleRemoveSheikh = (index: number) => {
+    const updated: CeremonyStageDetails = {
+      ...ceremonyDetails,
+      attendingSheikhs: ceremonyDetails.attendingSheikhs.filter((_, i) => i !== index),
+    };
+    setCeremonyDetails(updated);
+    onSaveCommittee({
+      ...committee,
+      ceremonyDetails: updated,
+    });
+  };
 
   // Scorer management per question
   const handleAddScorerToQuestion = (qId: string, scorerName: string) => {
@@ -167,6 +222,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
       stages: updatedStages,
       scoringDetails,
       aggregationDetails,
+      ceremonyDetails,
     };
     onSaveCommittee(updatedCommittee);
     setIsSavedToast(true);
@@ -274,6 +330,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
       stages,
       scoringDetails,
       aggregationDetails,
+      ceremonyDetails,
     };
     onSaveCommittee(updatedCommittee);
     setIsSavedToast(true);
@@ -877,7 +934,271 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                   );
                 }
 
-                // STANDARD STAGES (التسجيل، الامتحان، كتابة الكشف، المراجعة، الإعلان، الحفل)
+                // 3. SPECIAL STAGE: CEREMONY (مرحلة الحفل والتكريم وتوزيع الجوائز)
+                if (stageItem.key === 'ceremony') {
+                  return (
+                    <div
+                      key={stageItem.key}
+                      className={`rounded-2xl border transition-all overflow-hidden ${
+                        isCompleted
+                          ? 'bg-emerald-50/40 border-emerald-300 shadow-xs'
+                          : 'bg-amber-50/30 border-amber-300 shadow-xs'
+                      }`}
+                    >
+                      {/* Top Banner Row */}
+                      <div className="p-4 flex items-center justify-between gap-3 bg-gradient-to-l from-amber-50/70 via-white to-amber-50/30">
+                        <div className="flex items-center gap-3">
+                          <span className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-xl shrink-0 shadow-2xs">
+                            🎉
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-black text-sm text-[#0d1c2e]">
+                                مرحلة الحفل والتكريم وتوزيع الجوائز
+                              </span>
+                              <span
+                                className={`text-[11px] px-2.5 py-0.5 rounded-full font-black ${
+                                  isCompleted
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                }`}
+                              >
+                                {isCompleted ? '✓ تم الحفل والتكريم' : '⏳ قيد الترتيب والجدولة'}
+                              </span>
+                            </div>
+
+                            {isCompleted && stageData?.completedAt && (
+                              <div className="flex items-center gap-1 text-[11px] text-emerald-800 mt-1 font-mono">
+                                <span className="material-symbols-outlined text-xs">schedule</span>
+                                <span>تاريخ التمام: {stageData.completedAt}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStage('ceremony')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              isCompleted
+                                ? 'bg-emerald-700 text-white shadow-2xs'
+                                : 'bg-[#005c55] text-white hover:bg-[#004742] shadow-2xs'
+                            }`}
+                          >
+                            {isCompleted ? '✓ تم اعتماد الحفل' : 'إتمام الحفل الآن'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsCeremonyExpanded(!isCeremonyExpanded)}
+                            className="p-1.5 text-amber-900 hover:bg-amber-200/50 rounded-lg cursor-pointer"
+                            title="عرض / إخفاء تفاصيل الحفل"
+                          >
+                            <span className="material-symbols-outlined text-lg">
+                              {isCeremonyExpanded ? 'expand_less' : 'expand_more'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expandable Ceremony Details Form */}
+                      {isCeremonyExpanded && (
+                        <div className="p-4 space-y-4 border-t border-amber-200/70 bg-white">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            {/* 1. عدد الطلاب الذين سيتم تكريمهم */}
+                            <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-200/50 space-y-1">
+                              <label className="block font-bold text-[#0d1c2e]">
+                                🏆 عدد الطلاب الذين سيتم تكريمهم:
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={ceremonyDetails.honoredStudentsCount ?? ''}
+                                onChange={(e) => {
+                                  const updated = {
+                                    ...ceremonyDetails,
+                                    honoredStudentsCount:
+                                      e.target.value === '' ? undefined : Number(e.target.value),
+                                  };
+                                  setCeremonyDetails(updated);
+                                  onSaveCommittee({
+                                    ...committee,
+                                    ceremonyDetails: updated,
+                                  });
+                                }}
+                                placeholder="اكتب عدد الطلاب المكرمين..."
+                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
+                              />
+                              <span className="text-[10px] text-slate-500 block leading-tight">
+                                * يحدد يدوياً لتوثيق الناجحين فقط (إجمالي طلاب اللجنة: {studentsCount || 0} طالب)
+                              </span>
+                            </div>
+
+                            {/* 2. موعد الحفل بالتاريخ والوقت */}
+                            <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-200/50 space-y-2">
+                              <div>
+                                <label className="block font-bold text-[#0d1c2e] mb-1">
+                                  📅 موعد الحفل بالتاريخ:
+                                </label>
+                                <input
+                                  type="date"
+                                  value={ceremonyDetails.ceremonyDate || '2026-10-05'}
+                                  onChange={(e) => {
+                                    const updated = {
+                                      ...ceremonyDetails,
+                                      ceremonyDate: e.target.value,
+                                    };
+                                    setCeremonyDetails(updated);
+                                    onSaveCommittee({
+                                      ...committee,
+                                      ceremonyDetails: updated,
+                                    });
+                                  }}
+                                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-amber-600"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-bold text-[#0d1c2e] mb-1">
+                                  ⏰ موعد الحفل بالوقت (اكتبه بيدك):
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="مثال: 4 العصر، 4 المغرب، 08:00 م بعد العشاء..."
+                                  value={ceremonyDetails.ceremonyTime || ''}
+                                  onChange={(e) => {
+                                    const updated = {
+                                      ...ceremonyDetails,
+                                      ceremonyTime: e.target.value,
+                                    };
+                                    setCeremonyDetails(updated);
+                                    onSaveCommittee({
+                                      ...committee,
+                                      ceremonyDetails: updated,
+                                    });
+                                  }}
+                                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 3. أسماء المشايخ الذين سيحضرون الحفل (إضافة أكثر من شيخ) */}
+                          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm text-[#005c55]">
+                                  person_add
+                                </span>
+                                <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
+                              </label>
+                              <span className="text-[11px] font-bold text-slate-500 font-mono">
+                                ({ceremonyDetails.attendingSheikhs.length}) مشايخ مضافين
+                              </span>
+                            </div>
+
+                            {/* Added Sheikhs chips */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {ceremonyDetails.attendingSheikhs.map((sheikh, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 shadow-2xs"
+                                >
+                                  <span>{sheikh}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveSheikh(idx)}
+                                    className="w-4 h-4 rounded-full hover:bg-rose-100 hover:text-rose-700 flex items-center justify-center cursor-pointer text-slate-400"
+                                    title="حذف الشيخ"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Input + Button to add another sheikh */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={newSheikhInput}
+                                onChange={(e) => setNewSheikhInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddSheikh();
+                                  }
+                                }}
+                                placeholder="اكتب اسم الشيخ واضغط إضافة عضو آخر..."
+                                className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddSheikh}
+                                className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                              >
+                                <span className="material-symbols-outlined text-sm">add</span>
+                                <span>+ إضافة عضو آخر</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 4. مكان الحفل وملاحظات */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                                📍 مكان إقامة الحفل:
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="مثال: القاعة الكبرى - مسجد الإمام البخاري..."
+                                value={ceremonyDetails.ceremonyPlace || ''}
+                                onChange={(e) => {
+                                  const updated = {
+                                    ...ceremonyDetails,
+                                    ceremonyPlace: e.target.value,
+                                  };
+                                  setCeremonyDetails(updated);
+                                  onSaveCommittee({
+                                    ...committee,
+                                    ceremonyDetails: updated,
+                                  });
+                                }}
+                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                                📝 ملاحظات وترتيبات وتجهيزات:
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="مثال: تجهيز أجهزة الصوت والدروع وشهادات التقدير..."
+                                value={ceremonyDetails.notes || ''}
+                                onChange={(e) => {
+                                  const updated = {
+                                    ...ceremonyDetails,
+                                    notes: e.target.value,
+                                  };
+                                  setCeremonyDetails(updated);
+                                  onSaveCommittee({
+                                    ...committee,
+                                    ceremonyDetails: updated,
+                                  });
+                                }}
+                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // STANDARD STAGES (التسجيل، الامتحان، كتابة الكشف، المراجعة، الإعلان)
                 return (
                   <div
                     key={stageItem.key}

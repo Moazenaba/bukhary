@@ -29,13 +29,17 @@ import {
   Upload,
   Users,
   GraduationCap,
+  Calendar,
+  Tag,
+  PlusCircle,
+  X,
 } from 'lucide-react';
 import {
   SummerCourseRow,
   CourseFilterStatus,
   SummerCourseStats,
 } from '../types/summerCourse';
-import { Committee, StageKey } from '../types';
+import { Committee, StageKey, Course, AppUser } from '../types';
 import { syncRowsWithCommittees } from '../utils/committeeSync';
 import { MergeConfirmModal } from './MergeConfirmModal';
 import {
@@ -46,8 +50,12 @@ import {
 
 interface SummerCourseTrackerViewProps {
   committees?: Committee[];
+  courses?: Course[];
+  currentUser?: AppUser;
   onToggleCommitteeStage?: (committeeId: string, stageKey: StageKey) => void;
   onAddCommitteeFromRow?: (newComm: Committee) => void;
+  onUpdateCommitteeCourse?: (committeeId: string, courseId: string, courseName: string) => void;
+  onAddCourse?: (newCourse: Omit<Course, 'id' | 'createdAt'>) => Course;
   onNavigateToCommittees?: () => void;
   onOpenCommitteeDetails?: (row: SummerCourseRow) => void;
 }
@@ -59,8 +67,12 @@ const INITIAL_SAMPLE_ROWS: SummerCourseRow[] = [];
 
 export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = ({
   committees = [],
+  courses = [],
+  currentUser,
   onToggleCommitteeStage,
   onAddCommitteeFromRow,
+  onUpdateCommitteeCourse,
+  onAddCourse,
   onNavigateToCommittees,
   onOpenCommitteeDetails,
 }) => {
@@ -131,6 +143,41 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   const [statusFilter, setStatusFilter] = useState<CourseFilterStatus>('all');
   const [selectedBook, setSelectedBook] = useState<string>('all');
   const [selectedPlace, setSelectedPlace] = useState<string>('all');
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
+
+  // Course & Row Modals state
+  const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState<boolean>(false);
+  const [isAddRowModalOpen, setIsAddRowModalOpen] = useState<boolean>(false);
+
+  // New Course Form State
+  const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseSeason, setNewCourseSeason] = useState('صيفية');
+  const [newCourseYear, setNewCourseYear] = useState('1448هـ / 2026م');
+  const [newCourseStartDate, setNewCourseStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newCourseEndDate, setNewCourseEndDate] = useState('');
+  const [newCourseStatus, setNewCourseStatus] = useState<'active' | 'completed' | 'upcoming'>('active');
+  const [newCourseTargetCommittees, setNewCourseTargetCommittees] = useState<number>(30);
+  const [newCourseDescription, setNewCourseDescription] = useState('');
+
+  // New Row Form State
+  const [newRowNumber, setNewRowNumber] = useState<number>(1);
+  const [newRowCourseId, setNewRowCourseId] = useState<string>('');
+  const [newRowSheikhName, setNewRowSheikhName] = useState<string>('');
+  const [newRowPlace, setNewRowPlace] = useState<string>('مسجد الإمام البخاري');
+  const [newRowBook, setNewRowBook] = useState<string>('الأصول الثلاثة');
+  const [newRowStudentsCount, setNewRowStudentsCount] = useState<number>(0);
+  const [newRowDelivered, setNewRowDelivered] = useState<boolean>(false);
+  const [newRowCorrected, setNewRowCorrected] = useState<boolean>(false);
+  const [newRowReviewed, setNewRowReviewed] = useState<boolean>(false);
+  const [newRowAnnounced, setNewRowAnnounced] = useState<boolean>(false);
+  const [newRowCeremony, setNewRowCeremony] = useState<boolean>(false);
+  const [newRowNotes, setNewRowNotes] = useState<string>('');
+
+  // Default active course
+  const activeDefaultCourse = useMemo(() => {
+    if (!courses || courses.length === 0) return undefined;
+    return courses.find((c) => c.status === 'active' || c.isDefault) || courses[0];
+  }, [courses]);
 
   // Notification / Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -239,9 +286,17 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
         return false;
       }
 
+      // Course filter
+      if (selectedCourseFilter !== 'all') {
+        const rowCourseId = r.courseId || activeDefaultCourse?.id;
+        if (rowCourseId !== selectedCourseFilter) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [rows, searchQuery, statusFilter, selectedBook, selectedPlace]);
+  }, [rows, searchQuery, statusFilter, selectedBook, selectedPlace, selectedCourseFilter, activeDefaultCourse]);
 
   // Handle data returned from scanner
   const handleDataExtracted = (extracted: Omit<SummerCourseRow, 'id'>[]) => {
@@ -332,11 +387,163 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     }
   };
 
-  const handleAddNewRow = () => {
+  // Change Course for a row and sync linked committee
+  const handleRowCourseChange = (rowId: string, newCourseId: string) => {
+    const targetCourse = courses.find((c) => c.id === newCourseId);
+    if (!targetCourse) return;
+
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === rowId
+          ? { ...r, courseId: targetCourse.id, courseName: targetCourse.name }
+          : r
+      )
+    );
+
+    const targetRow = rows.find((r) => r.id === rowId);
+    if (targetRow && targetRow.committeeId && onUpdateCommitteeCourse) {
+      onUpdateCommitteeCourse(
+        targetRow.committeeId,
+        targetCourse.id,
+        targetCourse.name
+      );
+    }
+
+    showToast(
+      `✓ تم ربط لجنة #${targetRow?.number || ''} بدورة (${targetCourse.name}) وتحديث قاعدة البيانات.`
+    );
+  };
+
+  // Open Add Row Modal
+  const handleOpenAddRowModal = () => {
+    const maxRowNumber = rows.reduce((max, r) => Math.max(max, r.number || 0), 0);
+    const maxCommNumber = committees.reduce((max, c) => Math.max(max, c.committeeNumber || 0), 0);
+    const nextNum = Math.max(maxRowNumber, maxCommNumber) + 1;
+
+    setNewRowNumber(nextNum);
+    setNewRowCourseId(
+      selectedCourseFilter !== 'all' ? selectedCourseFilter : activeDefaultCourse?.id || ''
+    );
+    setNewRowSheikhName('');
+    setNewRowPlace('مسجد الإمام البخاري');
+    setNewRowBook('الأصول الثلاثة');
+    setNewRowStudentsCount(0);
+    setNewRowDelivered(false);
+    setNewRowCorrected(false);
+    setNewRowReviewed(false);
+    setNewRowAnnounced(false);
+    setNewRowCeremony(false);
+    setNewRowNotes('');
+    setIsAddRowModalOpen(true);
+  };
+
+  // Submit Add Row Modal
+  const handleAddRowModalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const effectiveCourseId = newRowCourseId || activeDefaultCourse?.id;
+    const targetCourse = courses.find((c) => c.id === effectiveCourseId) || activeDefaultCourse;
+    const commId = `comm-auto-${Date.now()}`;
+
+    const newRow: SummerCourseRow = {
+      id: `row-${Date.now()}`,
+      number: newRowNumber,
+      sheikh_name: newRowSheikhName.trim(),
+      place: newRowPlace.trim() || 'مسجد الإمام البخاري',
+      book: newRowBook.trim() || 'متن مقرر',
+      students_count: Number(newRowStudentsCount) || 0,
+      delivered: newRowDelivered,
+      corrected: newRowCorrected,
+      reviewed: newRowReviewed,
+      announced: newRowAnnounced,
+      ceremony: newRowCeremony,
+      struck_out: false,
+      uncertain: false,
+      notes: newRowNotes.trim() || '',
+      committeeId: commId,
+      courseId: targetCourse?.id,
+      courseName: targetCourse?.name,
+    };
+
+    setRows((prev) => [...prev, newRow]);
+
+    if (onAddCommitteeFromRow) {
+      const newComm: Committee = {
+        id: commId,
+        committeeNumber: newRowNumber,
+        committeeName: newRowSheikhName.trim()
+          ? `لجنة ${newRowSheikhName.trim()}`
+          : `لجنة #${newRowNumber}`,
+        sheikhName: newRowSheikhName.trim(),
+        branch: newRowPlace.trim() || 'مسجد الإمام البخاري',
+        competitionBook: newRowBook.trim() || '',
+        studentsCount: Number(newRowStudentsCount) || 0,
+        courseId: targetCourse?.id,
+        courseName: targetCourse?.name,
+        members: ['المشرف العام'],
+        generalNotes: newRowNotes.trim() || '',
+        stages: {
+          registration: { completed: true, completedAt: new Date().toLocaleDateString('ar-EG') },
+          exam: { completed: newRowDelivered },
+          scoring: { completed: newRowCorrected },
+          aggregation: { completed: false },
+          review: { completed: newRowReviewed },
+          sheet: { completed: false },
+          accreditation: { completed: false },
+          announcement: { completed: newRowAnnounced },
+          ceremony: { completed: newRowCeremony },
+        },
+        createdDate: new Date().toLocaleDateString('ar-EG'),
+        createdAtTime: new Date().toLocaleTimeString('ar-EG'),
+      };
+      onAddCommitteeFromRow(newComm);
+    }
+
+    setIsAddRowModalOpen(false);
+    showToast(
+      `✓ تمت إضافة الصف ولجنة #${newRowNumber} وربطها بدورة (${targetCourse?.name || 'العامة'}) في قاعدة البيانات.`
+    );
+  };
+
+  // Submit Create Course Modal
+  const handleCreateCourseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCourseName.trim()) {
+      showToast('يرجى إدخال اسم الدورة أولاً.');
+      return;
+    }
+
+    if (onAddCourse) {
+      const created = onAddCourse({
+        name: newCourseName.trim(),
+        season: newCourseSeason,
+        year: newCourseYear.trim(),
+        startDate: newCourseStartDate || new Date().toISOString().split('T')[0],
+        endDate: newCourseEndDate || '',
+        status: newCourseStatus,
+        targetCommitteesCount: Number(newCourseTargetCommittees) || 30,
+        description: newCourseDescription.trim(),
+        isDefault: newCourseStatus === 'active',
+      });
+      setSelectedCourseFilter(created.id);
+      showToast(`✓ تم إنشاء دورة (${created.name}) بنجاح وربطها بالنظام.`);
+    }
+
+    setIsAddCourseModalOpen(false);
+    setNewCourseName('');
+    setNewCourseDescription('');
+  };
+
+  const handleAddNewRow = (customCourseId?: string | React.MouseEvent) => {
     const maxRowNumber = rows.reduce((max, r) => Math.max(max, r.number || 0), 0);
     const maxCommNumber = committees.reduce((max, c) => Math.max(max, c.committeeNumber || 0), 0);
     const nextNum = Math.max(maxRowNumber, maxCommNumber) + 1;
     const commId = `comm-auto-${Date.now()}`;
+
+    const effectiveCourseId =
+      (typeof customCourseId === 'string' ? customCourseId : undefined) ||
+      (selectedCourseFilter !== 'all' ? selectedCourseFilter : activeDefaultCourse?.id);
+    const targetCourse =
+      courses.find((c) => c.id === effectiveCourseId) || activeDefaultCourse;
 
     const newRow: SummerCourseRow = {
       id: `row-${Date.now()}`,
@@ -354,6 +561,8 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       uncertain: false,
       notes: '',
       committeeId: commId,
+      courseId: targetCourse?.id,
+      courseName: targetCourse?.name,
     };
     setRows((prev) => [...prev, newRow]);
 
@@ -367,6 +576,8 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
         branch: 'مسجد الإمام البخاري',
         competitionBook: '',
         studentsCount: 0,
+        courseId: targetCourse?.id,
+        courseName: targetCourse?.name,
         members: ['المشرف العام'],
         generalNotes: '',
         stages: {
@@ -385,7 +596,9 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       };
       onAddCommitteeFromRow(newComm);
     }
-    showToast(`تمت إضافة الصف ولجنة #${nextNum} تلقائياً وربطهما.`);
+    showToast(
+      `تمت إضافة الصف ولجنة #${nextNum} وربطها بدورة (${targetCourse?.name || 'العامة'}) تلقائياً في قاعدة البيانات ✓`
+    );
   };
 
   const handleDeleteRow = (id: string, num: number) => {
@@ -456,15 +669,26 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               onChange={handleFileUpload}
             />
 
-            {/* Export Excel Button (Primary Action) */}
+            {/* Add New Course Button */}
             <button
               type="button"
-              onClick={() => exportCourseRowsToExcel(rows)}
-              className="flex items-center gap-2.5 px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold shadow-lg hover:shadow-amber-400/30 transition-all active:scale-[0.98] cursor-pointer"
-              title="تصدير كشف البيانات الحالي إلى ملف إكسيل (.xlsx)"
+              onClick={() => setIsAddCourseModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-teal-400/20 hover:bg-teal-400/30 text-teal-200 hover:text-white font-bold backdrop-blur-sm border border-teal-400/30 transition-all cursor-pointer shadow-xs"
+              title="إضافة دورة جديدة للمسابقات وربط اللجان بها"
             >
-              <FileSpreadsheet className="w-5 h-5 text-slate-900" />
-              <span>تصدير كشف Excel</span>
+              <Plus className="w-4 h-4 text-teal-300" />
+              <span>إضافة دورة جديدة</span>
+            </button>
+
+            {/* Add New Row Button */}
+            <button
+              type="button"
+              onClick={handleOpenAddRowModal}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold shadow-lg hover:shadow-emerald-400/30 transition-all active:scale-[0.98] cursor-pointer"
+              title="إضافة صف جديد وتحديد الدورة المقررة"
+            >
+              <Plus className="w-5 h-5 text-slate-950" />
+              <span>إضافة صف جديد (+)</span>
             </button>
 
             {/* Import Excel / CSV Button */}
@@ -477,23 +701,93 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               <Upload className="w-4 h-4 text-emerald-300" />
               <span>استيراد كشف</span>
             </button>
-
-            {/* Add New Row Button */}
-            <button
-              type="button"
-              onClick={handleAddNewRow}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-sm border border-white/20 transition-all cursor-pointer"
-              title="إضافة صف جديد إلى الجدول"
-            >
-              <Plus className="w-5 h-5 text-emerald-300" />
-              <span>إضافة صف جديد</span>
-            </button>
           </div>
         </div>
 
         {/* Decorative background Islamic geometry / mesh */}
         <div className="absolute -left-12 -bottom-16 w-64 h-64 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
         <div className="absolute right-0 top-0 w-72 h-72 rounded-full bg-teal-300/10 blur-3xl pointer-events-none" />
+      </div>
+
+      {/* Courses Navigation & Selector Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-right">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 ml-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>عرض حسب الدورة:</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedCourseFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              selectedCourseFilter === 'all'
+                ? 'bg-emerald-700 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <span>جميع الدورات</span>
+            <span className="mr-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-black/10 font-mono">
+              {rows.length}
+            </span>
+          </button>
+
+          {courses.map((crs) => {
+            const countInCourse = rows.filter(
+              (r) => (r.courseId || activeDefaultCourse?.id) === crs.id
+            ).length;
+            const isSelected = selectedCourseFilter === crs.id;
+            return (
+              <button
+                key={crs.id}
+                type="button"
+                onClick={() => setSelectedCourseFilter(crs.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+                title={crs.description || crs.name}
+              >
+                <span>{crs.name}</span>
+                {crs.status === 'active' && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    نشطة
+                  </span>
+                )}
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10 font-mono">
+                  {countInCourse}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsAddCourseModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="إضافة دورة جديدة للمسابقات"
+          >
+            <Plus className="w-4 h-4 text-teal-700" />
+            <span>➕ إضافة دورة جديدة</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenAddRowModal}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+            title="إضافة صف جديد مع تحديد الدورة"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة صف جديد (+)</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -718,31 +1012,22 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
             <button
               type="button"
-              onClick={() => exportCourseRowsToExcel(rows)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold transition-colors"
-              title="تصدير كملف إكسيل حقيقي (.xlsx) متوافق مع اللغة العربية"
+              onClick={() => setIsAddCourseModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-teal-50 text-teal-900 hover:bg-teal-100 border border-teal-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              title="إضافة دورة مسابقات جديدة"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-              <span>تصدير Excel (xlsx)</span>
+              <Plus className="w-4 h-4 text-teal-700" />
+              <span>دورة جديدة</span>
             </button>
 
             <button
               type="button"
-              onClick={() => exportCourseRowsToCSV(rows)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 text-xs font-bold transition-colors"
-              title="تصدير كملف CSV بترميز UTF-8 BOM لظهور اللغة العربية بشكل سليم"
-            >
-              <FileText className="w-4 h-4 text-blue-700" />
-              <span>تصدير CSV (BOM)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleAddNewRow}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition-colors"
+              onClick={handleOpenAddRowModal}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              title="إضافة صف جديد مع الدورة"
             >
               <Plus className="w-4 h-4" />
-              <span>صف جديد</span>
+              <span>صف جديد (+)</span>
             </button>
           </div>
         </div>
@@ -972,6 +1257,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               <thead>
                 <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold select-none">
                   <th className="py-3 px-3 w-12 text-center">م</th>
+                  <th className="py-3 px-3 min-w-[170px]">الدورة المقررة</th>
                   <th className="py-3 px-3 min-w-[190px]">اسم الشيخ</th>
                   <th className="py-3 px-3 min-w-[180px]">المكان</th>
                   <th className="py-3 px-3 min-w-[210px]">الكتاب المقرر</th>
@@ -1038,6 +1324,31 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                             <span>لجنة #{row.number}</span>
                           </button>
                         </div>
+                      </td>
+
+                      {/* 1.5) Course Selection Dropdown */}
+                      <td className="py-2.5 px-3 min-w-[170px]">
+                        <select
+                          value={row.courseId || activeDefaultCourse?.id || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '__new__') {
+                              setIsAddCourseModalOpen(true);
+                            } else {
+                              handleRowCourseChange(row.id, val);
+                            }
+                          }}
+                          className="w-full text-xs font-bold text-teal-950 bg-teal-50/70 hover:bg-white focus:bg-white border border-teal-200/90 hover:border-teal-400 focus:border-emerald-600 rounded-lg py-1 px-2 outline-none transition-all cursor-pointer shadow-2xs"
+                          title="اختر الدورة لربط اللجنة بها تلقائياً في قاعدة البيانات"
+                        >
+                          <option value="">(اختر الدورة...)</option>
+                          {courses.map((crs) => (
+                            <option key={crs.id} value={crs.id}>
+                              {crs.name} {crs.isDefault ? '⭐' : ''}
+                            </option>
+                          ))}
+                          <option value="__new__">➕ إضافة دورة جديدة...</option>
+                        </select>
                       </td>
 
                       {/* 2) Sheikh Name */}
@@ -1319,6 +1630,365 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
         onMerge={executeMerge}
         onReplace={executeReplace}
       />
+
+      {/* Modal: Add New Course (إضافة دورة جديدة) */}
+      {isAddCourseModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+            <div className="px-5 py-4 bg-gradient-to-l from-emerald-800 to-[#005c55] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-white/20 text-white">
+                  <Tag className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold">إضافة دورة مسابقات علمية جديدة</h3>
+                  <p className="text-[11px] text-emerald-100">
+                    إنشاء دورة جديدة وربط اللجان والصفوف بها تلقائياً في قاعدة البيانات
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddCourseModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-emerald-100 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCourseSubmit} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  اسم الدورة <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="مثال: دورة الصيف 1448هـ - متون العقيدة"
+                  value={newCourseName}
+                  onChange={(e) => setNewCourseName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 text-xs font-bold outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    الموسم
+                  </label>
+                  <select
+                    value={newCourseSeason}
+                    onChange={(e) => setNewCourseSeason(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 text-xs font-bold outline-none bg-slate-50 cursor-pointer"
+                  >
+                    <option value="صيفية">صيفية</option>
+                    <option value="شتوية">شتوية</option>
+                    <option value="رمضانية">رمضانية</option>
+                    <option value="مكثفة">مكثفة</option>
+                    <option value="سنوية">سنوية</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    العام الهجري / الميلادي
+                  </label>
+                  <input
+                    type="text"
+                    value={newCourseYear}
+                    onChange={(e) => setNewCourseYear(e.target.value)}
+                    placeholder="1448هـ / 2026م"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 text-xs font-bold outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    حالة الدورة
+                  </label>
+                  <select
+                    value={newCourseStatus}
+                    onChange={(e) => setNewCourseStatus(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 text-xs font-bold outline-none bg-slate-50 cursor-pointer"
+                  >
+                    <option value="active">نشطة (الحالية)</option>
+                    <option value="upcoming">قادمة</option>
+                    <option value="completed">مكتملة ومؤرشفة</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    العدد المستهدف للجان
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newCourseTargetCommittees}
+                    onChange={(e) => setNewCourseTargetCommittees(parseInt(e.target.value, 10) || 30)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 text-xs font-mono font-bold outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  وصف وملاحظات الدورة
+                </label>
+                <textarea
+                  rows={2}
+                  value={newCourseDescription}
+                  onChange={(e) => setNewCourseDescription(e.target.value)}
+                  placeholder="وصف مختصر لأهداف وفروع هذه الدورة..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:border-emerald-600 text-xs outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCourseModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  حفظ وإضافة الدورة
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add New Row & Committee with Course Selection */}
+      {isAddRowModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+            <div className="px-5 py-4 bg-gradient-to-l from-emerald-800 to-[#005c55] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-white/20 text-white">
+                  <PlusCircle className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold">إضافة صف ولجنة جديدة إلى الكشف</h3>
+                  <p className="text-[11px] text-emerald-100">
+                    تحديد الدورة المقررة وحفظ اللجنة في قاعدة البيانات تلقائياً
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddRowModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-emerald-100 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddRowModalSubmit} className="p-5 space-y-4 text-xs">
+              {/* Course Selector in Form */}
+              <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/80">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>الدورة التابعة لها هذه اللجنة:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCourseModalOpen(true)}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <span>+ إضافة دورة جديدة</span>
+                  </button>
+                </div>
+
+                <select
+                  value={newRowCourseId || activeDefaultCourse?.id || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__new__') {
+                      setIsAddCourseModalOpen(true);
+                    } else {
+                      setNewRowCourseId(val);
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white text-xs font-bold text-slate-800 focus:border-emerald-600 outline-none cursor-pointer"
+                >
+                  {courses.map((crs) => (
+                    <option key={crs.id} value={crs.id}>
+                      {crs.name} ({crs.season} - {crs.year}) {crs.isDefault ? '⭐' : ''}
+                    </option>
+                  ))}
+                  <option value="__new__">➕ إضافة دورة جديدة...</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    رقم تسلسلي (م)
+                  </label>
+                  <input
+                    type="number"
+                    value={newRowNumber}
+                    onChange={(e) => setNewRowNumber(parseInt(e.target.value, 10) || 1)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 font-mono font-bold text-center text-xs outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    اسم فضيلة الشيخ <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="اسم الشيخ المشرف على اللجنة..."
+                    value={newRowSheikhName}
+                    onChange={(e) => setNewRowSheikhName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs font-bold outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    المكان / القاعة
+                  </label>
+                  <input
+                    type="text"
+                    value={newRowPlace}
+                    onChange={(e) => setNewRowPlace(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs outline-none"
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    الكتاب المقرر
+                  </label>
+                  <input
+                    type="text"
+                    value={newRowBook}
+                    onChange={(e) => setNewRowBook(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs font-bold text-emerald-800 outline-none"
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    عدد الطلاب
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newRowStudentsCount}
+                    onChange={(e) => setNewRowStudentsCount(parseInt(e.target.value, 10) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs font-mono font-bold text-center outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Initial Stages */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                <span className="block text-[11px] font-bold text-slate-700">
+                  مراحل الإنجاز الحالية للجنة:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg bg-white border border-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newRowDelivered}
+                      onChange={(e) => setNewRowDelivered(e.target.checked)}
+                      className="rounded accent-emerald-600"
+                    />
+                    <span className="font-semibold text-emerald-900">1. تم الامتحان</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg bg-white border border-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newRowCorrected}
+                      onChange={(e) => setNewRowCorrected(e.target.checked)}
+                      className="rounded accent-teal-600"
+                    />
+                    <span className="font-semibold text-teal-900">2. تم التصحيح</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg bg-white border border-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newRowReviewed}
+                      onChange={(e) => setNewRowReviewed(e.target.checked)}
+                      className="rounded accent-blue-600"
+                    />
+                    <span className="font-semibold text-blue-900">3. تم المراجعة</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg bg-white border border-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newRowAnnounced}
+                      onChange={(e) => setNewRowAnnounced(e.target.checked)}
+                      className="rounded accent-purple-600"
+                    />
+                    <span className="font-semibold text-purple-900">4. تم الإعلان</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg bg-white border border-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newRowCeremony}
+                      onChange={(e) => setNewRowCeremony(e.target.checked)}
+                      className="rounded accent-amber-600"
+                    />
+                    <span className="font-semibold text-amber-900">5. تم الحفل</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  ملاحظات
+                </label>
+                <input
+                  type="text"
+                  value={newRowNotes}
+                  onChange={(e) => setNewRowNotes(e.target.value)}
+                  placeholder="أي ملاحظات خاصة باللجنة..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddRowModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  إضافة الصف واللجنة
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

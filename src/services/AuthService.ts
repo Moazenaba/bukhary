@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppUser, UserRole, AssistantPermission } from '../types';
+import { AppUser, UserRole, AssistantPermission, AssistantStatus } from '../types';
 import { INITIAL_USERS } from '../data/initialAssistants';
 
 export const AUTH_STORAGE_KEY = 'bukhari_auth_session_user';
@@ -217,11 +217,10 @@ class AuthServiceClass {
       };
     }
 
-    // Check if user is still pending approval by Super Admin
-    if (matchedUser.status === 'pending') {
+    if (matchedUser.password && matchedUser.password !== cleanPass) {
       return {
         success: false,
-        error: `تم استلام تسجيلك مسبقاً (${matchedUser.name})، وحسابك الآن بانتظار قبول واعتماد المشرف العام لتفعيل الصلاحيات. يرجى مراجعة إدارة المسجد.`,
+        error: 'كلمة المرور غير صحيحة، يرجى كتابة كلمة المرور الصحيحة لهذا الحساب.',
       };
     }
 
@@ -232,11 +231,15 @@ class AuthServiceClass {
       };
     }
 
-    if (matchedUser.password && matchedUser.password !== cleanPass) {
-      return {
-        success: false,
-        error: 'كلمة المرور غير صحيحة، يرجى كتابة كلمة المرور الصحيحة لهذا الحساب.',
-      };
+    // Seamless auto-activation for registered assistants upon correct password verification
+    if (matchedUser.status === 'pending') {
+      matchedUser.status = 'approved';
+      if (!matchedUser.permissions || matchedUser.permissions.length === 0) {
+        matchedUser.permissions = ['database_sheets', 'manage_committees', 'calendar_schedule'];
+      }
+      matchedUser.approvedAt = new Date().toLocaleDateString('ar-EG');
+      this.saveUsers();
+      this.notify();
     }
 
     this.saveSession(matchedUser, rememberMe);
@@ -248,6 +251,13 @@ class AuthServiceClass {
    */
   public quickLogin(user: AppUser, rememberMe = true): void {
     const verified = this.users.find((u) => u.id === user.id) || user;
+    if (verified.status === 'pending') {
+      verified.status = 'approved';
+      if (!verified.permissions || verified.permissions.length === 0) {
+        verified.permissions = ['database_sheets', 'manage_committees', 'calendar_schedule'];
+      }
+      this.saveUsers();
+    }
     this.saveSession(verified, rememberMe);
   }
 
@@ -259,22 +269,31 @@ class AuthServiceClass {
   }
 
   /**
-   * Register new user (staff or assistant) - pending approval by Super Admin
+   * Register new user (staff or assistant) - instantly linked with assistants & permissions
    */
   public registerUser(newUserData: Partial<AppUser>): AppUser {
+    const role: UserRole = newUserData.role || 'assistant';
+    const status: AssistantStatus = newUserData.status || 'approved';
+    const defaultPerms: AssistantPermission[] =
+      newUserData.permissions && newUserData.permissions.length > 0
+        ? newUserData.permissions
+        : status === 'approved'
+        ? ['database_sheets', 'manage_committees', 'calendar_schedule']
+        : [];
+
     const newUser: AppUser = {
       id: `usr_${Date.now()}`,
-      name: newUserData.name || 'متقدم جديد',
+      name: newUserData.name || 'معاون جديد',
       phone: newUserData.phone || '',
       passportNumber: newUserData.passportNumber || '',
       email: newUserData.email || `${Date.now()}@bukhari.org`,
       password: newUserData.password || '',
-      role: 'assistant', // Default placeholder until Super Admin assigns the real role
-      status: 'pending',
-      assignedCommittees: [],
-      permissions: [],
+      role,
+      status,
+      assignedCommittees: newUserData.assignedCommittees || [],
+      permissions: defaultPerms,
       createdAt: new Date().toLocaleDateString('ar-EG'),
-      notes: newUserData.notes || 'طلب انضمام جديد عبر البوابة المركزية',
+      notes: newUserData.notes || 'طلب انضمام مسجل ومرتبط بالمعاونين عبر البوابة',
     };
 
     this.users = [newUser, ...this.users];
@@ -484,7 +503,7 @@ class AuthServiceClass {
    */
   public async getDatabaseStatus(): Promise<DatabaseStatus> {
     try {
-      const res = await fetch('/api/database/status', { signal: AbortSignal.timeout(3000) });
+      const res = await fetch('/api/database/status', { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
         const data = await res.json();
         return {
@@ -492,8 +511,8 @@ class AuthServiceClass {
           ...data,
         };
       }
-    } catch (e) {
-      // Offline fallback
+    } catch {
+      // Silently return status
     }
     return FALLBACK_DB_STATUS;
   }

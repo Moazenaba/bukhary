@@ -66,6 +66,8 @@ export function mapCommitteeToCourseRow(c: Committee): SummerCourseRow {
     uncertain: false,
     notes: c.generalNotes || '',
     committeeId: c.id,
+    courseId: c.courseId,
+    courseName: c.courseName,
   };
 }
 
@@ -126,6 +128,8 @@ export function syncRowsWithCommittees(
             updatedRows[idx].students_count !== undefined
               ? updatedRows[idx].students_count
               : (c.studentsCount || 0),
+          courseId: updatedRows[idx].courseId || c.courseId,
+          courseName: updatedRows[idx].courseName || c.courseName,
           delivered: isCommitteeDelivered(c),
           corrected: isCommitteeCorrected(c),
           reviewed: isCommitteeReviewed(c),

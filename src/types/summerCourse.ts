@@ -15,6 +15,8 @@ export interface SummerCourseRow {
   notes?: string; // ملاحظات اختيارية
   updatedAt?: string;
   committeeId?: string; // معرف اللجنة المرتبطة في نظام اللجان
+  courseId?: string; // معرف الدورة المرتبطة (مثال: الدورة الصيفية)
+  courseName?: string; // اسم الدورة المرتبطة
 }
 
 export type CourseFilterStatus =
