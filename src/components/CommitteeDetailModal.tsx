@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import {
   Committee,
@@ -122,6 +122,23 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     );
   });
 
+  // Sections the user actually edited. The form fills in defaults for display (e.g. the members'
+  // names as scorers); a section that was not edited is sent back exactly as the server had it,
+  // so saving one thing never writes those defaults as if someone had entered them.
+  const edited = useRef({ scoring: false, aggregation: false, ceremony: false });
+  const editScoring = (v: ScoringStageDetails) => {
+    edited.current.scoring = true;
+    setScoringDetails(v);
+  };
+  const editAggregation = (v: AggregationStageDetails) => {
+    edited.current.aggregation = true;
+    setAggregationDetails(v);
+  };
+  const editCeremony = (v: CeremonyStageDetails) => {
+    edited.current.ceremony = true;
+    setCeremonyDetails(v);
+  };
+
   /** The committee as currently edited in the form, with optional overrides. */
   const buildCommittee = (overrides: Partial<Committee> = {}): Committee => {
     const selCourse = courses.find((c) => c.id === courseId);
@@ -140,9 +157,9 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
       studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
       isWomenCommittee,
       stages,
-      scoringDetails,
-      aggregationDetails,
-      ceremonyDetails,
+      scoringDetails: edited.current.scoring ? scoringDetails : committee.scoringDetails,
+      aggregationDetails: edited.current.aggregation ? aggregationDetails : committee.aggregationDetails,
+      ceremonyDetails: edited.current.ceremony ? ceremonyDetails : committee.ceremonyDetails,
       ...overrides,
     };
   };
@@ -165,6 +182,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
   const saveCeremony = (updated: CeremonyStageDetails) => {
     if (!canFinalize) return;
+    edited.current.ceremony = true;
     const before = ceremonyDetails;
     setCeremonyDetails(updated);
     void save(buildCommittee({ ceremonyDetails: updated }), () => setCeremonyDetails(before));
@@ -185,6 +203,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
   const saveScoring = (updatedScoring: ScoringStageDetails, nextStages = stages) => {
     if (!canScore) return;
+    edited.current.scoring = true;
     const before = { scoring: scoringDetails, stages };
     setScoringDetails(updatedScoring);
     setStages(nextStages);
@@ -555,7 +574,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 placeholder="اكتب اسم المصحح المعتمد..."
                                 value={scoringDetails.scorerName || ''}
                                 onChange={(e) =>
-                                  setScoringDetails({
+                                  editScoring({
                                     ...scoringDetails,
                                     scorerName: e.target.value,
                                   })
@@ -573,7 +592,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 placeholder="اكتب اسم مراجع التصحيح والدرجات..."
                                 value={scoringDetails.scoringReviewerName || ''}
                                 onChange={(e) =>
-                                  setScoringDetails({
+                                  editScoring({
                                     ...scoringDetails,
                                     scoringReviewerName: e.target.value,
                                   })
@@ -874,7 +893,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 placeholder="اسم المكلف بالتجميع..."
                                 value={aggregationDetails.aggregatorName || ''}
                                 onChange={(e) =>
-                                  setAggregationDetails({
+                                  editAggregation({
                                     ...aggregationDetails,
                                     aggregatorName: e.target.value,
                                   })
@@ -892,7 +911,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 placeholder="اسم مراجع الدرجات في التصحيح..."
                                 value={aggregationDetails.scoringReviewerName || ''}
                                 onChange={(e) =>
-                                  setAggregationDetails({
+                                  editAggregation({
                                     ...aggregationDetails,
                                     scoringReviewerName: e.target.value,
                                   })
@@ -990,7 +1009,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 min="0"
                                 value={ceremonyDetails.honoredStudentsCount ?? ''}
                                 disabled={!canFinalize}
-                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, honoredStudentsCount: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                onChange={(e) => editCeremony({ ...ceremonyDetails, honoredStudentsCount: e.target.value === '' ? undefined : Number(e.target.value) })}
                                 onBlur={() => saveCeremony(ceremonyDetails)}
                                 placeholder="اكتب عدد الطلاب المكرمين..."
                                 className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
@@ -1024,7 +1043,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                   placeholder="مثال: 4 العصر، 4 المغرب، 08:00 م بعد العشاء..."
                                   value={ceremonyDetails.ceremonyTime || ''}
                                   disabled={!canFinalize}
-                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, ceremonyTime: e.target.value })}
+                                onChange={(e) => editCeremony({ ...ceremonyDetails, ceremonyTime: e.target.value })}
                                 onBlur={() => saveCeremony(ceremonyDetails)}
                                   className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                                 />
@@ -1104,7 +1123,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 placeholder="مثال: القاعة الكبرى - مسجد الإمام البخاري..."
                                 value={ceremonyDetails.ceremonyPlace || ''}
                                 disabled={!canFinalize}
-                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, ceremonyPlace: e.target.value })}
+                                onChange={(e) => editCeremony({ ...ceremonyDetails, ceremonyPlace: e.target.value })}
                                 onBlur={() => saveCeremony(ceremonyDetails)}
                                 className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                               />
@@ -1119,7 +1138,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 placeholder="مثال: تجهيز أجهزة الصوت والدروع وشهادات التقدير..."
                                 value={ceremonyDetails.notes || ''}
                                 disabled={!canFinalize}
-                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, notes: e.target.value })}
+                                onChange={(e) => editCeremony({ ...ceremonyDetails, notes: e.target.value })}
                                 onBlur={() => saveCeremony(ceremonyDetails)}
                                 className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                               />
