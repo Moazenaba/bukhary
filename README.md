@@ -49,9 +49,10 @@ The server refuses to start while migrations are pending, and never changes the 
    `data` JSON into real columns, 003 adds constraints and moves exam PDFs into `exam_files`,
    004 adds shared settings tables.
 4. The old schema seeded demo accounts with **publicly known passwords** (`user-admin`,
-   `user-head-dosari`, `user-ast-moaz`) plus a demo course/committee/exam. Create your real admin
-   first, then delete or reset those accounts from the app (or with SQL) — migrations never
-   delete existing data on their own.
+   `user-head-dosari`, `user-ast-moaz`) plus a demo course/committee/exam. Migration 007 disables
+   those accounts (status `rejected`, no password, sessions revoked) unless their password was
+   changed through the app; nothing is deleted. If that leaves no super admin, run
+   `npm run create-admin` — it ignores those legacy accounts.
 
 ## Tests
 Tests need a throwaway PostgreSQL; they drop and recreate databases whose names end in `_test`.

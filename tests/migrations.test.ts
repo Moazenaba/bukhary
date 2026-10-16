@@ -68,6 +68,14 @@ describe('migrations on a legacy database', () => {
     expect(rows[0].data.role).toBeUndefined();
   });
 
+  it('disables the seeded demo accounts, whose passwords were published', async () => {
+    const { rows } = await pool.query(
+      "SELECT id, status, password FROM app_users WHERE id IN ('user-admin','user-head-dosari','user-ast-moaz') ORDER BY id;"
+    );
+    expect(rows).toHaveLength(3);
+    for (const r of rows) expect({ id: r.id, status: r.status, password: r.password }).toEqual({ id: r.id, status: 'rejected', password: null });
+  });
+
   it('deleted rows stay deleted: nothing re-seeds them', async () => {
     await pool.query("DELETE FROM app_users WHERE id = 'user-admin';");
     await migrate(pool);
