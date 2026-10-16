@@ -3,6 +3,7 @@ import { createFirstSuperAdmin } from '../server/bootstrapAdmin.ts';
 import { loadConfig } from '../server/config.ts';
 import { createPool } from '../server/db.ts';
 import { pendingMigrations } from '../server/migrate.ts';
+import { assertLocalDatabaseOrConfirmed } from '../server/scriptGuard.ts';
 import { passwordSchema, phoneSchema, emailSchema } from '../server/routes/users.ts';
 
 // One-time bootstrap of the first super admin. Reads ADMIN_NAME, ADMIN_PHONE,
@@ -18,7 +19,9 @@ async function main() {
   const password = passwordSchema.parse(process.env.ADMIN_PASSWORD || '');
   if (password.length < 10) throw new Error('ADMIN_PASSWORD must be at least 10 characters for the super admin.');
 
-  const pool = createPool(loadConfig(process.env, { requireSecrets: false }));
+  const config = loadConfig(process.env, { requireSecrets: false });
+  assertLocalDatabaseOrConfirmed(config.databaseUrl);
+  const pool = createPool(config);
   try {
     const pending = await pendingMigrations(pool);
     if (pending.length > 0) {

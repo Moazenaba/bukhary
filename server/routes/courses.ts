@@ -81,6 +81,10 @@ export function coursesRouter(pool: Pool) {
       if (!rows[0]) throw notFound('الدورة غير موجودة');
       const { rows: used } = await db.query('SELECT count(*)::int AS n FROM committees WHERE course_id = $1;', [req.params.id]);
       if (used[0].n > 0) throw conflict(`لا يمكن حذف الدورة لأنها مرتبطة بعدد ${used[0].n} لجنة. انقل اللجان أو احذفها أولاً.`);
+      const { rows: sheet } = await db.query('SELECT count(*)::int AS n FROM summer_course_rows WHERE course_id = $1;', [req.params.id]);
+      if (sheet[0].n > 0 && req.query.deleteSheetRows !== 'true') {
+        throw conflict(`للدورة كشف فيه ${sheet[0].n} صفاً سيُحذف معها. أكّد الحذف لحذف الكشف أيضاً.`);
+      }
       await db.query('DELETE FROM courses WHERE id = $1;', [req.params.id]);
       await audit(db, req, 'course.delete', 'course', req.params.id, courseFromRow(rows[0]), null);
     });

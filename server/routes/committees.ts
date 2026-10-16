@@ -2,9 +2,12 @@ import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
 import { audit } from '../audit.ts';
+import type { AppConfig } from '../config.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, notFound, route } from '../http.ts';
-import type { Action } from '../policy.ts';
+import { type Action, isScopedRole } from '../policy.ts';
+import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages } from '../workflow.ts';
+import { notify } from './notifications.ts';
 import {
   STAGE_KEYS,
   type StageKey,
@@ -64,17 +67,6 @@ const patchInput = z
   })
   .refine((v) => Object.keys(v).some((k) => k !== 'expectedUpdatedAt'), 'لا توجد تعديلات');
 
-const STAGE_ACTION: Record<StageKey, Action> = {
-  registration: 'committees.reception',
-  exam: 'committees.reception',
-  scoring: 'committees.scoring',
-  aggregation: 'committees.scoring',
-  review: 'committees.scoring',
-  sheet: 'committees.finalize',
-  accreditation: 'committees.finalize',
-  announcement: 'committees.finalize',
-  ceremony: 'committees.finalize',
-};
 
 export function committeeFromRow(r: any) {
   return {
@@ -112,8 +104,12 @@ async function courseName(db: Queryable, courseId: string | null): Promise<strin
   return rows[0].name;
 }
 
-function checkVersion(existing: any, expected: string | undefined) {
-  if (!expected) return;
+function checkVersion(existing: any, expected: string | undefined, required = false) {
+  if (!expected) {
+    // Replacing a whole JSON document without a version would silently drop someone else's edits (API-11).
+    if (required) throw conflict('أعد تحميل بيانات اللجنة ثم احفظ مرة أخرى (مطلوب رقم إصدار البيانات)');
+    return;
+  }
   const current = existing.updated_at instanceof Date ? existing.updated_at.toISOString() : String(existing.updated_at);
   if (new Date(current).getTime() !== new Date(expected).getTime()) {
     throw conflict('تم تعديل هذه اللجنة من مستخدم آخر، يرجى تحديث البيانات ثم المحاولة مرة أخرى');
@@ -125,13 +121,11 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
   const user = req.user!;
   if (existing) {
     assertAllowed(user, 'committees.update');
-    assertCommitteeScope(user, existing.committee_number);
-    checkVersion(existing, c.expectedUpdatedAt);
+    assertCommitteeScope(user, existing.id);
+    checkVersion(existing, c.expectedUpdatedAt, Boolean(c.scoringDetails || c.aggregationDetails || c.ceremonyDetails));
   } else {
     assertAllowed(user, 'committees.create');
   }
-  // A scoped user may not move a committee to a number outside their assignment.
-  assertCommitteeScope(user, c.committeeNumber);
 
   const name = await courseName(db, c.courseId);
   const stages = { ...emptyStages(), ...(existing?.stages ?? {}), ...(c.stages ?? {}) };
@@ -165,12 +159,46 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
       c.createdDate, c.createdAtTime,
     ]
   );
+  if (existing && existing.committee_number !== c.committeeNumber) {
+    // Denormalised numbers follow the committee (API-19).
+    await db.query('UPDATE schedule_tasks SET committee_number = $2 WHERE committee_id = $1;', [c.id, c.committeeNumber]);
+    await db.query('UPDATE scoring_records SET committee_number = $2 WHERE committee_id = $1;', [c.id, c.committeeNumber]);
+  }
+  if (c.ceremonyDetails) await syncCeremonyTask(db, rows[0]);
+  if (!existing && isScopedRole(user.role) && !user.allCommittees) {
+    // A scoped manager who creates a committee is responsible for it.
+    await db.query(
+      `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids || to_jsonb($2::text)
+       WHERE id = $1 AND NOT assigned_committee_ids ? $2;`,
+      [user.id, c.id]
+    );
+  }
   await audit(db, req, existing ? 'committee.update' : 'committee.create', 'committee', c.id,
     existing ? committeeFromRow(existing) : null, committeeFromRow(rows[0]));
   return rows[0];
 }
 
-export function committeesRouter(pool: Pool) {
+/** The ceremony's calendar task has one owner: the server (WEB-08). No date means no task. */
+async function syncCeremonyTask(db: Queryable, committee: any) {
+  const taskId = `task-ceremony-${committee.id}`;
+  const details = committee.ceremony_details ?? {};
+  const raw = typeof details.ceremonyDate === 'string' ? details.ceremonyDate.trim().replace(/\//g, '-') : '';
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(Date.parse(`${raw}T00:00:00Z`)) ? raw : null;
+  if (!date) {
+    await db.query('DELETE FROM schedule_tasks WHERE id = $1;', [taskId]);
+    return;
+  }
+  await db.query(
+    `INSERT INTO schedule_tasks (id, title, date, time, committee_id, committee_number, type, priority, completed, notes, data, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'ceremony','high',false,$7,'{}'::jsonb,NOW())
+     ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, date = EXCLUDED.date, time = EXCLUDED.time,
+       committee_id = EXCLUDED.committee_id, committee_number = EXCLUDED.committee_number, notes = EXCLUDED.notes, updated_at = NOW();`,
+    [taskId, `حفل تكريم لجنة ${committee.committee_number} - ${committee.committee_name}`, date,
+      details.ceremonyTime ?? null, committee.id, committee.committee_number, details.ceremonyPlace ?? null]
+  );
+}
+
+export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStagePatch'>) {
   const r = Router();
 
   r.get('/', can('committees.read'), route(async (req, res) => {
@@ -195,7 +223,7 @@ export function committeesRouter(pool: Pool) {
 
   // All rows are saved in one transaction: either every committee is stored or none.
   r.post('/bulk', route(async (req, res) => {
-    const { committees } = z.object({ committees: z.array(committeeInput).min(1).max(1000) }).parse(req.body);
+    const { committees } = z.object({ committees: z.array(committeeInput).min(1).max(500) }).parse(req.body);
     const saved = await withTransaction(pool, async (db) => {
       const out = [];
       for (const c of committees) {
@@ -207,16 +235,18 @@ export function committeesRouter(pool: Pool) {
     res.json({ success: true, count: saved.length, committees: saved.map(committeeFromRow) });
   }));
 
-  // Partial update. Stages are merged per key, so two people ticking different stages
-  // at the same time do not overwrite each other. The row is locked for the update.
+  // Partial update from older clients. Stages are merged per key, so two people ticking different
+  // stages at the same time do not overwrite each other; timestamps are the server's. New clients
+  // use POST /:id/actions. Replacing a JSON document requires the version the client saw (API-11).
   r.patch('/:id', route(async (req, res) => {
     const body = patchInput.parse(req.body);
     const user = req.user!;
+    if (body.stages && !config.legacyStagePatch) throw badRequest('استخدم POST /api/committees/:id/actions لتغيير المراحل');
     const row = await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
       const existing = rows[0];
       if (!existing) throw notFound('اللجنة غير موجودة');
-      checkVersion(existing, body.expectedUpdatedAt);
+      checkVersion(existing, body.expectedUpdatedAt, Boolean(body.scoringDetails || body.aggregationDetails || body.ceremonyDetails));
 
       const needed = new Set<Action>();
       for (const k of Object.keys(body.stages ?? {}) as StageKey[]) needed.add(STAGE_ACTION[k]);
@@ -224,9 +254,10 @@ export function committeesRouter(pool: Pool) {
       if (body.ceremonyDetails) needed.add('committees.finalize');
       if (body.receivedByAssistant !== undefined || body.examApprovedBy !== undefined) needed.add('committees.reception');
       for (const a of needed) assertAllowed(user, a);
-      assertCommitteeScope(user, existing.committee_number);
+      assertCommitteeScope(user, existing.id);
 
       const now = new Date().toISOString();
+      const stages = body.stages ? mergeLegacyStages(existing.stages ?? {}, body.stages, user, now) : {};
       const reception =
         body.receivedByAssistant === undefined
           ? existing.received_by_assistant
@@ -252,7 +283,7 @@ export function committeesRouter(pool: Pool) {
          WHERE id = $1 RETURNING *;`,
         [
           req.params.id,
-          JSON.stringify(body.stages ?? {}),
+          JSON.stringify(stages),
           body.scoringDetails ? JSON.stringify(body.scoringDetails) : null,
           body.aggregationDetails ? JSON.stringify(body.aggregationDetails) : null,
           body.ceremonyDetails ? JSON.stringify(body.ceremonyDetails) : null,
@@ -260,8 +291,68 @@ export function committeesRouter(pool: Pool) {
           approval ? JSON.stringify(approval) : null,
         ]
       );
+      if (body.ceremonyDetails) await syncCeremonyTask(db, updated[0]);
       await audit(db, req, 'committee.patch', 'committee', req.params.id, committeeFromRow(existing), committeeFromRow(updated[0]),
         Object.keys(body).filter((k) => k !== 'expectedUpdatedAt').join(','));
+      return updated[0];
+    });
+    res.json({ success: true, committeeId: row.id, committee: committeeFromRow(row) });
+  }));
+
+  // Workflow intents (API-10): the server applies the rule, stamps who and when, and keeps the
+  // ceremony task in step. The version is optional because each intent changes one thing.
+  r.post('/:id/actions', route(async (req, res) => {
+    const { action, expectedUpdatedAt: expected } = z
+      .object({ action: committeeAction, expectedUpdatedAt })
+      .parse(req.body);
+    const user = req.user!;
+    const row = await withTransaction(pool, async (db) => {
+      const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
+      const existing = rows[0];
+      if (!existing) throw notFound('اللجنة غير موجودة');
+      checkVersion(existing, expected);
+      assertAllowed(user, actionPermission(action));
+      assertCommitteeScope(user, existing.id);
+      const next = applyCommitteeAction(
+        {
+          stages: existing.stages ?? {},
+          receivedByAssistant: existing.received_by_assistant,
+          examApprovedBy: existing.exam_approved_by,
+          scoringDetails: existing.scoring_details,
+          aggregationDetails: existing.aggregation_details,
+          ceremonyDetails: existing.ceremony_details,
+        },
+        action,
+        user,
+        new Date().toISOString()
+      );
+      const { rows: updated } = await db.query(
+        `UPDATE committees SET stages = $2::jsonb, received_by_assistant = $3::jsonb, exam_approved_by = $4::jsonb,
+           scoring_details = $5::jsonb, aggregation_details = $6::jsonb, ceremony_details = $7::jsonb, updated_at = NOW()
+         WHERE id = $1 RETURNING *;`,
+        [
+          existing.id,
+          JSON.stringify(next.stages),
+          next.receivedByAssistant ? JSON.stringify(next.receivedByAssistant) : null,
+          next.examApprovedBy ? JSON.stringify(next.examApprovedBy) : null,
+          JSON.stringify(next.scoringDetails ?? {}),
+          JSON.stringify(next.aggregationDetails ?? {}),
+          JSON.stringify(next.ceremonyDetails ?? {}),
+        ]
+      );
+      if (action.type === 'scheduleCeremony') {
+        await syncCeremonyTask(db, updated[0]);
+        if (action.ceremonyDate) {
+          await notify(db, {
+            title: `تم تحديد موعد حفل لجنة ${existing.committee_number}`,
+            description: `${existing.committee_name} — ${action.ceremonyDate}${action.ceremonyTime ? ` ${action.ceremonyTime}` : ''}`,
+            type: 'info',
+            committeeId: existing.id,
+          });
+        }
+      }
+      await audit(db, req, `committee.${action.type}`, 'committee', existing.id, committeeFromRow(existing), committeeFromRow(updated[0]),
+        'stage' in action ? action.stage : '');
       return updated[0];
     });
     res.json({ success: true, committeeId: row.id, committee: committeeFromRow(row) });
@@ -272,7 +363,8 @@ export function committeesRouter(pool: Pool) {
       const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
       if (!rows[0]) throw notFound('اللجنة غير موجودة');
       assertAllowed(req.user!, 'committees.delete');
-      assertCommitteeScope(req.user!, rows[0].committee_number);
+      assertCommitteeScope(req.user!, rows[0].id);
+      await db.query('DELETE FROM schedule_tasks WHERE id = $1;', [`task-ceremony-${req.params.id}`]);
       await db.query('DELETE FROM committees WHERE id = $1;', [req.params.id]);
       await audit(db, req, 'committee.delete', 'committee', req.params.id, committeeFromRow(rows[0]), null);
     });

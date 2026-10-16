@@ -1,10 +1,11 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { can } from '../auth.ts';
+import { type Principal, canAccessExam } from '../policy.ts';
 import { audit } from '../audit.ts';
 import { type Pool, withTransaction } from '../db.ts';
-import { badRequest, notFound, route } from '../http.ts';
-import { id, nonNegativeInt, optionalText, timestampInput } from '../schemas.ts';
+import { badRequest, forbidden, notFound, route } from '../http.ts';
+import { id, nonNegativeInt, optionalText } from '../schemas.ts';
 
 export const MAX_EXAM_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -17,11 +18,17 @@ const examInput = z.object({
   durationMinutes: nonNegativeInt.default(60),
   questionsCount: nonNegativeInt.nullish(),
   sampleQuestions: z.array(z.string().max(2000)).max(100).optional(),
-  uploadedAt: timestampInput,
+  // Ignored: the server records when a file is uploaded (WEB-01). Kept so older clients still validate.
+  uploadedAt: z.string().max(100).nullish(),
   notes: optionalText(5000),
 });
 
-export function examFromRow(r: any) {
+/**
+ * Sample questions and notes are exam content: only people who may open the exam file see them
+ * (API-13). Everyone else sees the title, book and file metadata.
+ */
+export function examFromRow(r: any, viewer?: Principal) {
+  const content = !viewer || canAccessExam(viewer, r.id);
   return {
     id: r.id,
     title: r.title,
@@ -30,9 +37,10 @@ export function examFromRow(r: any) {
     totalMarks: r.total_marks ?? 100,
     durationMinutes: r.duration_minutes ?? 60,
     questionsCount: r.questions_count ?? undefined,
-    sampleQuestions: r.data?.sampleQuestions ?? [],
+    sampleQuestions: content ? r.data?.sampleQuestions ?? [] : [],
     uploadedAt: r.uploaded_at ?? '',
-    notes: r.notes ?? undefined,
+    notes: content ? r.notes ?? undefined : undefined,
+    canOpen: viewer ? canAccessExam(viewer, r.id) : undefined,
     // File metadata only; the content is served by GET /api/exams/:id/file to allowed roles.
     hasFile: Boolean(r.file_name),
     pdfFileName: r.file_name ?? undefined,
@@ -49,15 +57,15 @@ const LIST_SQL = `
 export function examsRouter(pool: Pool) {
   const r = Router();
 
-  r.get('/', can('exams.read'), route(async (_req, res) => {
+  r.get('/', can('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} ORDER BY e.updated_at DESC;`);
-    res.json({ success: true, exams: rows.map(examFromRow) });
+    res.json({ success: true, exams: rows.map((r) => examFromRow(r, req.user)) });
   }));
 
   r.get('/:id', can('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} WHERE e.id = $1;`, [req.params.id]);
     if (!rows[0]) throw notFound('الامتحان غير موجود');
-    res.json({ success: true, exam: examFromRow(rows[0]) });
+    res.json({ success: true, exam: examFromRow(rows[0], req.user) });
   }));
 
   r.post('/', can('exams.write'), route(async (req, res) => {
@@ -73,13 +81,13 @@ export function examsRouter(pool: Pool) {
            questions_count = EXCLUDED.questions_count, notes = EXCLUDED.notes,
            data = EXCLUDED.data, updated_at = NOW();`,
         [e.id, e.title, e.book, e.branch, e.totalMarks, e.durationMinutes, e.questionsCount ?? null,
-          e.uploadedAt ?? new Date().toISOString(), e.notes, JSON.stringify({ sampleQuestions: e.sampleQuestions ?? before[0]?.data?.sampleQuestions ?? [] })]
+          before[0]?.uploaded_at ?? new Date().toISOString(), e.notes, JSON.stringify({ sampleQuestions: e.sampleQuestions ?? before[0]?.data?.sampleQuestions ?? [] })]
       );
       const { rows } = await db.query(`${LIST_SQL} WHERE e.id = $1;`, [e.id]);
       await audit(db, req, before[0] ? 'exam.update' : 'exam.create', 'exam', e.id, before[0] ? examFromRow(before[0]) : null, examFromRow(rows[0]));
       return rows[0];
     });
-    res.json({ success: true, exam: examFromRow(row) });
+    res.json({ success: true, exam: examFromRow(row, req.user) });
   }));
 
   // Raw PDF upload: Content-Type application/pdf, file name in X-File-Name (URI-encoded).
@@ -91,7 +99,12 @@ export function examsRouter(pool: Pool) {
       const body = req.body as Buffer;
       if (!Buffer.isBuffer(body) || body.length === 0) throw badRequest('يرجى إرسال ملف PDF');
       if (body.subarray(0, 5).toString('latin1') !== '%PDF-') throw badRequest('الملف المرسل ليس ملف PDF صالحاً');
-      const fileName = decodeURIComponent(String(req.headers['x-file-name'] || `${req.params.id}.pdf`)).slice(0, 255);
+      let fileName: string;
+      try {
+        fileName = decodeURIComponent(String(req.headers['x-file-name'] || `${req.params.id}.pdf`)).slice(0, 255);
+      } catch {
+        throw badRequest('اسم الملف غير صالح');
+      }
       await withTransaction(pool, async (db) => {
         const { rows } = await db.query('SELECT id FROM exams WHERE id = $1 FOR UPDATE;', [req.params.id]);
         if (!rows[0]) throw notFound('الامتحان غير موجود');
@@ -102,7 +115,7 @@ export function examsRouter(pool: Pool) {
              content = EXCLUDED.content, uploaded_by = EXCLUDED.uploaded_by, uploaded_at = NOW();`,
           [req.params.id, fileName, body.length, body, req.user!.id]
         );
-        await db.query('UPDATE exams SET updated_at = NOW() WHERE id = $1;', [req.params.id]);
+        await db.query('UPDATE exams SET uploaded_at = NOW(), updated_at = NOW() WHERE id = $1;', [req.params.id]);
         await audit(db, req, 'exam.file_upload', 'exam', req.params.id, null, { fileName, sizeBytes: body.length });
       });
       res.json({ success: true });
@@ -110,6 +123,8 @@ export function examsRouter(pool: Pool) {
   );
 
   r.get('/:id/file', can('exams.file'), route(async (req, res) => {
+    // The per-user exam allow-list is enforced here, not only in the UI (API-06).
+    if (!canAccessExam(req.user!, req.params.id)) throw forbidden('هذا الامتحان غير متاح لك');
     const { rows } = await pool.query('SELECT file_name, mime_type, content FROM exam_files WHERE exam_id = $1;', [req.params.id]);
     if (!rows[0]) throw notFound('لا يوجد ملف مرفوع لهذا الامتحان');
     res.setHeader('Content-Type', rows[0].mime_type);

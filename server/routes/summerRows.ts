@@ -1,9 +1,9 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { can } from '../auth.ts';
+import { assertAllowed, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
-import { badRequest, notFound, route } from '../http.ts';
+import { badRequest, forbidden, notFound, route } from '../http.ts';
 import { id, nonNegativeInt, optionalId, optionalText } from '../schemas.ts';
 
 // Field names follow the web type SummerCourseRow (snake_case sheet columns + camelCase links).
@@ -104,6 +104,8 @@ export function summerRowsRouter(pool: Pool) {
     const { rows, replaceCourseId } = z
       .object({ rows: z.array(rowInput).max(2000), replaceCourseId: optionalId })
       .parse(req.body);
+    // Replacing a sheet deletes every row that is not in the request: super admins only.
+    if (replaceCourseId && req.user!.role !== 'super_admin') throw forbidden('استبدال كشف الدورة بالكامل متاح للمشرف العام فقط');
     const saved = await withTransaction(pool, async (db) => {
       const out = [];
       for (const row of rows) out.push(await upsertRow(db, req, row));

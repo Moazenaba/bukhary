@@ -6,6 +6,7 @@ import { createApp } from './server/app.ts';
 import { loadConfig } from './server/config.ts';
 import { createPool } from './server/db.ts';
 import { logger, reportError } from './server/logger.ts';
+import { startMaintenance } from './server/maintenance.ts';
 import { pendingMigrations } from './server/migrate.ts';
 
 // Entry point: API + web app. Schema changes are never applied here; run
@@ -27,6 +28,7 @@ async function main() {
   }
 
   const app = createApp(config, pool);
+  startMaintenance(pool);
 
   if (config.isProduction) {
     const dist = path.resolve(process.cwd(), 'dist');

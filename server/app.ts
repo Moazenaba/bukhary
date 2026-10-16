@@ -1,9 +1,11 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { authenticate } from './auth.ts';
 import type { AppConfig } from './config.ts';
 import type { Pool } from './db.ts';
 import { errorHandler, notFound, requestId, route } from './http.ts';
+import { idempotency } from './idempotency.ts';
 import { logger } from './logger.ts';
 import { pendingMigrations } from './migrate.ts';
 import { auditLogsRouter, databaseRouter, ocrRouter } from './routes/admin.ts';
@@ -56,13 +58,21 @@ export function createApp(config: AppConfig, pool: Pool) {
   app.use('/api/extract-table', express.json({ limit: '15mb' }));
   app.use(express.json({ limit: '1mb' }));
 
+  // A ceiling for every API route per IP (API-26); login, registration and OCR have tighter ones.
+  // The store is in memory, so with several instances the effective limit multiplies (API-28).
+  if (config.apiRateLimitPerMinute > 0 && config.nodeEnv !== 'test') {
+    app.use('/api/', rateLimit({ windowMs: 60_000, limit: config.apiRateLimitPerMinute, standardHeaders: true, legacyHeaders: false,
+      message: { success: false, message: 'طلبات كثيرة، يرجى المحاولة بعد قليل' } }));
+  }
+
   // ---- Public ----
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.get('/api/ready', route(async (_req, res) => {
     try {
       await pool.query('SELECT 1;');
       const pending = await pendingMigrations(pool);
-      if (pending.length) return res.status(503).json({ status: 'migrations_pending', pending: pending.map((m) => m.name) });
+      // Only the count is public; `npm run migrate -- status` lists the names (API-25).
+      if (pending.length) return res.status(503).json({ status: 'migrations_pending', pending: pending.length });
       res.json({ status: 'ready' });
     } catch {
       res.status(503).json({ status: 'database_unavailable' });
@@ -71,10 +81,11 @@ export function createApp(config: AppConfig, pool: Pool) {
   app.use('/api/auth', authRouter(config, pool));
 
   // ---- Authenticated ----
-  const authed = authenticate(config, pool);
+  // Writes that carry an Idempotency-Key are applied once, however often they are retried.
+  const authed = [authenticate(config, pool), idempotency(pool)];
   app.use('/api/courses', authed, coursesRouter(pool));
-  app.use('/api/committees', authed, committeesRouter(pool));
-  app.use('/api/users', authed, usersRouter(pool));
+  app.use('/api/committees', authed, committeesRouter(pool, config));
+  app.use('/api/users', authed, usersRouter(pool, { strictPermissionIds: config.strictPermissionIds }));
   app.use('/api/exams', authed, examsRouter(pool));
   app.use('/api/tasks', authed, tasksRouter(pool));
   app.use('/api/notifications', authed, notificationsRouter(pool));

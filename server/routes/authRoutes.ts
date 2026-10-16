@@ -1,12 +1,22 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { authenticate, consumeRefreshToken, issueRefreshToken, signAccessToken, toPrincipal } from '../auth.ts';
+import {
+  authenticate,
+  createSession,
+  issueRefreshToken,
+  loadPrincipal,
+  revokeAllSessions,
+  revokeSession,
+  rotateRefreshToken,
+  signAccessToken,
+} from '../auth.ts';
 import { audit } from '../audit.ts';
 import type { AppConfig } from '../config.ts';
-import { type Pool, withTransaction } from '../db.ts';
+import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { HttpError, conflict, route } from '../http.ts';
 import { evaluatedPermissions } from '../policy.ts';
 import { optionalText, toAsciiDigits } from '../schemas.ts';
@@ -15,7 +25,13 @@ import { emailSchema, passwordSchema, phoneSchema, userFromRow } from './users.t
 // Hash of a random string, compared when the account does not exist so that
 // "unknown user" and "wrong password" take the same time.
 const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 12);
-const INVALID_LOGIN = 'بيانات الدخول غير صحيحة';
+// One message for unknown account, wrong password and temporarily locked account, so the
+// response never tells whether an account exists (API-22).
+const INVALID_LOGIN = 'بيانات الدخول غير صحيحة، أو أن الحساب موقوف مؤقتاً بسبب محاولات متكررة';
+
+// The web keeps its refresh token in this HttpOnly cookie; page scripts cannot read it (WEB-11).
+export const REFRESH_COOKIE = 'bukhari_rt';
+const COOKIE_PATH = '/api/auth';
 
 const loginInput = z.object({
   identifier: z.string().trim().min(1).max(200),
@@ -42,6 +58,42 @@ function newRequestCode(): string {
   return `REQ-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
+/**
+ * The web client identifies itself with `X-Client: web`. A custom header cannot be sent
+ * cross-site without a CORS preflight (which this API never grants), so it also protects the
+ * cookie-based refresh against CSRF, together with SameSite=Strict.
+ */
+const isWebClient = (req: Request) => req.get('X-Client') === 'web';
+
+function readCookie(req: Request, name: string): string | undefined {
+  const header = req.headers.cookie;
+  if (!header) return undefined;
+  for (const part of header.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(v.join('='));
+  }
+  return undefined;
+}
+
+function setRefreshCookie(res: Response, config: AppConfig, token: string) {
+  res.cookie(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'strict',
+    path: COOKIE_PATH,
+    maxAge: config.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+  });
+}
+
+function clearRefreshCookie(res: Response, config: AppConfig) {
+  res.clearCookie(REFRESH_COOKIE, { httpOnly: true, secure: config.isProduction, sameSite: 'strict', path: COOKIE_PATH });
+}
+
+/** Security events go to the audit log with the request's IP; the password is never recorded. */
+async function securityEvent(db: Queryable, req: Request, action: string, userId: string | null, details: string) {
+  await audit(db, req, action, 'auth', userId, null, null, details).catch(() => undefined);
+}
+
 export function authRouter(config: AppConfig, pool: Pool) {
   const r = Router();
   const isTest = config.nodeEnv === 'test';
@@ -53,10 +105,21 @@ export function authRouter(config: AppConfig, pool: Pool) {
   const trackLimiter = rateLimit({ windowMs: 15 * 60_000, limit: isTest ? 1000 : 30, standardHeaders: true, legacyHeaders: false,
     message: { success: false, message: 'محاولات استعلام كثيرة، يرجى المحاولة لاحقاً' } });
 
-  async function issueSession(userRow: any, userAgent?: string) {
-    const token = signAccessToken(config, userRow.id, userRow.token_version);
-    const refreshToken = await issueRefreshToken(pool, config, userRow.id, userAgent);
-    return { token, refreshToken, user: userFromRow(userRow, { includeIdentity: true }) };
+  /** Sends the session to the client: refresh token in an HttpOnly cookie for the web, in the body otherwise. */
+  async function sendSession(req: Request, res: Response, userRow: any, sessionId: string, status = 200) {
+    const token = signAccessToken(config, userRow.id, userRow.token_version, sessionId);
+    const refreshToken = await issueRefreshToken(pool, config, userRow.id, sessionId, req.headers['user-agent']);
+    const principal = await loadPrincipal(pool, userRow.id);
+    const body: Record<string, unknown> = {
+      success: true,
+      token,
+      user: userFromRow(userRow, { includeIdentity: true }),
+      mustChangePassword: Boolean(userRow.must_change_password),
+      permissions: principal ? evaluatedPermissions(principal) : undefined,
+    };
+    if (isWebClient(req)) setRefreshCookie(res, config, refreshToken);
+    else body.refreshToken = refreshToken;
+    res.status(status).json(body);
   }
 
   r.post('/login', loginLimiter, route(async (req, res) => {
@@ -65,27 +128,33 @@ export function authRouter(config: AppConfig, pool: Pool) {
     const identifier = toAsciiDigits(raw);
     const ident = /^\+?[\d\s-]+$/.test(identifier) ? identifier.replace(/[\s-]/g, '') : identifier;
     const { rows } = await pool.query(
-      `SELECT * FROM app_users
+      `SELECT *, (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
+              (locked_until IS NOT NULL AND locked_until <= NOW()) AS lock_expired
+       FROM app_users
        WHERE phone = $1 OR lower(email) = lower($1)
        ORDER BY (phone = $1) DESC LIMIT 1;`,
       [ident]
     );
     const user = rows[0];
 
-    if (user?.locked_until && new Date(user.locked_until) > new Date()) {
-      throw new HttpError(429, 'تم إيقاف تسجيل الدخول لهذا الحساب مؤقتاً بسبب محاولات فاشلة متكررة. حاول لاحقاً.', 'locked');
-    }
-
+    // The hash is always compared, so a locked or unknown account takes the same time.
     const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH);
-    if (!user || !user.password || !ok) {
-      if (user) {
-        await pool.query(
+    if (!user || !user.password || !ok || user.is_locked) {
+      if (user && !user.is_locked) {
+        // A lock that has run out starts a fresh count instead of re-locking on the next mistake.
+        const { rows: after } = await pool.query(
           `UPDATE app_users SET
-             failed_login_count = failed_login_count + 1,
-             locked_until = CASE WHEN failed_login_count + 1 >= $2 THEN NOW() + make_interval(mins => $3) ELSE locked_until END
-           WHERE id = $1;`,
-          [user.id, config.maxLoginAttempts, config.lockoutMinutes]
+             failed_login_count = CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END,
+             locked_until = CASE WHEN (CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END) >= $2
+                                 THEN NOW() + make_interval(mins => $3) ELSE NULL END
+           WHERE id = $1 RETURNING locked_until;`,
+          [user.id, config.maxLoginAttempts, config.lockoutMinutes, Boolean(user.lock_expired)]
         );
+        await securityEvent(pool, req, after[0]?.locked_until ? 'auth.locked' : 'auth.login_failed', user.id, 'wrong password');
+      } else if (user?.is_locked) {
+        await securityEvent(pool, req, 'auth.login_failed', user.id, 'account locked');
+      } else {
+        await securityEvent(pool, req, 'auth.login_failed', null, `unknown identifier ${ident.slice(0, 3)}…`);
       }
       throw new HttpError(401, INVALID_LOGIN, 'invalid_credentials');
     }
@@ -99,20 +168,53 @@ export function authRouter(config: AppConfig, pool: Pool) {
           : 'الحساب قيد المراجعة من المشرف العام ولم يتم تفعيله بعد';
       throw new HttpError(403, message, `account_${user.status}`);
     }
-    res.json({ success: true, ...(await issueSession(user, req.headers['user-agent'])) });
+    const sessionId = await createSession(pool, user.id, req.headers['user-agent']);
+    await securityEvent(pool, req, 'auth.login', user.id, '');
+    await sendSession(req, res, user, sessionId);
   }));
 
   r.post('/refresh', loginLimiter, route(async (req, res) => {
-    const { refreshToken } = z.object({ refreshToken: z.string().min(10).max(500) }).parse(req.body);
-    const userId = await consumeRefreshToken(pool, refreshToken);
-    const { rows } = await pool.query('SELECT * FROM app_users WHERE id = $1;', [userId]);
-    if (!rows[0] || rows[0].status !== 'approved') throw new HttpError(401, 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'invalid_refresh');
-    res.json({ success: true, ...(await issueSession(rows[0], req.headers['user-agent'])) });
+    const body = z.object({ refreshToken: z.string().min(10).max(500).optional() }).parse(req.body ?? {});
+    const fromCookie = !body.refreshToken && isWebClient(req) ? readCookie(req, REFRESH_COOKIE) : undefined;
+    const token = body.refreshToken ?? fromCookie;
+    if (!token) throw new HttpError(401, 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'invalid_refresh');
+    try {
+      // Not in a transaction: when reuse is detected the session revocation must stick even though
+      // the request fails.
+      const { userId, sessionId } = await rotateRefreshToken(pool, token, { allowGrace: Boolean(fromCookie) });
+      const { rows } = await pool.query('SELECT * FROM app_users WHERE id = $1;', [userId]);
+      if (!rows[0] || rows[0].status !== 'approved') throw new HttpError(401, 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'invalid_refresh');
+      await sendSession(req, res, rows[0], sessionId);
+    } catch (err) {
+      if (err instanceof HttpError && err.code === 'invalid_refresh') {
+        if (fromCookie) clearRefreshCookie(res, config);
+        await securityEvent(pool, req, 'auth.refresh_failed', null, '');
+      }
+      throw err;
+    }
   }));
 
+  // Ends the session immediately: its access tokens stop working and its refresh tokens are revoked.
   r.post('/logout', route(async (req, res) => {
-    const token = z.object({ refreshToken: z.string().max(500).optional() }).parse(req.body ?? {}).refreshToken;
-    if (token) await consumeRefreshToken(pool, token).catch(() => undefined);
+    const body = z.object({ refreshToken: z.string().max(500).optional() }).parse(req.body ?? {});
+    const token = body.refreshToken ?? (isWebClient(req) ? readCookie(req, REFRESH_COOKIE) : undefined);
+    const sessions = new Set<string>();
+    if (token) {
+      const [id] = String(token).split('.');
+      const { rows } = await pool.query('SELECT session_id FROM refresh_tokens WHERE id = $1;', [id]);
+      if (rows[0]) sessions.add(rows[0].session_id);
+    }
+    const header = req.headers.authorization || '';
+    if (header.startsWith('Bearer ')) {
+      try {
+        const claims = jwt.verify(header.slice(7), config.jwtSecret, { algorithms: ['HS256'], ignoreExpiration: true }) as any;
+        if (claims?.sid) sessions.add(claims.sid);
+      } catch {
+        // A bad token simply has no session to end.
+      }
+    }
+    for (const sid of sessions) await revokeSession(pool, sid, 'logout');
+    clearRefreshCookie(res, config);
     res.json({ success: true });
   }));
 
@@ -149,29 +251,38 @@ export function authRouter(config: AppConfig, pool: Pool) {
 
   r.get('/me', authed, route(async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM app_users WHERE id = $1;', [req.user!.id]);
-    res.json({ success: true, user: userFromRow(rows[0], { includeIdentity: true }), permissions: evaluatedPermissions(toPrincipal(rows[0])) });
+    res.json({
+      success: true,
+      user: userFromRow(rows[0], { includeIdentity: true }),
+      permissions: evaluatedPermissions(req.user!),
+      mustChangePassword: req.user!.mustChangePassword,
+    });
   }));
 
   r.post('/change-password', authed, route(async (req, res) => {
     const { currentPassword, newPassword } = z
       .object({ currentPassword: z.string().min(1).max(128), newPassword: passwordSchema })
       .parse(req.body);
-    const session = await withTransaction(pool, async (db) => {
+    const { user, sessionId } = await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM app_users WHERE id = $1 FOR UPDATE;', [req.user!.id]);
-      const user = rows[0];
-      if (!(await bcrypt.compare(currentPassword, user.password || DUMMY_HASH))) {
+      const current = rows[0];
+      if (!(await bcrypt.compare(currentPassword, current.password || DUMMY_HASH))) {
         throw new HttpError(400, 'كلمة المرور الحالية غير صحيحة', 'wrong_password');
       }
+      if (await bcrypt.compare(newPassword, current.password || DUMMY_HASH)) {
+        throw new HttpError(400, 'كلمة المرور الجديدة يجب أن تختلف عن الحالية', 'same_password');
+      }
       const { rows: updated } = await db.query(
-        `UPDATE app_users SET password = $2, password_changed_at = NOW(), token_version = token_version + 1
+        `UPDATE app_users SET password = $2, password_changed_at = NOW(), token_version = token_version + 1,
+           must_change_password = false
          WHERE id = $1 RETURNING *;`,
-        [user.id, await bcrypt.hash(newPassword, 12)]
+        [current.id, await bcrypt.hash(newPassword, 12)]
       );
-      await db.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL;', [user.id]);
-      await audit(db, req, 'user.change_password', 'user', user.id, null, null);
-      return updated[0];
+      await revokeAllSessions(db, current.id, 'password_change');
+      await audit(db, req, 'user.change_password', 'user', current.id, null, null);
+      return { user: updated[0], sessionId: await createSession(db, current.id, req.headers['user-agent']) };
     });
-    res.json({ success: true, ...(await issueSession(session, req.headers['user-agent'])) });
+    await sendSession(req, res, user, sessionId);
   }));
 
   return r;

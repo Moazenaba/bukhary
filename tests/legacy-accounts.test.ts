@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../server/app.ts';
-import { issueRefreshToken } from '../server/auth.ts';
+import { sha256 } from '../server/auth.ts';
 import { countRealSuperAdmins, createFirstSuperAdmin } from '../server/bootstrapAdmin.ts';
 import { loadConfig } from '../server/config.ts';
 import { createPool, type Pool } from '../server/db.ts';
@@ -51,7 +52,14 @@ beforeAll(async () => {
   await insertLegacyUser('user-admin', 'super_admin', '0501112233', 'admin', OLD_PASSWORD, false);
   await insertLegacyUser('user-head-dosari', 'committee_head', '0552223344', 'dosari@bukhari.org', CHANGED_PASSWORD, true);
   await insertLegacyUser('user-ast-moaz', 'assistant', '0553334455', 'moaz@bukhari.org', OLD_PASSWORD, false);
-  adminRefreshToken = await issueRefreshToken(pool, config, 'user-admin');
+  // A refresh token as the server issued them before sessions existed (schema at migration 006).
+  const secret = crypto.randomBytes(32).toString('base64url');
+  const tokenId = crypto.randomUUID();
+  await pool.query(
+    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES ($1, 'user-admin', $2, NOW() + interval '30 days');`,
+    [tokenId, sha256(secret)]
+  );
+  adminRefreshToken = `${tokenId}.${secret}`;
 });
 
 afterAll(async () => {
@@ -60,13 +68,14 @@ afterAll(async () => {
 });
 
 describe('legacy demo accounts', () => {
-  it('can still sign in before migration 007 (the risk being fixed)', async () => {
-    const res = await request(app).post('/api/auth/login').send({ identifier: 'admin', password: OLD_PASSWORD });
-    expect(res.status).toBe(200);
+  it('before migration 007 the published password still works (the risk being fixed)', async () => {
+    const { rows } = await pool.query("SELECT status, password FROM app_users WHERE id = 'user-admin';");
+    expect(rows[0].status).toBe('approved');
+    expect(await bcrypt.compare(OLD_PASSWORD, rows[0].password)).toBe(true);
   });
 
   it('migration 007 disables accounts that still have their original password', async () => {
-    expect(await migrate(pool)).toEqual(['007_disable_legacy_accounts']);
+    expect((await migrate(pool))[0]).toBe('007_disable_legacy_accounts');
     const { rows } = await pool.query(
       "SELECT id, status, password, token_version FROM app_users WHERE id IN ('user-admin','user-ast-moaz') ORDER BY id;"
     );

@@ -2,13 +2,17 @@ import 'dotenv/config';
 import { loadConfig } from '../server/config.ts';
 import { createPool } from '../server/db.ts';
 import { listMigrations, migrate, pendingMigrations } from '../server/migrate.ts';
+import { assertLocalDatabaseOrConfirmed } from '../server/scriptGuard.ts';
 
 // Usage:
 //   npm run migrate            apply pending migrations
 //   npm run migrate -- status  list applied / pending migrations without changing anything
+//   npm run migrate -- --remote  allow a non-local DATABASE_URL (the release step uses migrate:prod)
 
 async function main() {
-  const pool = createPool(loadConfig(process.env, { requireSecrets: false }));
+  const config = loadConfig(process.env, { requireSecrets: false });
+  assertLocalDatabaseOrConfirmed(config.databaseUrl);
+  const pool = createPool(config);
   try {
     if (process.argv[2] === 'status') {
       const pending = new Set((await pendingMigrations(pool)).map((m) => m.name));

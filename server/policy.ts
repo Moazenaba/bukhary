@@ -1,5 +1,5 @@
 // Single source of truth for who may do what. The server enforces it, and
-// GET /api/me/permissions returns the evaluated result so web and mobile show
+// GET /api/auth/me returns the evaluated result so web and mobile show
 // exactly the actions the server will accept.
 
 export const ROLES = ['super_admin', 'committee_head', 'teacher', 'assistant', 'auditor'] as const;
@@ -25,7 +25,7 @@ export interface ActionRule {
   grantedToRoles?: readonly Role[];
   /** Read-only actions are the only ones an auditor may perform. */
   readOnly?: boolean;
-  /** Non-admin committee_head/assistant may act only on their assigned committees. */
+  /** Scoped roles (head, assistant, teacher) may act only on their assigned committees. */
   committeeScoped?: boolean;
   description: string;
 }
@@ -98,7 +98,6 @@ export const ACTIONS = {
   },
   'notifications.create': { roles: ['super_admin'], description: 'إرسال تنبيه عام' },
   'audit.read': { roles: ['super_admin', 'auditor'], readOnly: true, description: 'عرض سجلات التدقيق' },
-  'stats.read': { readOnly: true, anyPermission: ['progress_stats'], grantedToRoles: ['auditor', 'committee_head'], description: 'الإحصائيات' },
   'database.admin': { roles: ['super_admin'], description: 'حالة قاعدة البيانات' },
   'ocr.use': { roles: MANAGERS, anyPermission: ['database_sheets'], description: 'استخراج جدول من صورة' },
 } satisfies Record<string, ActionRule>;
@@ -110,11 +109,25 @@ export interface Principal {
   name: string;
   role: Role;
   permissions: string[];
+  /** Committees (by id) a scoped user may act on. Committee numbers repeat across courses, ids do not. */
+  assignedCommitteeIds: string[];
+  /** Scoped user granted every committee (set only by a super admin). */
+  allCommittees: boolean;
+  /** Committee numbers of the assigned committees; informational, kept for older clients. */
   assignedCommittees: number[];
+  /** Exam access for roles that may download exam files. */
+  allExams: boolean;
+  allowedExamIds: string[];
+  /** Set after an admin password reset; only account endpoints work until it is cleared. */
+  mustChangePassword: boolean;
 }
 
+/** Roles whose committee actions are limited to their assigned committees. */
+export const SCOPED_ROLES: readonly Role[] = ['committee_head', 'assistant', 'teacher'];
+export const isScopedRole = (role: Role) => SCOPED_ROLES.includes(role);
+
 /** Whether `user` may perform `action` at all (committee scope is checked separately). */
-export function isAllowed(user: Principal, action: Action): boolean {
+export function isAllowed(user: Pick<Principal, 'role' | 'permissions'>, action: Action): boolean {
   if (user.role === 'super_admin') return true;
   const rule: ActionRule = ACTIONS[action];
   if (user.role === 'auditor' && !rule.readOnly) return false;
@@ -124,16 +137,40 @@ export function isAllowed(user: Principal, action: Action): boolean {
   return true;
 }
 
-/** Committee-scope rule from the business decision: heads and assistants act only on assigned committees. */
-export function isCommitteeInScope(user: Principal, committeeNumber: number | null | undefined): boolean {
-  if (user.role !== 'committee_head' && user.role !== 'assistant') return true;
-  if (committeeNumber === null || committeeNumber === undefined) return false;
-  return user.assignedCommittees.includes(Number(committeeNumber));
+/**
+ * Committee-scope rule from the business decision: heads, assistants and teachers act only on
+ * committees assigned to them (by committee id), unless a super admin granted them all committees.
+ */
+export function isCommitteeInScope(user: Principal, committeeId: string | null | undefined): boolean {
+  if (!isScopedRole(user.role)) return true;
+  if (user.allCommittees) return true;
+  if (!committeeId) return false;
+  return user.assignedCommitteeIds.includes(committeeId);
 }
+
+/** Exam content (file, sample questions) is limited by the per-user exam allow-list. */
+export function canAccessExam(user: Principal, examId: string): boolean {
+  if (!isAllowed(user, 'exams.file')) return false;
+  if (user.role === 'super_admin') return true;
+  return user.allExams || user.allowedExamIds.includes(examId);
+}
+
+/** Only system permissions grant anything; custom permission labels are display-only tags. */
+export const isSystemPermission = (p: string): p is (typeof SYSTEM_PERMISSIONS)[number] =>
+  (SYSTEM_PERMISSIONS as readonly string[]).includes(p);
 
 export function evaluatedPermissions(user: Principal) {
   const actions: Record<string, boolean> = {};
   for (const a of Object.keys(ACTIONS) as Action[]) actions[a] = isAllowed(user, a);
-  const scoped = user.role === 'committee_head' || user.role === 'assistant';
-  return { role: user.role, actions, committeeScope: scoped ? user.assignedCommittees : 'all' as const };
+  const scoped = isScopedRole(user.role) && !user.allCommittees;
+  return {
+    role: user.role,
+    actions,
+    // 'all' or the committee ids in scope.
+    committeeScope: scoped ? user.assignedCommitteeIds : ('all' as const),
+    // Same scope as committee numbers, for clients that predate committee ids.
+    committeeNumbers: scoped ? user.assignedCommittees : ('all' as const),
+    exams: user.role === 'super_admin' || user.allExams ? ('all' as const) : user.allowedExamIds,
+    mustChangePassword: user.mustChangePassword,
+  };
 }

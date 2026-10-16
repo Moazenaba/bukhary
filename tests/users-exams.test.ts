@@ -46,10 +46,12 @@ describe('users', () => {
     expect(reject.body.user.rejectedBy).toBeTruthy();
   });
 
-  it('the last super admin cannot be demoted or deleted', async () => {
+  it('a super admin cannot demote themself, and the last super admin cannot be deleted', async () => {
     const demote = await t.api().post('/api/users').set(admin.auth)
       .send({ id: admin.id, name: 'admin', phone: admin.phone, role: 'assistant' });
-    expect(demote.status).toBe(409);
+    expect(demote.status).toBe(403);
+    const { rows } = await t.pool.query('SELECT role FROM app_users WHERE id = $1;', [admin.id]);
+    expect(rows[0].role).toBe('super_admin');
   });
 
   it('identity documents are hidden from managers who are not super admins', async () => {

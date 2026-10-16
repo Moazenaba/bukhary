@@ -51,15 +51,36 @@ export const PASSWORD = 'Passw0rd-test';
 
 export async function createUser(
   pool: pg.Pool,
-  opts: { role: string; status?: string; permissions?: string[]; assigned?: number[]; name?: string; phone?: string }
+  opts: {
+    role: string;
+    status?: string;
+    permissions?: string[];
+    /** Committee numbers; resolved to the ids of committees that exist when the user is created. */
+    assigned?: number[];
+    committeeIds?: string[];
+    allCommittees?: boolean;
+    /** Defaults to true, matching accounts that existed before exam allow-lists were enforced. */
+    allExams?: boolean;
+    allowedExamIds?: string[];
+    mustChangePassword?: boolean;
+    name?: string;
+    phone?: string;
+  }
 ) {
   const id = `usr_${crypto.randomUUID()}`;
   const phone = opts.phone ?? `05${crypto.randomInt(10_000_000, 99_999_999)}`;
+  let ids = opts.committeeIds ?? [];
+  if (opts.assigned?.length) {
+    const { rows } = await pool.query('SELECT id FROM committees WHERE committee_number = ANY($1::int[]);', [opts.assigned]);
+    ids = [...new Set([...ids, ...rows.map((r) => r.id as string)])];
+  }
   await pool.query(
-    `INSERT INTO app_users (id, name, phone, password, role, status, permissions, assigned_committees, created_at, data)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),'{}'::jsonb);`,
+    `INSERT INTO app_users (id, name, phone, password, role, status, permissions, assigned_committees, assigned_committee_ids,
+       all_committees, all_exams, allowed_exam_ids, must_change_password, created_at, data)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),'{}'::jsonb);`,
     [id, opts.name ?? `${opts.role} user`, phone, await bcrypt.hash(PASSWORD, 4), opts.role, opts.status ?? 'approved',
-      JSON.stringify(opts.permissions ?? []), JSON.stringify(opts.assigned ?? [])]
+      JSON.stringify(opts.permissions ?? []), JSON.stringify(opts.assigned ?? []), JSON.stringify(ids),
+      opts.allCommittees ?? false, opts.allExams ?? true, JSON.stringify(opts.allowedExamIds ?? []), opts.mustChangePassword ?? false]
   );
   return { id, phone };
 }

@@ -39,6 +39,7 @@ export type StageKey = (typeof STAGE_KEYS)[number];
 export const stageRecord = z.object({
   completed: z.boolean(),
   completedAt: z.string().max(100).nullish(),
+  completedBy: z.string().max(200).nullish(),
   notes: z.string().max(2000).nullish(),
 });
 

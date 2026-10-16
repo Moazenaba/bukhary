@@ -3,8 +3,9 @@
 //   npm run backup
 //
 // Needs the PostgreSQL client tools (pg_dump 17 or newer for Supabase). Set PG_DUMP to the
-// full path if pg_dump is not on PATH. Note: the connection string (with its password) is
-// given to pg_dump as an argument, so keep this script on the operator's own machine.
+// full path if pg_dump is not on PATH. The password is passed to pg_dump through PGPASSWORD,
+// never on the command line. A non-local database needs `npm run backup -- --remote`.
+// The dump contains password hashes and personal data: store it encrypted (see docs/BACKUP_RESTORE.md).
 import 'dotenv/config';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,13 +17,24 @@ if (!dbUrl) {
   process.exit(1);
 }
 
+const parsed = new URL(dbUrl);
+const LOCAL = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+if (!LOCAL.has(parsed.hostname) && !process.argv.includes('--remote')) {
+  console.error(`DATABASE_URL points at ${parsed.hostname}. Add "-- --remote" if you really mean that database.`);
+  process.exit(1);
+}
+const password = decodeURIComponent(parsed.password);
+parsed.password = '';
+const dbUrlWithoutPassword = parsed.toString();
+
 const outDir = path.resolve(process.env.BACKUP_DIR || 'backups');
 fs.mkdirSync(outDir, { recursive: true });
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const file = path.join(outDir, `bukhari-${stamp}.dump`);
 
 const env = { ...process.env };
-const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(dbUrl);
+if (password) env.PGPASSWORD = password;
+const isLocal = LOCAL.has(parsed.hostname);
 const caPath = process.env.DATABASE_CA_CERT_PATH;
 if (caPath && !isLocal) {
   env.PGSSLROOTCERT = path.resolve(caPath);
@@ -31,7 +43,7 @@ if (caPath && !isLocal) {
 
 const result = spawnSync(
   process.env.PG_DUMP || 'pg_dump',
-  ['-w', '--format=custom', '--no-owner', '--no-privileges', `--dbname=${dbUrl}`, `--file=${file}`],
+  ['-w', '--format=custom', '--no-owner', '--no-privileges', `--dbname=${dbUrlWithoutPassword}`, `--file=${file}`],
   { env, stdio: 'inherit', timeout: 15 * 60 * 1000 }
 );
 if (result.error || result.status !== 0) {

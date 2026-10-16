@@ -50,7 +50,7 @@ export function scoringRouter(pool: Pool) {
     const row = await withTransaction(pool, async (db) => {
       const { rows: comm } = await db.query('SELECT committee_number FROM committees WHERE id = $1;', [s.committeeId]);
       if (!comm[0]) throw badRequest('اللجنة غير موجودة');
-      assertCommitteeScope(req.user!, comm[0].committee_number);
+      assertCommitteeScope(req.user!, s.committeeId);
       const { rows: before } = await db.query('SELECT * FROM scoring_records WHERE id = $1 FOR UPDATE;', [s.id]);
       if (before[0] && before[0].committee_id !== s.committeeId) throw badRequest('لا يمكن نقل الدرجة إلى لجنة أخرى');
       const { rows } = await db.query(
@@ -74,7 +74,8 @@ export function scoringRouter(pool: Pool) {
     await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM scoring_records WHERE id = $1 FOR UPDATE;', [req.params.id]);
       if (!rows[0]) throw notFound('الدرجة غير موجودة');
-      assertCommitteeScope(req.user!, rows[0].committee_number);
+      // Scope comes from the committee row, not the stored (possibly stale) number.
+      assertCommitteeScope(req.user!, rows[0].committee_id);
       await db.query('DELETE FROM scoring_records WHERE id = $1;', [req.params.id]);
       await audit(db, req, 'score.delete', 'scoring_record', req.params.id, fromRow(rows[0]), null);
     });

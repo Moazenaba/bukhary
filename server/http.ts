@@ -31,8 +31,12 @@ export function parse<S extends ZodTypeAny>(schema: S, value: unknown): z.infer<
   return schema.parse(value);
 }
 
+// A client may pass its own request id for tracing; anything unusual is replaced (API-25).
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
 export function requestId(req: Request, res: Response, next: NextFunction) {
-  const id = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  const sent = req.headers['x-request-id'];
+  const id = typeof sent === 'string' && REQUEST_ID_PATTERN.test(sent) ? sent : crypto.randomUUID();
   (req as any).id = id;
   res.setHeader('X-Request-Id', id);
   next();
@@ -58,7 +62,12 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
     });
   }
   if (err instanceof HttpError) {
+    // Refused actions are security events worth seeing in the logs (API-32).
+    if (err.status === 403) logger.warn('request.forbidden', { requestId: reqId, path: req.path, method: req.method, userId: req.user?.id, code: err.code });
     return res.status(err.status).json({ success: false, message: err.message, code: err.code, details: err.details, requestId: reqId });
+  }
+  if (err instanceof URIError) {
+    return res.status(400).json({ success: false, message: 'صيغة الرابط غير صحيحة', requestId: reqId });
   }
   if (err?.type === 'entity.too.large') {
     return res.status(413).json({ success: false, message: 'حجم البيانات المرسلة كبير جداً', requestId: reqId });

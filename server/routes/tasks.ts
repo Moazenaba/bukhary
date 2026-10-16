@@ -1,18 +1,19 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { assertAllowed, can } from '../auth.ts';
+import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, forbidden, notFound, route } from '../http.ts';
-import { isAllowed } from '../policy.ts';
-import { id, optionalId, optionalText, pageQuery, pagedRows } from '../schemas.ts';
+import { isAllowed, isCommitteeInScope, isScopedRole } from '../policy.ts';
+import { dateOnly, id, optionalId, optionalText, pageQuery, pagedRows } from '../schemas.ts';
+import { notify } from './notifications.ts';
 
 const TASK_TYPES = ['delivery', 'receive', 'exam', 'scoring', 'review', 'ceremony', 'general'] as const;
 
 const taskInput = z.object({
   id,
   title: z.string().trim().min(1, 'عنوان المهمة مطلوب').max(300),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'التاريخ يجب أن يكون بصيغة YYYY-MM-DD'),
+  date: dateOnly.refine((v) => v !== null, 'التاريخ مطلوب بصيغة YYYY-MM-DD'),
   time: optionalText(50),
   committeeId: optionalId,
   assignedAssistantId: optionalId,
@@ -76,9 +77,23 @@ export function tasksRouter(pool: Pool) {
 
   r.post('/', can('tasks.write'), route(async (req, res) => {
     const t = taskInput.parse(req.body);
+    const user = req.user!;
     const row = await withTransaction(pool, async (db) => {
       const { rows: before } = await db.query('SELECT * FROM schedule_tasks WHERE id = $1 FOR UPDATE;', [t.id]);
+      // Committee-scoped staff work only on tasks of their committees (API-12): they cannot
+      // overwrite another committee's task by reusing its id, nor create one for it.
+      if (before[0]?.committee_id) assertCommitteeScope(user, before[0].committee_id);
+      if (t.committeeId) assertCommitteeScope(user, t.committeeId);
+      else if (isScopedRole(user.role) && !user.allCommittees && before[0] && !before[0].committee_id && before[0].assigned_assistant_id !== user.id) {
+        throw forbidden('لا يمكنك تعديل مهمة عامة لم تُسند إليك');
+      }
       const refs = await resolveRefs(db, t.committeeId, t.assignedAssistantId);
+      if (t.assignedAssistantId && t.assignedAssistantId !== user.id && isScopedRole(user.role) && !user.allCommittees) {
+        const { rows: target } = await db.query('SELECT all_committees, assigned_committee_ids FROM app_users WHERE id = $1;', [t.assignedAssistantId]);
+        const theirs: string[] = Array.isArray(target[0]?.assigned_committee_ids) ? target[0].assigned_committee_ids : [];
+        const shared = Boolean(target[0]?.all_committees) || theirs.some((cid) => isCommitteeInScope(user, cid));
+        if (!shared) throw forbidden('لا يمكنك إسناد مهمة لشخص خارج نطاق لجانك');
+      }
       const wasCompleted = Boolean(before[0]?.completed);
       const completedAt = t.completed ? (wasCompleted ? before[0].completed_at : new Date().toISOString()) : null;
       const { rows } = await db.query(
@@ -97,6 +112,9 @@ export function tasksRouter(pool: Pool) {
           t.type, t.priority, t.completed, completedAt, t.deliverable, t.notes]
       );
       await audit(db, req, before[0] ? 'task.update' : 'task.create', 'task', t.id, before[0] ? taskFromRow(before[0]) : null, taskFromRow(rows[0]));
+      if (t.assignedAssistantId && t.assignedAssistantId !== before[0]?.assigned_assistant_id && t.assignedAssistantId !== user.id) {
+        await notify(db, { title: 'مهمة جديدة مسندة إليك', description: `${t.title} — ${t.date}`, type: 'info', committeeId: t.committeeId, targetUserId: t.assignedAssistantId });
+      }
       return rows[0];
     });
     res.json({ success: true, task: taskFromRow(row) });
@@ -112,10 +130,13 @@ export function tasksRouter(pool: Pool) {
       const user = req.user!;
       const isAssignee = task.assigned_assistant_id === user.id && user.role !== 'auditor';
       if (!isAssignee && !isAllowed(user, 'tasks.write')) throw forbidden();
+      if (!isAssignee && task.committee_id) assertCommitteeScope(user, task.committee_id);
       const { rows: updated } = await db.query(
-        `UPDATE schedule_tasks SET completed = $2, completed_at = CASE WHEN $2 THEN $3 ELSE NULL END, updated_at = NOW()
+        // completed_at is timestamptz (migration 006); a text parameter here made every toggle fail (NEW-06).
+        `UPDATE schedule_tasks SET completed = $2,
+           completed_at = CASE WHEN $2 THEN COALESCE(completed_at, NOW()) ELSE NULL END, updated_at = NOW()
          WHERE id = $1 RETURNING *;`,
-        [task.id, completed, new Date().toISOString()]
+        [task.id, completed]
       );
       await audit(db, req, 'task.toggle', 'task', task.id, { completed: task.completed }, { completed });
       return updated[0];
@@ -128,6 +149,7 @@ export function tasksRouter(pool: Pool) {
     await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM schedule_tasks WHERE id = $1 FOR UPDATE;', [req.params.id]);
       if (!rows[0]) throw notFound('المهمة غير موجودة');
+      if (rows[0].committee_id) assertCommitteeScope(req.user!, rows[0].committee_id);
       await db.query('DELETE FROM schedule_tasks WHERE id = $1;', [req.params.id]);
       await audit(db, req, 'task.delete', 'task', req.params.id, taskFromRow(rows[0]), null);
     });

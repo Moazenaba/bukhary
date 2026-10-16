@@ -69,8 +69,15 @@ describe('date inputs', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rejects an unreadable exam upload time', async () => {
-    const res = await t.api().post('/api/exams').set(admin.auth).send({ id: 'exam-bad-date', title: 'x', book: 'y', uploadedAt: 'not a date' });
+  it('ignores the exam upload time a client sends; the server sets it (WEB-01)', async () => {
+    // The exact value the web form used to send, which made every "add exam" fail.
+    const res = await t.api().post('/api/exams').set(admin.auth).send({ id: 'exam-web-date', title: 'x', book: 'y', uploadedAt: '2026/10/16 - 8:30 م' });
+    expect(res.status).toBe(200);
+    expect(Number.isNaN(Date.parse(res.body.exam.uploadedAt))).toBe(false);
+  });
+
+  it('rejects impossible task dates with 400, not 500 (API-18)', async () => {
+    const res = await t.api().post('/api/tasks').set(admin.auth).send({ id: 'task-bad-date', title: 'x', date: '2026-02-30' });
     expect(res.status).toBe(400);
   });
 });

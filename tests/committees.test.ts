@@ -131,9 +131,21 @@ describe('authorization', () => {
     expect((await t.api().get('/api/audit-logs').set(auditor.auth)).status).toBe(200);
   });
 
-  it('teachers record scores for any committee, scorer name comes from the token', async () => {
+  it('teachers score only their committees (D-02); "all committees" teachers score any', async () => {
+    const c = await createCommittee({ committeeNumber: 61 });
+    const scoped = await userWithToken(t, { role: 'teacher', name: 'معلم' });
+    const denied = await t.api().post('/api/scoring').set(scoped.auth)
+      .send({ id: 's0', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
+    expect(denied.status).toBe(403);
+    const assigned = await userWithToken(t, { role: 'teacher', committeeIds: [c.id] });
+    const ok = await t.api().post('/api/scoring').set(assigned.auth)
+      .send({ id: 's0', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
+    expect(ok.status).toBe(200);
+  });
+
+  it('teachers with all committees record scores, scorer name comes from the token', async () => {
     const c = await createCommittee({ committeeNumber: 60 });
-    const teacher = await userWithToken(t, { role: 'teacher', name: 'المعلم' });
+    const teacher = await userWithToken(t, { role: 'teacher', name: 'المعلم', allCommittees: true });
     const res = await t.api().post('/api/scoring').set(teacher.auth)
       .send({ id: 's1', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
     expect(res.status).toBe(200);
@@ -144,12 +156,15 @@ describe('authorization', () => {
   });
 
   it('/api/auth/me returns the same evaluated permissions the server enforces', async () => {
-    const asst = await userWithToken(t, { role: 'assistant', assigned: [1, 2] });
+    const a = await createCommittee({ committeeNumber: 81 });
+    const b = await createCommittee({ committeeNumber: 82 });
+    const asst = await userWithToken(t, { role: 'assistant', committeeIds: [a.id, b.id] });
     const me = await t.api().get('/api/auth/me').set(asst.auth);
     expect(me.status).toBe(200);
     expect(me.body.permissions.actions['committees.reception']).toBe(true);
     expect(me.body.permissions.actions['committees.finalize']).toBe(false);
-    expect(me.body.permissions.committeeScope).toEqual([1, 2]);
+    expect([...me.body.permissions.committeeScope].sort()).toEqual([a.id, b.id].sort());
+    expect(me.body.permissions.committeeNumbers).toEqual([81, 82]);
   });
 });
 

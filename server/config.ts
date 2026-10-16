@@ -17,6 +17,14 @@ export interface AppConfig {
   trustProxy: string | number | boolean;
   maxLoginAttempts: number;
   lockoutMinutes: number;
+  /** After an admin password reset, block everything except account endpoints until the user sets a new one. */
+  enforcePasswordChange: boolean;
+  /** Reject unknown permission ids with 400 instead of dropping them (turn on once all clients send ids only). */
+  strictPermissionIds: boolean;
+  /** Accept stage changes through PATCH /api/committees/:id (older Android builds); new clients use /actions. */
+  legacyStagePatch: boolean;
+  /** Requests per minute per IP across the whole API (0 disables the limiter). */
+  apiRateLimitPerMinute: number;
 }
 
 const DEV_JWT_SECRET = 'bukhari_dev_only_secret';
@@ -50,9 +58,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
 
   const jwtSecret = env.JWT_SECRET ?? '';
   if (PLACEHOLDER_SECRETS.has(jwtSecret) || jwtSecret.length < 32) {
-    if (isProduction && requireSecrets) {
-      // A known or short secret would let anyone forge admin tokens.
-      throw new Error('JWT_SECRET must be set to a random value of at least 32 characters in production.');
+    // A known or short secret would let anyone forge admin tokens. Only automated tests may use
+    // the built-in development secret; local development needs its own JWT_SECRET too.
+    if (nodeEnv !== 'test' && requireSecrets) {
+      throw new Error('JWT_SECRET must be set to a random value of at least 32 characters (see .env.example).');
     }
   }
 
@@ -71,12 +80,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     databaseCaCert,
     databaseSslDisabled,
     jwtSecret: jwtSecret.length >= 32 ? jwtSecret : DEV_JWT_SECRET.padEnd(32, '_'),
-    accessTokenTtl: env.ACCESS_TOKEN_TTL || '8h',
+    accessTokenTtl: env.ACCESS_TOKEN_TTL || '15m',
     refreshTokenTtlDays: Number(env.REFRESH_TOKEN_TTL_DAYS) || 30,
     geminiApiKey: env.GEMINI_API_KEY || env.API_KEY || undefined,
     geminiModel: env.GEMINI_MODEL || 'gemini-2.5-flash',
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     maxLoginAttempts: Number(env.MAX_LOGIN_ATTEMPTS) || 5,
     lockoutMinutes: Number(env.LOCKOUT_MINUTES) || 15,
+    enforcePasswordChange: env.ENFORCE_PASSWORD_CHANGE !== 'false',
+    strictPermissionIds: env.STRICT_PERMISSION_IDS === 'true',
+    legacyStagePatch: env.LEGACY_STAGE_PATCH !== 'false',
+    apiRateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE === undefined ? 600 : Number(env.API_RATE_LIMIT_PER_MINUTE) || 0,
   };
 }

@@ -1,12 +1,14 @@
 import { Router, type Request } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { assertAllowed, can } from '../auth.ts';
+import { assertAllowed, can, revokeAllSessions } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
-import { ROLES, isAllowed } from '../policy.ts';
+import { logger } from '../logger.ts';
+import { type Principal, ROLES, isAllowed, isCommitteeInScope, isSystemPermission } from '../policy.ts';
 import { id, optionalText, toAsciiDigits } from '../schemas.ts';
+import { notify } from './notifications.ts';
 
 export const passwordSchema = z
   .string()
@@ -31,15 +33,12 @@ export const emailSchema = z
   .transform((v) => (v ? v.toLowerCase() : null))
   .refine((v) => v === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'البريد الإلكتروني غير صحيح');
 
-// Profile fields kept in app_users.data. Everything that affects access
-// (role, status, permissions, committees, password) lives in real columns only.
+// Profile fields kept in app_users.data. Everything that affects access (role, status,
+// permissions, committees, exam access, password) lives in real columns and is never
+// writable by the user themself.
 const PROFILE_FIELDS = {
   whatsapp: optionalText(50),
   nationalId: optionalText(50),
-  profileId: optionalText(255),
-  allowedExamIds: z.array(z.string().max(255)).max(500).optional(),
-  allExamsAllowed: z.boolean().optional(),
-  allCommitteesAllowed: z.boolean().optional(),
   quranLevel: optionalText(500),
   qualification: optionalText(500),
   experience: optionalText(2000),
@@ -60,17 +59,36 @@ const userInput = z.object({
   password: z.string().max(128).optional(),
   role: z.enum(ROLES).optional(),
   status: z.enum(['pending', 'interview', 'approved', 'rejected']).optional(),
+  /** Committees by id (authoritative). */
+  assignedCommitteeIds: z.array(z.string().max(255)).max(1000).optional(),
+  /** Committees by number: accepted from clients that predate committee ids. */
   assignedCommittees: z.array(z.coerce.number().int().min(0)).max(1000).optional(),
+  allCommitteesAllowed: z.boolean().optional(),
+  allExamsAllowed: z.boolean().optional(),
+  allowedExamIds: z.array(z.string().max(255)).max(1000).optional(),
+  /** Applying a permission profile copies its settings onto the user (super admin only). */
+  profileId: z.string().max(255).nullish(),
   permissions: z.array(z.string().max(100)).max(200).optional(),
   notes: optionalText(5000),
   /** The updatedAt the client last saw; a different server value means someone else changed the user. */
   expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
   ...PROFILE_FIELDS,
 });
+type UserInput = z.infer<typeof userInput>;
+
+/** Selects a user row plus the committee numbers of its assigned committee ids. */
+const USER_SELECT = `
+  SELECT u.*, COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
+                        WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb) AS assigned_numbers
+  FROM app_users u`;
+
+const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+const iso = (v: any) => (v instanceof Date ? v.toISOString() : v);
 
 /** API representation. Identity documents are only shown to super admins and the user themself. */
 export function userFromRow(r: any, opts: { includeIdentity: boolean }) {
   const profile = r.data ?? {};
+  const numbers = Array.isArray(r.assigned_numbers) ? r.assigned_numbers : r.assigned_committees ?? [];
   const out: Record<string, unknown> = {
     id: r.id,
     name: r.name,
@@ -78,14 +96,20 @@ export function userFromRow(r: any, opts: { includeIdentity: boolean }) {
     email: r.email ?? '',
     role: r.role,
     status: r.status,
-    assignedCommittees: r.assigned_committees ?? [],
+    assignedCommittees: [...numbers].map(Number).sort((a, b) => a - b),
+    assignedCommitteeIds: asStrings(r.assigned_committee_ids),
+    allCommitteesAllowed: Boolean(r.all_committees),
+    allExamsAllowed: Boolean(r.all_exams),
+    allowedExamIds: asStrings(r.allowed_exam_ids),
+    profileId: r.profile_id ?? undefined,
+    mustChangePassword: Boolean(r.must_change_password),
     permissions: r.permissions ?? [],
     createdAt: r.created_at ?? '',
     approvedAt: r.approved_at ?? undefined,
     approvedBy: r.approved_by ?? undefined,
     notes: r.notes ?? undefined,
     requestCode: r.request_code ?? undefined,
-    updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : r.updated_at,
+    updatedAt: iso(r.updated_at),
   };
   for (const k of PROFILE_KEYS) if (profile[k] !== undefined && profile[k] !== null) out[k] = profile[k];
   if (profile.rejectedAt) out.rejectedAt = profile.rejectedAt;
@@ -106,7 +130,48 @@ async function countSuperAdmins(db: Queryable, excludeId: string): Promise<numbe
 const sameSet = (a: unknown[] = [], b: unknown[] = []) =>
   a.length === b.length && a.every((x) => b.map(String).includes(String(x)));
 
-async function saveUser(db: Queryable, req: Request, input: z.infer<typeof userInput>) {
+/**
+ * Only system permissions grant anything (custom permission labels are display-only, D-01).
+ * Unknown ids are dropped and logged; with STRICT_PERMISSION_IDS they are rejected.
+ */
+export function cleanPermissions(input: string[], strict: boolean): string[] {
+  const unknown = input.filter((p) => !isSystemPermission(p));
+  if (unknown.length) {
+    if (strict) throw badRequest(`صلاحيات غير معروفة: ${unknown.join('، ')}`);
+    logger.warn('users.unknown_permissions_dropped', { unknown });
+  }
+  return [...new Set(input.filter(isSystemPermission))];
+}
+
+/**
+ * Committee numbers from older clients become ids. Numbers that did not change keep their
+ * current ids; a newly added number means that committee number in the default course (or in
+ * every course when there is no default).
+ */
+async function idsFromNumbers(db: Queryable, numbers: number[], currentIds: string[]): Promise<string[]> {
+  const { rows: current } = await db.query('SELECT id, committee_number FROM committees WHERE id = ANY($1::text[]);', [currentIds]);
+  const keep = current.filter((c) => numbers.includes(Number(c.committee_number))).map((c) => c.id as string);
+  const keptNumbers = new Set(current.filter((c) => keep.includes(c.id)).map((c) => Number(c.committee_number)));
+  const added = numbers.filter((n) => !keptNumbers.has(n));
+  if (added.length === 0) return keep;
+  const { rows: def } = await db.query('SELECT id FROM courses WHERE is_default LIMIT 1;');
+  const { rows } = def[0]
+    ? await db.query('SELECT id FROM committees WHERE committee_number = ANY($1::int[]) AND course_id = $2;', [added, def[0].id])
+    : await db.query('SELECT id FROM committees WHERE committee_number = ANY($1::int[]);', [added]);
+  return [...new Set([...keep, ...rows.map((r) => r.id as string)])];
+}
+
+async function committeeNumbersFor(db: Queryable, ids: string[]): Promise<number[]> {
+  if (ids.length === 0) return [];
+  const { rows } = await db.query('SELECT DISTINCT committee_number FROM committees WHERE id = ANY($1::text[]) ORDER BY 1;', [ids]);
+  return rows.map((r) => Number(r.committee_number));
+}
+
+interface SaveOptions {
+  strictPermissionIds: boolean;
+}
+
+async function saveUser(db: Queryable, req: Request, input: UserInput, opts: SaveOptions) {
   const actor = req.user!;
   const { rows } = await db.query('SELECT * FROM app_users WHERE id = $1 FOR UPDATE;', [input.id]);
   const existing = rows[0];
@@ -122,17 +187,67 @@ async function saveUser(db: Queryable, req: Request, input: z.infer<typeof userI
 
   if (!existing && !canManage) throw forbidden();
   if (existing && !isSelf && !canManage) throw forbidden('ليس لديك صلاحية لتعديل هذا المستخدم');
-  // Managers who are not super admins cannot touch super admins.
-  if (existing && !isSelf && existing.role === 'super_admin' && !canGrant) throw forbidden();
+  // Managers who are not super admins cannot touch super admins, and among approved accounts
+  // they manage assistants only (API-01). Applicants of any requested role stay visible to them.
+  if (existing && !isSelf && !canGrant) {
+    if (existing.role === 'super_admin') throw forbidden();
+    if (existing.status === 'approved' && existing.role !== 'assistant') {
+      throw forbidden('إدارة الحسابات المعتمدة لغير المعاونين متاحة للمشرف العام فقط');
+    }
+  }
+
+  // ---- Access settings: start from the stored values, apply a profile, then explicit fields.
+  let permissions: string[] = asStrings(existing?.permissions);
+  let assignedIds: string[] = asStrings(existing?.assigned_committee_ids);
+  let allCommittees = Boolean(existing?.all_committees);
+  let allExams = Boolean(existing?.all_exams);
+  let allowedExamIds: string[] = asStrings(existing?.allowed_exam_ids);
+  let profileId: string | null = existing?.profile_id ?? null;
+
+  if (input.profileId !== undefined && (input.profileId ?? null) !== profileId) {
+    profileId = input.profileId ?? null;
+    if (profileId) {
+      const { rows: prof } = await db.query('SELECT * FROM permission_profiles WHERE id = $1;', [profileId]);
+      if (!prof[0]) throw badRequest('البروفايل غير موجود');
+      const p = prof[0];
+      permissions = asStrings(p.permissions);
+      allCommittees = Boolean(p.all_committees_allowed);
+      assignedIds = allCommittees ? assignedIds : asStrings(p.allowed_committee_ids);
+      allExams = Boolean(p.all_exams_allowed);
+      allowedExamIds = asStrings(p.allowed_exam_ids);
+    }
+  }
+  if (input.permissions !== undefined) permissions = input.permissions;
+  permissions = cleanPermissions(permissions, opts.strictPermissionIds);
+  if (input.assignedCommitteeIds !== undefined) assignedIds = [...new Set(input.assignedCommitteeIds)];
+  else if (input.assignedCommittees !== undefined) assignedIds = await idsFromNumbers(db, input.assignedCommittees, assignedIds);
+  if (input.allCommitteesAllowed !== undefined) allCommittees = input.allCommitteesAllowed;
+  if (input.allExamsAllowed !== undefined) allExams = input.allExamsAllowed;
+  if (input.allowedExamIds !== undefined) allowedExamIds = [...new Set(input.allowedExamIds)];
 
   const role = input.role ?? existing?.role ?? 'assistant';
-  const permissions = input.permissions ?? existing?.permissions ?? [];
   const status = input.status ?? existing?.status ?? 'pending';
-  const assigned = input.assignedCommittees ?? existing?.assigned_committees ?? [];
 
+  const before = {
+    permissions: cleanPermissions(asStrings(existing?.permissions), false),
+    assignedIds: asStrings(existing?.assigned_committee_ids),
+  };
   const roleChanged = existing ? role !== existing.role : role !== 'assistant';
-  const permsChanged = existing ? !sameSet(permissions, existing.permissions) : permissions.length > 0;
-  if ((roleChanged || permsChanged) && !canGrant) {
+  const permsChanged = existing ? !sameSet(permissions, before.permissions) : permissions.length > 0;
+  const statusChanged = existing ? status !== existing.status : status !== 'pending';
+  const assignedChanged = existing ? !sameSet(assignedIds, before.assignedIds) : assignedIds.length > 0;
+  const grantsChanged = existing
+    ? allCommittees !== Boolean(existing.all_committees) ||
+      allExams !== Boolean(existing.all_exams) ||
+      !sameSet(allowedExamIds, asStrings(existing.allowed_exam_ids)) ||
+      profileId !== (existing.profile_id ?? null)
+    : allCommittees || allExams || allowedExamIds.length > 0 || profileId !== null;
+
+  // Nobody changes their own access, whatever their role (API-01). Another super admin must do it.
+  if (isSelf && existing && (roleChanged || permsChanged || statusChanged || assignedChanged || grantsChanged)) {
+    throw forbidden('لا يمكنك تعديل صلاحياتك أو لجانك أو حالة حسابك بنفسك');
+  }
+  if ((roleChanged || permsChanged || grantsChanged) && !canGrant) {
     throw forbidden('تعيين الأدوار والصلاحيات متاح للمشرف العام فقط');
   }
   // Approving an account activates the role it carries. A join request may ask for any role,
@@ -141,9 +256,20 @@ async function saveUser(db: Queryable, req: Request, input: z.infer<typeof userI
   if (activating && role !== 'assistant' && !canGrant) {
     throw forbidden('اعتماد حساب بدور غير «معاون» متاح للمشرف العام فقط');
   }
-  const statusChanged = existing ? status !== existing.status : status !== 'pending';
-  const assignedChanged = existing ? !sameSet(assigned, existing.assigned_committees) : assigned.length > 0;
-  if (isSelf && !canManage && (statusChanged || assignedChanged)) throw forbidden();
+  // Managers who are not super admins may assign only committees inside their own scope.
+  if (assignedChanged && !canGrant) {
+    if (role !== 'assistant') throw forbidden('تعيين لجان لغير المعاونين متاح للمشرف العام فقط');
+    const changed = [
+      ...assignedIds.filter((x) => !before.assignedIds.includes(x)),
+      ...before.assignedIds.filter((x) => !assignedIds.includes(x)),
+    ];
+    const outside = changed.filter((cid) => !isCommitteeInScope(actor as Principal, cid));
+    if (outside.length) throw forbidden('لا يمكنك إسناد لجان خارج نطاق لجانك');
+  }
+  if (assignedIds.length) {
+    const { rows: found } = await db.query('SELECT count(*)::int AS n FROM committees WHERE id = ANY($1::text[]);', [assignedIds]);
+    if (found[0].n !== assignedIds.length) throw badRequest('إحدى اللجان المحددة غير موجودة');
+  }
 
   // Never leave the system without an approved super admin.
   if (existing?.role === 'super_admin' && (role !== 'super_admin' || status !== 'approved')) {
@@ -151,12 +277,15 @@ async function saveUser(db: Queryable, req: Request, input: z.infer<typeof userI
   }
 
   let passwordHash: string | null = existing?.password ?? null;
+  let mustChange = Boolean(existing?.must_change_password);
   if (!existing) {
-    // New accounts created by staff must get an initial password so the person can log in.
+    // New accounts created by staff must get an initial password; the person changes it at first login.
     passwordHash = await bcrypt.hash(passwordSchema.parse(input.password ?? ''), 12);
+    mustChange = true;
   } else if (input.password && !isSelf && canGrant) {
-    // Admin reset. Users change their own password through /api/auth/change-password.
+    // Admin reset (older clients). New clients use POST /api/users/:id/reset-password.
     passwordHash = await bcrypt.hash(passwordSchema.parse(input.password), 12);
+    mustChange = true;
   }
 
   const profile: Record<string, unknown> = { ...(existing?.data ?? {}) };
@@ -167,26 +296,35 @@ async function saveUser(db: Queryable, req: Request, input: z.infer<typeof userI
   }
 
   const approvedNow = status === 'approved' && existing?.status !== 'approved';
-  const sessionsInvalid = existing && (roleChanged || permsChanged || statusChanged || assignedChanged || passwordHash !== existing.password);
+  const passwordChanged = Boolean(existing) && passwordHash !== existing.password;
+  const sessionsInvalid = Boolean(existing) && (roleChanged || permsChanged || statusChanged || assignedChanged || grantsChanged || passwordChanged);
+  const numbers = await committeeNumbersFor(db, assignedIds);
 
   const { rows: saved } = await db.query(
     `INSERT INTO app_users (id, name, phone, email, password, passport_number, role, status, assigned_committees,
+       assigned_committee_ids, all_committees, all_exams, allowed_exam_ids, profile_id, must_change_password,
        permissions, notes, created_at, approved_at, approved_by, data, token_version, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,0,NOW())
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,0,NOW())
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name, phone = EXCLUDED.phone, email = EXCLUDED.email, password = EXCLUDED.password,
        passport_number = EXCLUDED.passport_number, role = EXCLUDED.role, status = EXCLUDED.status,
-       assigned_committees = EXCLUDED.assigned_committees, permissions = EXCLUDED.permissions,
+       assigned_committees = EXCLUDED.assigned_committees, assigned_committee_ids = EXCLUDED.assigned_committee_ids,
+       all_committees = EXCLUDED.all_committees, all_exams = EXCLUDED.all_exams,
+       allowed_exam_ids = EXCLUDED.allowed_exam_ids, profile_id = EXCLUDED.profile_id,
+       must_change_password = EXCLUDED.must_change_password, permissions = EXCLUDED.permissions,
        notes = EXCLUDED.notes, approved_at = EXCLUDED.approved_at, approved_by = EXCLUDED.approved_by,
        data = EXCLUDED.data,
-       token_version = app_users.token_version + $16,
+       token_version = app_users.token_version + $22,
        password_changed_at = CASE WHEN app_users.password IS DISTINCT FROM EXCLUDED.password THEN NOW() ELSE app_users.password_changed_at END,
        updated_at = NOW()
      RETURNING *;`,
     [
       input.id, input.name, input.phone, input.email, passwordHash,
-      input.passportNumber !== undefined ? input.passportNumber : existing?.passport_number ?? null,
-      role, status, JSON.stringify(assigned), JSON.stringify(permissions),
+      // Only people who can see the passport number may change it; managers receive the list
+      // without it, so a value they send back (usually empty) must not wipe it (MOB-09).
+      input.passportNumber !== undefined && (canGrant || isSelf) ? input.passportNumber : existing?.passport_number ?? null,
+      role, status, JSON.stringify(numbers), JSON.stringify(assignedIds), allCommittees, allExams,
+      JSON.stringify(allowedExamIds), profileId, mustChange, JSON.stringify(permissions),
       input.notes !== undefined ? input.notes : existing?.notes ?? null,
       existing?.created_at ?? new Date().toISOString(),
       approvedNow ? new Date().toISOString() : existing?.approved_at ?? null,
@@ -195,28 +333,94 @@ async function saveUser(db: Queryable, req: Request, input: z.infer<typeof userI
       sessionsInvalid ? 1 : 0,
     ]
   );
-  if (sessionsInvalid) await db.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL;', [input.id]);
+  if (sessionsInvalid) await revokeAllSessions(db, input.id, 'access_changed');
+
+  if (approvedNow && existing) {
+    await notify(db, { title: 'تم اعتماد حسابك', description: 'يمكنك الآن تسجيل الدخول واستخدام النظام', type: 'success', targetUserId: input.id });
+  } else if (existing && assignedChanged && status === 'approved') {
+    await notify(db, { title: 'تم تحديث اللجان المسندة إليك', description: `عدد اللجان: ${allCommittees ? 'كل اللجان' : assignedIds.length}`, type: 'info', targetUserId: input.id });
+  }
 
   const safe = (r: any) => (r ? userFromRow(r, { includeIdentity: false }) : null);
   await audit(db, req, existing ? 'user.update' : 'user.create', 'user', input.id, safe(existing), safe(saved[0]));
   return saved[0];
 }
 
-export function usersRouter(pool: Pool) {
+/**
+ * Which users a manager sees (API-08): super admins see everyone; other managers see themself,
+ * applicants, and assistants in their committees or not assigned to any committee yet.
+ */
+async function listUsersFor(db: Queryable, actor: Principal) {
+  const order = "ORDER BY (u.role = 'super_admin') DESC, u.created_at ASC NULLS LAST, u.name ASC";
+  if (isAllowed(actor, 'users.grant')) {
+    const { rows } = await db.query(`${USER_SELECT} ${order};`);
+    return rows;
+  }
+  const { rows } = await db.query(
+    `${USER_SELECT}
+     WHERE u.id = $1
+        OR u.status <> 'approved'
+        OR (u.role = 'assistant' AND (
+              $2::boolean
+              OR jsonb_array_length(u.assigned_committee_ids) = 0
+              OR u.assigned_committee_ids ?| $3::text[]))
+     ${order};`,
+    [actor.id, actor.allCommittees, actor.assignedCommitteeIds]
+  );
+  return rows;
+}
+
+export function usersRouter(pool: Pool, opts: SaveOptions) {
   const r = Router();
 
   r.get('/', can('users.read'), route(async (req, res) => {
     const includeIdentity = isAllowed(req.user!, 'users.grant');
-    const { rows } = await pool.query(
-      "SELECT * FROM app_users ORDER BY (role = 'super_admin') DESC, created_at ASC NULLS LAST, name ASC;"
-    );
+    const rows = await listUsersFor(pool, req.user!);
     res.json({ success: true, users: rows.map((u) => userFromRow(u, { includeIdentity })) });
+  }));
+
+  /**
+   * People a task may be assigned to (D-07): anyone allowed to write tasks gets id and name of
+   * approved staff, limited to their own committees when they are committee-scoped.
+   */
+  r.get('/assignable', can('tasks.write'), route(async (req, res) => {
+    const actor = req.user!;
+    const unscoped = actor.role === 'super_admin' || actor.allCommittees || !['committee_head', 'assistant', 'teacher'].includes(actor.role);
+    const { rows } = await pool.query(
+      `SELECT id, name, role FROM app_users
+       WHERE status = 'approved' AND role IN ('assistant', 'teacher', 'committee_head')
+         AND (id = $1 OR $2::boolean OR all_committees OR assigned_committee_ids ?| $3::text[])
+       ORDER BY name ASC;`,
+      [actor.id, unscoped, actor.assignedCommitteeIds]
+    );
+    res.json({ success: true, users: rows.map((u) => ({ id: u.id, name: u.name, role: u.role })) });
   }));
 
   r.post('/', route(async (req, res) => {
     const input = userInput.parse(req.body);
-    const row = await withTransaction(pool, (db) => saveUser(db, req, input));
-    res.json({ success: true, user: userFromRow(row, { includeIdentity: isAllowed(req.user!, 'users.grant') || req.user!.id === row.id }) });
+    const row = await withTransaction(pool, (db) => saveUser(db, req, input, opts));
+    const { rows } = await pool.query(`${USER_SELECT} WHERE u.id = $1;`, [row.id]);
+    res.json({ success: true, user: userFromRow(rows[0], { includeIdentity: isAllowed(req.user!, 'users.grant') || req.user!.id === row.id }) });
+  }));
+
+  // Admin password reset (WEB-02): the user must choose a new password at the next login.
+  r.post('/:id/reset-password', can('users.grant'), route(async (req, res) => {
+    const { password } = z.object({ password: passwordSchema }).parse(req.body);
+    if (req.params.id === req.user!.id) throw badRequest('لتغيير كلمة مرورك استخدم «حسابي» ← تغيير كلمة المرور');
+    await withTransaction(pool, async (db) => {
+      const { rows } = await db.query('SELECT id FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
+      if (!rows[0]) throw notFound('المستخدم غير موجود');
+      await db.query(
+        `UPDATE app_users SET password = $2, password_changed_at = NOW(), must_change_password = true,
+           token_version = token_version + 1, failed_login_count = 0, locked_until = NULL, updated_at = NOW()
+         WHERE id = $1;`,
+        [req.params.id, await bcrypt.hash(password, 12)]
+      );
+      await revokeAllSessions(db, req.params.id, 'password_reset');
+      await audit(db, req, 'user.password_reset', 'user', req.params.id, null, null);
+      await notify(db, { title: 'تمت إعادة تعيين كلمة المرور', description: 'سجّل الدخول بكلمة المرور المؤقتة ثم اختر كلمة مرور جديدة', type: 'urgent', targetUserId: req.params.id });
+    });
+    res.json({ success: true });
   }));
 
   r.delete('/:id', route(async (req, res) => {
