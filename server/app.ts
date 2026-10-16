@@ -66,6 +66,16 @@ export function createApp(config: AppConfig, pool: Pool) {
       message: { success: false, message: 'طلبات كثيرة، يرجى المحاولة بعد قليل' } }));
   }
 
+  // An Android build older than the minimum is told to update instead of having its writes refused
+  // one by one; the app keeps them queued until it is updated (426 Upgrade Required).
+  app.use('/api/', (req, res, next) => {
+    const sent = Number(req.get('X-App-Version-Code'));
+    if (config.minAndroidVersionCode > 0 && Number.isFinite(sent) && sent > 0 && sent < config.minAndroidVersionCode) {
+      return res.status(426).json({ success: false, code: 'app_update_required', message: 'يرجى تحديث التطبيق إلى أحدث إصدار للمتابعة' });
+    }
+    next();
+  });
+
   // ---- Public ----
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.get('/api/ready', route(async (_req, res) => {

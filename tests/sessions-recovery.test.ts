@@ -137,6 +137,19 @@ describe('admin password reset (WEB-02)', () => {
   });
 });
 
+describe('minimum app version', () => {
+  it('an Android build older than MIN_ANDROID_VERSION_CODE is told to update; newer and web clients pass', async () => {
+    const { createApp } = await import('../server/app.ts');
+    const request = (await import('supertest')).default;
+    const app = createApp({ ...t.config, minAndroidVersionCode: 2 }, t.pool);
+    const old = await request(app).get('/api/health').set('X-App-Version-Code', '1');
+    expect(old.status).toBe(426);
+    expect(old.body.code).toBe('app_update_required');
+    expect((await request(app).get('/api/health').set('X-App-Version-Code', '2')).status).toBe(200);
+    expect((await request(app).get('/api/health')).status).toBe(200);
+  });
+});
+
 describe('configuration (API-24)', () => {
   it('refuses to start without a strong JWT secret outside automated tests', () => {
     expect(() => loadConfig({ NODE_ENV: 'development', DATABASE_URL: 'postgres://x' })).toThrow(/JWT_SECRET/);

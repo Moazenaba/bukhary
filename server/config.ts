@@ -25,6 +25,11 @@ export interface AppConfig {
   legacyStagePatch: boolean;
   /** Requests per minute per IP across the whole API (0 disables the limiter). */
   apiRateLimitPerMinute: number;
+  /**
+   * Oldest Android versionCode the server accepts (0 = any). Raised after a release whose old
+   * builds would send requests the server now refuses (rollout plan in docs/RELEASE.md).
+   */
+  minAndroidVersionCode: number;
 }
 
 const DEV_JWT_SECRET = 'bukhari_dev_only_secret';
@@ -91,5 +96,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     strictPermissionIds: env.STRICT_PERMISSION_IDS === 'true',
     legacyStagePatch: env.LEGACY_STAGE_PATCH !== 'false',
     apiRateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE === undefined ? 600 : Number(env.API_RATE_LIMIT_PER_MINUTE) || 0,
+    minAndroidVersionCode: Number(env.MIN_ANDROID_VERSION_CODE) || 0,
   };
 }

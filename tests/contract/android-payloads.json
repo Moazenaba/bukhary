@@ -1,0 +1,217 @@
+[
+  {
+    "method": "POST",
+    "path": "api/committees",
+    "body": {
+      "id": "contract-new",
+      "committeeNumber": 8.0,
+      "committeeName": "لجنة العقد",
+      "associationName": "",
+      "members": [],
+      "branch": "",
+      "competitionBook": "",
+      "generalNotes": "",
+      "courseId": "contract-course",
+      "courseName": "",
+      "sheikhName": "",
+      "sheikhPhone": "",
+      "sheikhCountry": "",
+      "studentsCount": 0.0,
+      "isWomenCommittee": false,
+      "stages": {
+        "registration": {
+          "completed": true
+        },
+        "exam": {
+          "completed": false
+        },
+        "scoring": {
+          "completed": false
+        },
+        "aggregation": {
+          "completed": false
+        },
+        "review": {
+          "completed": false
+        },
+        "sheet": {
+          "completed": false
+        },
+        "accreditation": {
+          "completed": false
+        },
+        "announcement": {
+          "completed": false
+        },
+        "ceremony": {
+          "completed": false
+        }
+      },
+      "scoringDetails": {
+        "scorerName": "",
+        "scoringReviewerName": "",
+        "questions": [
+          {
+            "id": "q-1",
+            "questionNumber": 1.0,
+            "label": "السؤال 1",
+            "completed": false,
+            "scorers": []
+          }
+        ],
+        "notes": ""
+      },
+      "aggregationDetails": {
+        "aggregatorName": "",
+        "aggregationReviewerName": "",
+        "scoringReviewerName": "",
+        "reviewConfirmed": false,
+        "date": "",
+        "notes": ""
+      },
+      "ceremonyDetails": {
+        "ceremonyDate": "",
+        "ceremonyTime": "",
+        "ceremonyPlace": "",
+        "honoredStudentsCount": 0.0,
+        "attendingSheikhs": [],
+        "notes": ""
+      },
+      "createdDate": "",
+      "createdAtTime": ""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/committees/contract-committee/actions",
+    "body": {
+      "action": {
+        "type": "completeStage",
+        "stage": "exam"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/committees/contract-committee/actions",
+    "body": {
+      "action": {
+        "type": "receive",
+        "status": "received",
+        "phone": "0500000000"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/committees/contract-committee/actions",
+    "body": {
+      "action": {
+        "type": "approveReadiness"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/committees/contract-committee/actions",
+    "body": {
+      "action": {
+        "type": "updateQuestion",
+        "questionId": "q-1",
+        "completed": true
+      }
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "api/committees/contract-committee",
+    "body": {
+      "scoringDetails": {
+        "scorerName": "مصحح",
+        "scoringReviewerName": "",
+        "questions": [
+          {
+            "id": "q-1",
+            "questionNumber": 1.0,
+            "label": "السؤال 1",
+            "completed": false,
+            "scorers": []
+          }
+        ],
+        "notes": ""
+      },
+      "expectedUpdatedAt": "2026-10-01T00:00:00.000Z"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/committees/contract-committee/actions",
+    "body": {
+      "action": {
+        "type": "updateAggregation",
+        "aggregatorName": "مجمع",
+        "reviewConfirmed": true,
+        "date": "2026-10-16"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/committees/contract-committee/actions",
+    "body": {
+      "action": {
+        "type": "scheduleCeremony",
+        "ceremonyDate": "2026-11-01",
+        "ceremonyTime": "7 مساءً",
+        "ceremonyPlace": "القاعة",
+        "honoredStudentsCount": 10.0,
+        "attendingSheikhs": [
+          "الشيخ"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/tasks",
+    "body": {
+      "id": "contract-task",
+      "title": "تسليم",
+      "date": "2026-10-20",
+      "time": "09:30 ص",
+      "committeeId": "contract-committee",
+      "assignedAssistantId": "contract-user",
+      "type": "general",
+      "priority": "normal",
+      "completed": false,
+      "deliverable": "",
+      "notes": ""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/users",
+    "body": {
+      "id": "contract-applicant",
+      "name": "متقدم",
+      "phone": "0512345678",
+      "status": "approved",
+      "assignedCommitteeIds": [
+        "contract-committee"
+      ],
+      "expectedUpdatedAt": "2026-10-01T00:00:00.000Z"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "api/users",
+    "body": {
+      "id": "contract-applicant",
+      "name": "متقدم",
+      "phone": "0512345678",
+      "status": "rejected",
+      "rejectionReason": "اكتمل العدد",
+      "expectedUpdatedAt": "2026-10-01T00:00:00.000Z"
+    }
+  }
+]

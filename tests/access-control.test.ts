@@ -161,6 +161,20 @@ describe('permission ids (API-34) and directory (API-08)', () => {
     expect(rows[0].passport_number).toBe('P-777');
   });
 
+  it('a save that leaves fields out keeps their stored values (found by the contract test)', async () => {
+    const u = await userWithToken(t, { role: 'assistant', committeeIds: [c1.id] });
+    await t.pool.query(
+      `UPDATE app_users SET notes = 'ملاحظة', passport_number = 'P-1', email = 'a@b.co',
+         data = '{"whatsapp":"0599","interviewNotes":"جيد"}'::jsonb WHERE id = $1;`,
+      [u.id]
+    );
+    const res = await t.api().post('/api/users').set(admin.auth).send({ id: u.id, name: 'اسم جديد', phone: u.phone });
+    expect(res.status).toBe(200);
+    const { rows } = await t.pool.query('SELECT name, notes, passport_number, email, data FROM app_users WHERE id = $1;', [u.id]);
+    expect(rows[0]).toMatchObject({ name: 'اسم جديد', notes: 'ملاحظة', passport_number: 'P-1', email: 'a@b.co' });
+    expect(rows[0].data).toMatchObject({ whatsapp: '0599', interviewNotes: 'جيد' });
+  });
+
   it('task assignee list is limited to the actor\'s committees (D-07)', async () => {
     const asst = await userWithToken(t, { role: 'assistant', permissions: ['calendar_schedule'], committeeIds: [c1.id] });
     const colleague = await userWithToken(t, { role: 'assistant', committeeIds: [c1.id], name: 'زميل' });

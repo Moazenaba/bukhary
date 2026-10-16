@@ -23,7 +23,7 @@ Copy `.env.example` to `.env` and fill it in. Required in production: `DATABASE_
 ## First-time setup
 ```bash
 npm ci
-npm run migrate                 # creates/updates the schema; never inserts demo data
+npm run migrate                 # creates/updates the schema; never inserts demo data (local DB only; -- --remote otherwise)
 ADMIN_NAME="..." ADMIN_PHONE="..." ADMIN_PASSWORD="..." npm run create-admin
 npm run dev                     # http://localhost:3000
 ```
@@ -41,6 +41,7 @@ and start the container. Health endpoints: `GET /api/health` (process up) and `G
 (database reachable and no pending migrations — use this for load-balancer checks).
 
 The server refuses to start while migrations are pending, and never changes the schema itself.
+Release order, rollout switches and operator checks: [docs/RELEASE.md](docs/RELEASE.md).
 
 ### Upgrading an existing (pre-migrations) database
 1. Take a backup (Supabase: Database > Backups, or `pg_dump`).

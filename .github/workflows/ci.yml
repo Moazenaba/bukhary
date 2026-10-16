@@ -34,6 +34,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: No committed secrets
+        # Database URLs with a password, private keys, or a .env file in the repository fail the build.
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then echo "A .env file is committed"; exit 1; fi
+          if git grep -nE 'postgres(ql)?://[^:/@ ]+:[^@ <$]+@' -- ':!*.lock' ':!tests/**' | grep -vE '@(localhost|127\.0\.0\.1)'; then
+            echo "A database URL with a password is committed"; exit 1
+          fi
+          if git grep -nE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY'; then echo "A private key is committed"; exit 1; fi
       - run: npm ci
       - run: npm run lint
       - run: npm test

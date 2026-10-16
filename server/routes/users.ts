@@ -182,6 +182,9 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
     }
   }
   const isSelf = actor.id === input.id;
+  // Optional text fields parse a missing value as null, so "was it sent?" is read from the raw body:
+  // a field a client leaves out keeps its stored value (partial saves never wipe data).
+  const sent = (key: string) => Object.prototype.hasOwnProperty.call(req.body ?? {}, key);
   const canManage = isAllowed(actor, 'users.manage');
   const canGrant = isAllowed(actor, 'users.grant');
 
@@ -289,7 +292,7 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
   }
 
   const profile: Record<string, unknown> = { ...(existing?.data ?? {}) };
-  for (const k of PROFILE_KEYS) if (input[k] !== undefined) profile[k] = input[k];
+  for (const k of PROFILE_KEYS) if (sent(k)) profile[k] = input[k];
   if (status === 'rejected' && existing?.status !== 'rejected') {
     profile.rejectedAt = new Date().toISOString();
     profile.rejectedBy = actor.name;
@@ -320,15 +323,14 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
      RETURNING *;`,
     [
       input.id, input.name, input.phone,
-      // A client that leaves the email out keeps the stored one (partial saves).
-      Object.prototype.hasOwnProperty.call(req.body ?? {}, 'email') ? input.email : existing?.email ?? null,
+      sent('email') || !existing ? input.email : existing.email,
       passwordHash,
       // Only people who can see the passport number may change it; managers receive the list
       // without it, so a value they send back (usually empty) must not wipe it (MOB-09).
-      input.passportNumber !== undefined && (canGrant || isSelf) ? input.passportNumber : existing?.passport_number ?? null,
+      sent('passportNumber') && (canGrant || isSelf) ? input.passportNumber : existing?.passport_number ?? null,
       role, status, JSON.stringify(numbers), JSON.stringify(assignedIds), allCommittees, allExams,
       JSON.stringify(allowedExamIds), profileId, mustChange, JSON.stringify(permissions),
-      input.notes !== undefined ? input.notes : existing?.notes ?? null,
+      sent('notes') ? input.notes : existing?.notes ?? null,
       existing?.created_at ?? new Date().toISOString(),
       approvedNow ? new Date().toISOString() : existing?.approved_at ?? null,
       approvedNow ? actor.name : existing?.approved_by ?? null,
