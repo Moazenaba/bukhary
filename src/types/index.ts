@@ -282,7 +282,7 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
   },
 ];
 
-export type AssistantStatus = 'pending' | 'approved' | 'rejected';
+export type AssistantStatus = 'pending' | 'interview' | 'approved' | 'rejected';
 
 export type AssistantPermission = string;
 
@@ -355,10 +355,28 @@ export const SYSTEM_PERMISSIONS: PermissionDefinition[] = [
   },
 ];
 
+export interface PermissionProfile {
+  id: string;
+  name: string;
+  description: string;
+  badgeColor?: 'emerald' | 'blue' | 'amber' | 'purple' | 'rose' | 'teal';
+  allowedTabs: string[]; // e.g. ['summer_course', 'committees', 'exams', 'calendar', 'stats', 'ceremonies', 'daily_alerts', 'courses', 'assistants']
+  allowedCommittees: number[];
+  allCommitteesAllowed: boolean;
+  allowedExamIds: string[];
+  allExamsAllowed: boolean;
+  permissions: AssistantPermission[];
+  createdAt: string;
+  createdBy?: string;
+  isDefault?: boolean;
+}
+
 export interface AppUser {
   id: string;
   name: string;
   phone: string;
+  whatsapp?: string;
+  nationalId?: string;
   passportNumber?: string; // رقم الجواز أو الهوية
   email: string;
   password?: string;
@@ -370,6 +388,25 @@ export interface AppUser {
   approvedAt?: string;
   approvedBy?: string;
   notes?: string;
+  
+  // Custom Role & Scope Profiles (نظام بروفايل الصلاحيات المخصصة)
+  profileId?: string;               // معرّف بروفايل الصلاحية المخصص
+  allowedExamIds?: string[];        // معرّفات الامتحانات المسموح بالدخول عليها فقط
+  allExamsAllowed?: boolean;        // السماح بالدخول على كافة الامتحانات
+  allCommitteesAllowed?: boolean;   // السماح بالدخول على كافة اللجان
+  
+  // Join Request & Dossier Fields (تفاصيل طلب الانضمام)
+  requestCode?: string;             // كود تتبع الطلب (مثل REQ-2026-104)
+  quranLevel?: string;              // مقدار حفظ القرآن والإجازات
+  qualification?: string;           // المؤهل العلمي والتخصص
+  experience?: string;              // الخبرات السابقة في لجان المساجد والمسابقات
+  availability?: string;            // الفترات والأوقات المتاحة للتفرغ
+  preferredCommittees?: number[];   // أرقام اللجان المفضلة
+  interviewDate?: string;           // تاريخ ووقت المقابلة الشخصية
+  interviewNotes?: string;          // ملاحظات المقابلة الشخصية
+  rejectionReason?: string;         // سبب الاعتذار/الرفض
+  rejectedAt?: string;              // تاريخ الاعتذار
+  rejectedBy?: string;              // منفذ الاعتذار
 }
 
 export interface NotificationItem {

@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
       <footer className="mt-12 bg-white border-t border-[#bdc9c6]/30 py-6 text-center text-right">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-[#005c55] text-[16px] font-bold">
-            <span className="material-symbols-outlined">mosque</span>
+            <span className="material-symbols-outlined" aria-hidden="true">mosque</span>
             <span>مسابقات مسجد البخاري العلمية</span>
           </div>
 
@@ -57,7 +57,7 @@ export const Footer: React.FC = () => {
                 onClick={() => setModalContent(null)}
                 className="p-1 rounded-lg text-gray-400 hover:text-gray-700"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
               </button>
             </div>
 

@@ -26,7 +26,7 @@ export const MergeModal: React.FC<MergeModalProps> = ({
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-[#005c55] flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-2xl">call_merge</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">call_merge</span>
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900">
@@ -79,7 +79,7 @@ export const MergeModal: React.FC<MergeModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-bold text-emerald-900 text-sm">دمج الصفوف (الموصى به)</span>
-                <span className="material-symbols-outlined text-emerald-700">playlist_add</span>
+                <span className="material-symbols-outlined text-emerald-700" aria-hidden="true">playlist_add</span>
               </div>
               <p className="text-xs text-emerald-800/80 leading-relaxed">
                 إضافة الـ {newRows.length} صفاً الجديدة إلى نهاية الجدول الحالي مع الحفاظ على البيانات القديمة ({existingCount} صفاً).
@@ -101,7 +101,7 @@ export const MergeModal: React.FC<MergeModalProps> = ({
                 <span className="font-bold text-slate-800 group-hover:text-rose-900 text-sm">
                   استبدال البيانات القديمة
                 </span>
-                <span className="material-symbols-outlined text-slate-400 group-hover:text-rose-600">
+                <span className="material-symbols-outlined text-slate-400 group-hover:text-rose-600" aria-hidden="true">
                   find_replace
                 </span>
               </div>

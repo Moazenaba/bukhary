@@ -91,7 +91,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">event_repeat</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">event_repeat</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-bold">
               إدارة الدورات والمسابقات الموسمية
@@ -108,7 +108,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
             onClick={handleOpenAdd}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600">add_circle</span>
+            <span className="material-symbols-outlined text-xl text-emerald-600" aria-hidden="true">add_circle</span>
             <span>+ إضافة دورة جديدة</span>
           </button>
         )}
@@ -192,7 +192,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                           : 'bg-blue-100 text-blue-800'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-lg">
+                      <span className="material-symbols-outlined text-lg" aria-hidden="true">
                         {course.status === 'active'
                           ? 'local_fire_department'
                           : course.status === 'completed'
@@ -264,7 +264,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                   onClick={() => onNavigateCommitteesByCourse(course.id)}
                   className="w-full py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] transition-all"
                 >
-                  <span className="material-symbols-outlined text-sm">groups</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
                   <span>عرض لجان هذه الدورة ({courseComms.length})</span>
                 </button>
 
@@ -314,7 +314,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
             <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl">event_repeat</span>
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">event_repeat</span>
                 </span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
@@ -329,7 +329,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 onClick={() => setIsAddModalOpen(false)}
                 className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
               </button>
             </div>
 
@@ -461,7 +461,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
             <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl">edit</span>
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">edit</span>
                 </span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
@@ -476,7 +476,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 onClick={() => setEditingCourse(null)}
                 className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
               </button>
             </div>
 

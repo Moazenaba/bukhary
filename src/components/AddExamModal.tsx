@@ -82,7 +82,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-800">
-            <span className="material-symbols-outlined text-2xl text-emerald-600">upload_file</span>
+            <span className="material-symbols-outlined text-2xl text-emerald-600" aria-hidden="true">upload_file</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">
               إضافة امتحان جديد ورفع ملف PDF
             </h3>
@@ -91,7 +91,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -211,7 +211,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               {pdfFileName ? (
                 <div className="flex items-center justify-center gap-3">
                   <span className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                    <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>
+                    <span className="material-symbols-outlined text-2xl" aria-hidden="true">picture_as_pdf</span>
                   </span>
                   <div className="text-right">
                     <span className="font-bold text-xs text-emerald-900 block truncate max-w-xs">
@@ -225,7 +225,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               ) : (
                 <div className="space-y-1.5">
                   <span className="w-10 h-10 rounded-xl bg-white border border-[#bdc9c6]/50 text-[#005c55] inline-flex items-center justify-center font-bold shadow-2xs">
-                    <span className="material-symbols-outlined text-2xl">cloud_upload</span>
+                    <span className="material-symbols-outlined text-2xl" aria-hidden="true">cloud_upload</span>
                   </span>
                   <p className="font-bold text-xs text-[#0d1c2e]">
                     اضغط هنا لرفع ملف الامتحان (PDF) من جهازك
@@ -265,7 +265,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               type="submit"
               className="px-5 py-2 rounded-xl font-semibold text-white bg-[#005c55] hover:bg-[#1b6b51] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm">check</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>
               <span>حفظ الامتحان ورفع النموذج</span>
             </button>
           </div>

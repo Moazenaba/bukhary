@@ -79,7 +79,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
               isActive ? 'bg-emerald-50 text-[#005c55]' : 'text-slate-500'
             }`}>
-              <span className="material-symbols-outlined text-xl">
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">
                 {item.icon}
               </span>
             </div>
@@ -104,7 +104,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         )}
         
         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-          <span className="material-symbols-outlined text-xl">
+          <span className="material-symbols-outlined text-xl" aria-hidden="true">
             menu
           </span>
         </div>

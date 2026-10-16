@@ -39,6 +39,7 @@ export const MergeConfirmModal: React.FC<MergeConfirmModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="إغلاق النافذة"
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50"
           >
             <X className="w-5 h-5" />

@@ -62,7 +62,7 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="w-8 h-8 rounded-xl bg-[#005c55]/10 text-[#005c55] flex items-center justify-center">
-              <span className="material-symbols-outlined text-lg">add_task</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">add_task</span>
             </span>
             <h3 className="text-sm font-bold text-[#0d1c2e]">إضافة صف جديد إلى الجدول</h3>
           </div>
@@ -71,7 +71,7 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-white text-gray-400 hover:text-gray-700"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 

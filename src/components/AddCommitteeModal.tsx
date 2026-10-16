@@ -245,14 +245,14 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[#005c55]">
-            <span className="material-symbols-outlined text-2xl">add_circle</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">add_circle</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">إضافة لجنة جديدة</h3>
           </div>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -452,7 +452,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           <div className="bg-[#f8f9ff] border border-[#bdc9c6]/60 p-3.5 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base">person_pin</span>
+                <span className="material-symbols-outlined text-base" aria-hidden="true">person_pin</span>
                 <span>بيانات الشيخ المرسل إليه:</span>
               </span>
               <span className="text-[10px] text-[#6e7977]">
@@ -556,7 +556,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 onClick={handleAddMemberField}
                 className="text-xs text-[#005c55] font-bold hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm">add</span>
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
                 <span>+ إضافة عضو آخر</span>
               </button>
             </div>
@@ -581,7 +581,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                       className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg"
                       title="حذف هذا العضو"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
                     </button>
                   )}
                 </div>
@@ -687,7 +687,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               type="submit"
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm">check</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>
               <span>تسجيل اللجنة واعتمادها</span>
             </button>
           </div>

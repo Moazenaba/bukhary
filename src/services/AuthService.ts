@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { AppUser, UserRole, AssistantPermission, AssistantStatus } from '../types';
-import { INITIAL_USERS } from '../data/initialAssistants';
+import { AppUser, UserRole, AssistantPermission, AssistantStatus, PermissionProfile } from '../types';
+import { SupabaseService } from './SupabaseService';
+import { INITIAL_PERMISSION_PROFILES } from '../data/initialPermissionProfiles';
 
 export const AUTH_STORAGE_KEY = 'bukhari_auth_session_user';
 export const AUTH_TOKEN_KEY = 'bukhari_auth_session_token';
 export const USERS_STORAGE_KEY = 'bukhari_users_v2';
+export const PROFILES_STORAGE_KEY = 'bukhari_permission_profiles_v1';
 
 export interface DatabaseStatus {
   status: 'connected' | 'reconnecting' | 'offline';
@@ -19,27 +21,21 @@ export interface DatabaseStatus {
 }
 
 export const FALLBACK_DB_STATUS: DatabaseStatus = {
-  status: 'connected',
-  engine: 'Bukhari SQL Enterprise Engine (v2.4)',
-  connectionPool: 'active (10/10 pools connected)',
-  latencyMs: 14,
-  uptimeSeconds: 86420,
+  status: 'offline',
+  engine: 'Supabase PostgreSQL Cloud Engine',
+  connectionPool: 'غير متصل',
+  latencyMs: 0,
+  uptimeSeconds: 0,
   timestamp: new Date().toISOString(),
-  tables: [
-    { name: 'لجان الاختبارات (Committees)', count: 18, status: 'synced' },
-    { name: 'نماذج الامتحانات (Exams)', count: 7, status: 'synced' },
-    { name: 'الدورات والمتون (Courses)', count: 4, status: 'synced' },
-    { name: 'المستخدمين والصلاحيات (Users & Roles)', count: 6, status: 'synced' },
-    { name: 'سجلات التصحيح والرصد (Scoring)', count: 94, status: 'synced' },
-    { name: 'سجلات الأمان والتدقيق (Audit Logs)', count: 152, status: 'synced' },
-  ],
-  encryption: 'TLS 1.3 / AES-256-GCM',
-  backupStatus: 'النسخ الاحتياطي التلقائي: نشط ومتزامن',
+  tables: [],
+  encryption: 'TLS 1.3 / SSL Verified',
+  backupStatus: 'يتطلب الاتصال بقاعدة بيانات سوبابيز',
 };
 
 class AuthServiceClass {
   private currentUser: AppUser | null = null;
   private users: AppUser[] = [];
+  private profiles: PermissionProfile[] = [];
   private listeners: Set<() => void> = new Set();
   private initialized: boolean = false;
 
@@ -47,70 +43,38 @@ class AuthServiceClass {
     this.init();
   }
 
-  public init(): void {
+  public async init(): Promise<void> {
     if (this.initialized) return;
 
-    // 1. Load users from localStorage or fallback to INITIAL_USERS
+    // 1. First load from local storage cache if available
     try {
       const rawUsers = localStorage.getItem(USERS_STORAGE_KEY);
       if (rawUsers) {
         this.users = JSON.parse(rawUsers);
-      } else {
-        this.users = [...INITIAL_USERS];
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(this.users));
       }
     } catch (e) {
-      console.error('Failed to load users in AuthService', e);
-      this.users = [...INITIAL_USERS];
+      console.error('Failed to load cached users in AuthService', e);
     }
 
-    // Ensure Super Admin has username 'admin' and password '504' and all permissions
-    const allSystemPermissions = [
-      'database_sheets',
-      'manage_committees',
-      'add_new_committee',
-      'exams_pdf',
-      'manage_courses',
-      'calendar_schedule',
-      'progress_stats',
-      'manage_assistants',
-    ];
-
-    const adminIndex = this.users.findIndex((u) => u.role === 'super_admin' || u.id === 'user-admin');
-    if (adminIndex !== -1) {
-      this.users[adminIndex].password = '504';
-      this.users[adminIndex].email = 'admin';
-      this.users[adminIndex].status = 'approved';
-      this.users[adminIndex].permissions = allSystemPermissions;
-    } else {
-      this.users.unshift({
-        id: 'user-admin',
-        name: 'فضيلة الشيخ د. أحمد بن محمد المنشاوي',
-        phone: '0501112233',
-        email: 'admin',
-        password: '504',
-        role: 'super_admin',
-        status: 'approved',
-        assignedCommittees: [],
-        permissions: allSystemPermissions,
-        createdAt: '2026/09/20 - 08:00 ص',
-        notes: 'المشرف العام على مسابقات مسجد البخاري ومدير النظام بصلاحيات كاملة',
-      });
+    // Load permission profiles
+    try {
+      const rawProfiles = localStorage.getItem(PROFILES_STORAGE_KEY);
+      if (rawProfiles) {
+        this.profiles = JSON.parse(rawProfiles);
+      } else {
+        this.profiles = INITIAL_PERMISSION_PROFILES;
+        this.saveProfiles();
+      }
+    } catch (e) {
+      this.profiles = INITIAL_PERMISSION_PROFILES;
     }
-    this.saveUsers();
 
     // 2. Load active session if exists
     try {
       const rawSession = localStorage.getItem(AUTH_STORAGE_KEY);
       if (rawSession) {
         const savedUser: AppUser = JSON.parse(rawSession);
-        // Verify user still exists in database and is approved
-        const matched = this.users.find((u) => u.id === savedUser.id);
-        if (matched && matched.status === 'approved') {
-          this.currentUser = matched;
-        } else {
-          this.clearSession();
-        }
+        this.currentUser = savedUser;
       }
     } catch (e) {
       console.error('Failed to load auth session in AuthService', e);
@@ -118,6 +82,28 @@ class AuthServiceClass {
     }
 
     this.initialized = true;
+
+    // 3. Immediately fetch live users directly from Supabase app_users table
+    try {
+      const dbUsers = await SupabaseService.getUsers();
+      if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+        this.users = dbUsers;
+        this.saveUsers();
+
+        // Refresh current user session from live DB
+        if (this.currentUser) {
+          const matched = dbUsers.find((u) => u.id === this.currentUser?.id);
+          if (matched && matched.status === 'approved') {
+            this.currentUser = matched;
+          } else if (!matched || matched.status === 'rejected') {
+            this.clearSession();
+          }
+        }
+        this.notify();
+      }
+    } catch (err) {
+      console.warn('تعذر جلب المستخدمين مباشرة من سوبابيز:', err);
+    }
   }
 
   private notify(): void {
@@ -273,7 +259,7 @@ class AuthServiceClass {
    */
   public registerUser(newUserData: Partial<AppUser>): AppUser {
     const role: UserRole = newUserData.role || 'assistant';
-    const status: AssistantStatus = newUserData.status || 'approved';
+    const status: AssistantStatus = newUserData.status || 'pending';
     const defaultPerms: AssistantPermission[] =
       newUserData.permissions && newUserData.permissions.length > 0
         ? newUserData.permissions
@@ -281,10 +267,17 @@ class AuthServiceClass {
         ? ['database_sheets', 'manage_committees', 'calendar_schedule']
         : [];
 
+    const requestCode =
+      newUserData.requestCode ||
+      `REQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newUser: AppUser = {
-      id: `usr_${Date.now()}`,
+      ...newUserData,
+      id: newUserData.id || `usr_${Date.now()}`,
       name: newUserData.name || 'معاون جديد',
       phone: newUserData.phone || '',
+      whatsapp: newUserData.whatsapp || newUserData.phone || '',
+      nationalId: newUserData.nationalId || '',
       passportNumber: newUserData.passportNumber || '',
       email: newUserData.email || `${Date.now()}@bukhari.org`,
       password: newUserData.password || '',
@@ -292,12 +285,24 @@ class AuthServiceClass {
       status,
       assignedCommittees: newUserData.assignedCommittees || [],
       permissions: defaultPerms,
-      createdAt: new Date().toLocaleDateString('ar-EG'),
-      notes: newUserData.notes || 'طلب انضمام مسجل ومرتبط بالمعاونين عبر البوابة',
+      createdAt: newUserData.createdAt || new Date().toLocaleDateString('ar-EG'),
+      notes: newUserData.notes || 'طلب انضمام جديد مسجل عبر البوابة المركزية',
+      requestCode,
+      quranLevel: newUserData.quranLevel || '',
+      qualification: newUserData.qualification || '',
+      experience: newUserData.experience || '',
+      availability: newUserData.availability || 'طوال فترة المسابقة',
+      preferredCommittees: newUserData.preferredCommittees || [],
+      interviewDate: newUserData.interviewDate,
+      interviewNotes: newUserData.interviewNotes,
+      rejectionReason: newUserData.rejectionReason,
+      rejectedAt: newUserData.rejectedAt,
+      rejectedBy: newUserData.rejectedBy,
     };
 
     this.users = [newUser, ...this.users];
     this.saveUsers();
+    SupabaseService.saveUser(newUser).catch(console.error);
     this.notify();
     return newUser;
   }
@@ -311,9 +316,10 @@ class AuthServiceClass {
     assignedCommittees: number[],
     role: UserRole = 'assistant'
   ): void {
+    let targetUser: AppUser | undefined;
     this.users = this.users.map((u) => {
       if (u.id === userId) {
-        return {
+        targetUser = {
           ...u,
           role,
           status: 'approved',
@@ -321,22 +327,95 @@ class AuthServiceClass {
           assignedCommittees,
           approvedAt: new Date().toLocaleDateString('ar-EG'),
           approvedBy: this.currentUser?.name || 'المشرف العام',
+          rejectionReason: undefined,
+          rejectedAt: undefined,
         };
+        return targetUser;
       }
       return u;
     });
 
     this.saveUsers();
+    if (targetUser) {
+      SupabaseService.saveUser(targetUser).catch(console.error);
+    }
     this.notify();
   }
 
   /**
-   * Super Admin rejects pending user
+   * Super Admin schedules an interview & trial exam for applicant
    */
-  public rejectUser(userId: string): void {
-    this.users = this.users.filter((u) => u.id !== userId);
+  public scheduleInterview(
+    userId: string,
+    interviewDate: string,
+    interviewNotes?: string
+  ): void {
+    let targetUser: AppUser | undefined;
+    this.users = this.users.map((u) => {
+      if (u.id === userId) {
+        targetUser = {
+          ...u,
+          status: 'interview',
+          interviewDate,
+          interviewNotes:
+            interviewNotes ||
+            'تم تحديد موعد المقابلة الشخصية والاختبار التجريبي بمقر إدارة لجان المسجد.',
+        };
+        return targetUser;
+      }
+      return u;
+    });
+
     this.saveUsers();
+    if (targetUser) {
+      SupabaseService.saveUser(targetUser).catch(console.error);
+    }
     this.notify();
+  }
+
+  /**
+   * Super Admin rejects / apologizes to applicant with formal reason
+   */
+  public rejectUser(userId: string, reason?: string): void {
+    let targetUser: AppUser | undefined;
+    this.users = this.users.map((u) => {
+      if (u.id === userId) {
+        targetUser = {
+          ...u,
+          status: 'rejected',
+          rejectionReason:
+            reason ||
+            'نعتذر عن قبول الطلب حالياً لاكتمال النصاب المطلوب في لجان هذه الدورة، مع خالص التقدير والشكر.',
+          rejectedAt: new Date().toLocaleDateString('ar-EG'),
+          rejectedBy: this.currentUser?.name || 'المشرف العام',
+        };
+        return targetUser;
+      }
+      return u;
+    });
+
+    this.saveUsers();
+    if (targetUser) {
+      SupabaseService.saveUser(targetUser).catch(console.error);
+    }
+    this.notify();
+  }
+
+  /**
+   * Track application by phone number, request code, or national ID
+   */
+  public trackJoinRequest(query: string): AppUser | null {
+    const clean = query.trim().toLowerCase();
+    if (!clean) return null;
+    return (
+      this.users.find(
+        (u) =>
+          u.phone.trim() === clean ||
+          (u.requestCode && u.requestCode.toLowerCase() === clean) ||
+          (u.nationalId && u.nationalId.trim() === clean) ||
+          u.email.toLowerCase() === clean
+      ) || null
+    );
   }
 
   /**
@@ -349,6 +428,7 @@ class AuthServiceClass {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
     }
     this.saveUsers();
+    SupabaseService.saveUser(updatedUser).catch(console.error);
     this.notify();
   }
 
@@ -358,6 +438,7 @@ class AuthServiceClass {
   public deleteUser(userId: string): void {
     this.users = this.users.filter((u) => u.id !== userId);
     this.saveUsers();
+    SupabaseService.deleteUser(userId).catch(console.error);
     this.notify();
     if (this.currentUser?.id === userId) {
       this.clearSession();
@@ -376,8 +457,135 @@ class AuthServiceClass {
     };
     this.users = [user, ...this.users];
     this.saveUsers();
+    SupabaseService.saveUser(user).catch(console.error);
     this.notify();
     return user;
+  }
+
+  private saveProfiles(): void {
+    try {
+      localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(this.profiles));
+    } catch (e) {
+      console.error('Failed to persist permission profiles', e);
+    }
+  }
+
+  public getProfiles(): PermissionProfile[] {
+    return [...this.profiles];
+  }
+
+  public getProfileById(profileId: string): PermissionProfile | undefined {
+    return this.profiles.find((p) => p.id === profileId);
+  }
+
+  public saveProfile(profileData: PermissionProfile): PermissionProfile {
+    const existingIndex = this.profiles.findIndex((p) => p.id === profileData.id);
+    let updatedProfile: PermissionProfile;
+    if (existingIndex >= 0) {
+      updatedProfile = {
+        ...this.profiles[existingIndex],
+        ...profileData,
+      };
+      this.profiles[existingIndex] = updatedProfile;
+    } else {
+      updatedProfile = {
+        ...profileData,
+        id: profileData.id || `profile_${Date.now()}`,
+        createdAt: profileData.createdAt || new Date().toLocaleDateString('ar-EG'),
+      };
+      this.profiles = [updatedProfile, ...this.profiles];
+    }
+    this.saveProfiles();
+    this.notify();
+    return updatedProfile;
+  }
+
+  public deleteProfile(profileId: string): boolean {
+    const target = this.profiles.find((p) => p.id === profileId);
+    if (target?.isDefault) return false;
+    this.profiles = this.profiles.filter((p) => p.id !== profileId);
+    this.saveProfiles();
+    this.notify();
+    return true;
+  }
+
+  public assignProfileToUser(userId: string, profileId: string): void {
+    const profile = this.getProfileById(profileId);
+    if (!profile) return;
+    this.users = this.users.map((u) => {
+      if (u.id === userId) {
+        const updatedUser: AppUser = {
+          ...u,
+          profileId,
+          permissions: profile.permissions,
+          assignedCommittees: profile.allCommitteesAllowed ? [] : profile.allowedCommittees,
+          allCommitteesAllowed: profile.allCommitteesAllowed,
+          allowedExamIds: profile.allowedExamIds,
+          allExamsAllowed: profile.allExamsAllowed,
+        };
+        SupabaseService.saveUser(updatedUser).catch(console.error);
+        return updatedUser;
+      }
+      return u;
+    });
+    this.saveUsers();
+    this.notify();
+  }
+
+  public setSuperAdmin(userId: string, makeSuper: boolean): { success: boolean; message: string } {
+    if (!this.isSuperAdmin()) {
+      return { success: false, message: 'عذراً، فقط المشرف العام (سوبر أدمن) يملك صلاحية تعيين المشرفين.' };
+    }
+
+    const currentSuperAdmins = this.users.filter((u) => u.role === 'super_admin');
+    if (makeSuper) {
+      if (currentSuperAdmins.length >= 2) {
+        return {
+          success: false,
+          message: 'لا يمكن تعيين أكثر من (2) مشرفين عامين (سوبر أدمن) في المنظومة للحفاظ على أمان وصلاحيات النظام.',
+        };
+      }
+    } else {
+      if (currentSuperAdmins.length <= 1) {
+        return {
+          success: false,
+          message: 'يجب أن يتبقى على الأقل مشرف عام واحد (سوبر أدمن) في المنظومة.',
+        };
+      }
+    }
+
+    this.users = this.users.map((u) => {
+      if (u.id === userId) {
+        const updated: AppUser = {
+          ...u,
+          role: makeSuper ? 'super_admin' : 'assistant',
+          profileId: makeSuper ? 'profile_super_admin' : undefined,
+          allCommitteesAllowed: makeSuper,
+          allExamsAllowed: makeSuper,
+          permissions: makeSuper
+            ? [
+                'database_sheets',
+                'manage_committees',
+                'add_new_committee',
+                'exams_pdf',
+                'manage_courses',
+                'calendar_schedule',
+                'progress_stats',
+                'manage_assistants',
+              ]
+            : ['database_sheets', 'manage_committees'],
+        };
+        SupabaseService.saveUser(updated).catch(console.error);
+        return updated;
+      }
+      return u;
+    });
+    this.saveUsers();
+    this.notify();
+    return {
+      success: true,
+      message: makeSuper ? 'تمت ترقية المستخدم إلى مشرف عام (سوبر أدمن) بنجاح.' : 'تم تعديل دور المستخدم بنجاح.',
+    };
   }
 
   // ==========================================
@@ -412,6 +620,108 @@ class AuthServiceClass {
     if (!this.currentUser) return false;
     if (this.currentUser.role === 'super_admin') return true;
     return this.currentUser.permissions.includes(permission);
+  }
+
+  public canAccessTab(tab: string, user?: AppUser): boolean {
+    const target = user || this.currentUser;
+    if (!target) return false;
+    if (target.role === 'super_admin') return true;
+
+    // If user has assigned permission profile
+    if (target.profileId) {
+      const profile = this.getProfileById(target.profileId);
+      if (profile && Array.isArray(profile.allowedTabs)) {
+        return profile.allowedTabs.includes(tab);
+      }
+    }
+
+    const perms = target.permissions || [];
+    switch (tab) {
+      case 'home':
+        return true;
+      case 'summer_course':
+        return perms.includes('database_sheets');
+      case 'committees':
+        return perms.includes('manage_committees');
+      case 'exams':
+        return perms.includes('exams_pdf');
+      case 'calendar':
+        return perms.includes('calendar_schedule');
+      case 'stats':
+        return perms.includes('progress_stats');
+      case 'assistants':
+        return perms.includes('manage_assistants');
+      case 'courses':
+        return perms.includes('manage_courses');
+      case 'ceremonies':
+      case 'daily_alerts':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  public canAccessCommittee(committeeNumber: number, user?: AppUser): boolean {
+    const target = user || this.currentUser;
+    if (!target) return false;
+    if (target.role === 'super_admin' || target.allCommitteesAllowed) return true;
+
+    if (target.profileId) {
+      const profile = this.getProfileById(target.profileId);
+      if (profile) {
+        if (profile.allCommitteesAllowed) return true;
+        if (profile.allowedCommittees && profile.allowedCommittees.length > 0) {
+          return profile.allowedCommittees.includes(committeeNumber);
+        }
+      }
+    }
+
+    if (target.assignedCommittees && target.assignedCommittees.length > 0) {
+      return target.assignedCommittees.includes(committeeNumber);
+    }
+
+    return false;
+  }
+
+  public canAccessExam(examId: string, user?: AppUser): boolean {
+    const target = user || this.currentUser;
+    if (!target) return false;
+    if (target.role === 'super_admin' || target.allExamsAllowed) return true;
+
+    if (target.profileId) {
+      const profile = this.getProfileById(target.profileId);
+      if (profile) {
+        if (profile.allExamsAllowed) return true;
+        if (profile.allowedExamIds && profile.allowedExamIds.length > 0) {
+          return profile.allowedExamIds.includes(examId);
+        }
+      }
+    }
+
+    if (target.allowedExamIds && target.allowedExamIds.length > 0) {
+      return target.allowedExamIds.includes(examId);
+    }
+
+    // Default if not restricted: allowed if user has exams_pdf perm
+    return this.hasPermission('exams_pdf');
+  }
+
+  public getUserAllowedCommittees(user?: AppUser, allComms: number[] = []): number[] {
+    const target = user || this.currentUser;
+    if (!target) return [];
+    if (target.role === 'super_admin' || target.allCommitteesAllowed) return allComms;
+
+    if (target.profileId) {
+      const profile = this.getProfileById(target.profileId);
+      if (profile && !profile.allCommitteesAllowed && profile.allowedCommittees.length > 0) {
+        return profile.allowedCommittees;
+      }
+    }
+
+    if (target.assignedCommittees && target.assignedCommittees.length > 0) {
+      return target.assignedCommittees;
+    }
+    return allComms;
   }
 
   public canAccessDatabaseSheets(): boolean {
@@ -466,7 +776,7 @@ class AuthServiceClass {
     const targetRole = role || this.currentUser?.role;
     switch (targetRole) {
       case 'super_admin':
-        return 'المشرف العام (مدير النظام)';
+        return 'المشرف العام (سوبر أدمن)';
       case 'committee_head':
         return 'رئيس لجنة واختبارات (معلم)';
       case 'teacher':
@@ -527,11 +837,14 @@ export const AuthService = new AuthServiceClass();
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(AuthService.getCurrentUser());
   const [users, setUsers] = useState<AppUser[]>(AuthService.getUsers());
+  const [profiles, setProfiles] = useState<PermissionProfile[]>(AuthService.getProfiles());
 
   useEffect(() => {
+    AuthService.init();
     const unsubscribe = AuthService.subscribe(() => {
       setCurrentUser(AuthService.getCurrentUser());
       setUsers(AuthService.getUsers());
+      setProfiles(AuthService.getProfiles());
     });
     return unsubscribe;
   }, []);
@@ -539,6 +852,7 @@ export function useAuth() {
   return {
     currentUser,
     users,
+    profiles,
     isAuthenticated: currentUser !== null,
     login: (e: string, p: string, r?: boolean) => AuthService.login(e, p, r),
     quickLogin: (u: AppUser, r?: boolean) => AuthService.quickLogin(u, r),
@@ -547,9 +861,27 @@ export function useAuth() {
     updateUser: (u: AppUser) => AuthService.updateUser(u),
     approveUser: (id: string, p: AssistantPermission[], c: number[], r?: UserRole) =>
       AuthService.approveUser(id, p, c, r),
-    rejectUser: (id: string) => AuthService.rejectUser(id),
+    scheduleInterview: (id: string, date: string, notes?: string) =>
+      AuthService.scheduleInterview(id, date, notes),
+    rejectUser: (id: string, reason?: string) => AuthService.rejectUser(id, reason),
+    trackJoinRequest: (query: string) => AuthService.trackJoinRequest(query),
     deleteUser: (id: string) => AuthService.deleteUser(id),
     addDirectUser: (d: Omit<AppUser, 'id' | 'createdAt'>) => AuthService.addDirectUser(d),
+    
+    // Profiles & Role Management
+    saveProfile: (p: PermissionProfile) => AuthService.saveProfile(p),
+    deleteProfile: (id: string) => AuthService.deleteProfile(id),
+    assignProfileToUser: (uId: string, pId: string) => AuthService.assignProfileToUser(uId, pId),
+    setSuperAdmin: (uId: string, isSuper: boolean) => AuthService.setSuperAdmin(uId, isSuper),
+    getProfileById: (pId: string) => AuthService.getProfileById(pId),
+
+    // Granular Scope Checks
+    canAccessTab: (tab: string, user?: AppUser) => AuthService.canAccessTab(tab, user),
+    canAccessCommittee: (commNum: number, user?: AppUser) => AuthService.canAccessCommittee(commNum, user),
+    canAccessExam: (examId: string, user?: AppUser) => AuthService.canAccessExam(examId, user),
+    getUserAllowedCommittees: (user?: AppUser, allComms?: number[]) =>
+      AuthService.getUserAllowedCommittees(user, allComms),
+
     isSuperAdmin: AuthService.isSuperAdmin(),
     isCommitteeHead: AuthService.isCommitteeHead(),
     isTeacher: AuthService.isTeacher(),

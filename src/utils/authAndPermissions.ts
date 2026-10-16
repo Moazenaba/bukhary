@@ -16,26 +16,19 @@ export interface DatabaseStatus {
 }
 
 export const FALLBACK_DB_STATUS: DatabaseStatus = {
-  status: 'connected',
-  engine: 'Bukhari SQL Enterprise Engine (v2.4)',
-  connectionPool: 'active (10/10 pools connected)',
-  latencyMs: 14,
-  uptimeSeconds: 86420,
+  status: 'offline',
+  engine: 'Supabase PostgreSQL Cloud Engine',
+  connectionPool: 'غير متصل',
+  latencyMs: 0,
+  uptimeSeconds: 0,
   timestamp: new Date().toISOString(),
-  tables: [
-    { name: 'لجان الاختبارات (Committees)', count: 18, status: 'synced' },
-    { name: 'نماذج الامتحانات (Exams)', count: 7, status: 'synced' },
-    { name: 'الدورات والمتون (Courses)', count: 4, status: 'synced' },
-    { name: 'المستخدمين والصلاحيات (Users & Roles)', count: 6, status: 'synced' },
-    { name: 'سجلات التصحيح والرصد (Scoring)', count: 94, status: 'synced' },
-    { name: 'سجلات الأمان والتدقيق (Audit Logs)', count: 152, status: 'synced' },
-  ],
-  encryption: 'TLS 1.3 / AES-256-GCM',
-  backupStatus: 'النسخ الاحتياطي التلقائي: نشط ومتزامن',
+  tables: [],
+  encryption: 'TLS 1.3 / SSL Verified',
+  backupStatus: 'يتطلب الاتصال بسوبابيز',
 };
 
 /**
- * Fetch database connection status from server, with seamless fallback
+ * Fetch database connection status from server, querying live Supabase
  */
 export async function fetchDatabaseStatus(): Promise<DatabaseStatus> {
   try {
@@ -48,7 +41,7 @@ export async function fetchDatabaseStatus(): Promise<DatabaseStatus> {
       };
     }
   } catch (err) {
-    // Graceful fallback
+    // Offline status
   }
   return FALLBACK_DB_STATUS;
 }

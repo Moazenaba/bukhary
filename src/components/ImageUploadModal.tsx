@@ -213,7 +213,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-xl bg-[#005c55]/10 text-[#005c55] flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">document_scanner</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">document_scanner</span>
             </span>
             <div>
               <h2 className="text-base font-bold text-[#0d1c2e] flex items-center gap-2">
@@ -232,7 +232,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onClick={onClose}
             className="w-9 h-9 rounded-xl border border-[#bdc9c6]/40 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -242,7 +242,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           {!imageSrc ? (
             <div className="border-2 border-dashed border-[#bdc9c6] hover:border-[#005c55] rounded-2xl p-8 bg-[#f8f9ff] text-center transition-all flex flex-col items-center justify-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-[#005c55] flex items-center justify-center shadow-xs">
-                <span className="material-symbols-outlined text-4xl">cloud_upload</span>
+                <span className="material-symbols-outlined text-4xl" aria-hidden="true">cloud_upload</span>
               </div>
 
               <div>
@@ -260,7 +260,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className="px-4 py-2.5 rounded-xl bg-[#005c55] text-white hover:bg-[#1b6b51] text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-base">photo_library</span>
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">photo_library</span>
                   <span>اختيار صورة من الجهاز</span>
                 </button>
 
@@ -269,7 +269,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   onClick={() => cameraInputRef.current?.click()}
                   className="px-4 py-2.5 rounded-xl bg-white border border-[#bdc9c6] text-[#005c55] hover:bg-emerald-50 text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-base">photo_camera</span>
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">photo_camera</span>
                   <span>التقاط بالكاميرا مباشرة</span>
                 </button>
               </div>
@@ -310,7 +310,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     className="px-2.5 py-1.5 bg-white border border-[#bdc9c6] hover:bg-gray-100 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                     title="تدوير 90 درجة لليمين"
                   >
-                    <span className="material-symbols-outlined text-sm">rotate_right</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">rotate_right</span>
                     <span>تدوير لليمين</span>
                   </button>
 
@@ -320,7 +320,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     className="px-2.5 py-1.5 bg-white border border-[#bdc9c6] hover:bg-gray-100 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                     title="تدوير 90 درجة لليسار"
                   >
-                    <span className="material-symbols-outlined text-sm">rotate_left</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">rotate_left</span>
                     <span>تدوير لليسار</span>
                   </button>
 
@@ -335,7 +335,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     }`}
                     title="تحسين تباين الخط اليدوي للورقة"
                   >
-                    <span className="material-symbols-outlined text-sm">contrast</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">contrast</span>
                     <span>{contrastBoost ? 'التباين العالي: مفعل' : 'تعزيز التباين'}</span>
                   </button>
 
@@ -349,7 +349,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                         : 'bg-white border-[#bdc9c6] text-[#3e4947] hover:bg-gray-100'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-sm">crop</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">crop</span>
                     <span>{isCropMode ? 'إنهاء القص' : 'تحديد وقص الجدول'}</span>
                   </button>
                 </div>
@@ -471,7 +471,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                       onClick={handleStartExtraction}
                       className="w-full py-3 bg-[#005c55] hover:bg-[#1b6b51] text-white rounded-xl text-sm font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
                     >
-                      <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                      <span className="material-symbols-outlined text-lg" aria-hidden="true">auto_awesome</span>
                       <span>استخراج وتحويل الجدول تلقائياً بـ Gemini 2.5 Flash</span>
                     </button>
                   )}
@@ -482,7 +482,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               {errorMessage && (
                 <div className="p-3 bg-rose-50 border border-rose-300 text-rose-900 rounded-xl text-xs flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-base text-rose-600">error</span>
+                    <span className="material-symbols-outlined text-base text-rose-600" aria-hidden="true">error</span>
                     <span>{errorMessage}</span>
                   </div>
                   <button
@@ -500,7 +500,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 <div className="p-4 bg-emerald-50/80 border border-emerald-300 rounded-2xl space-y-4 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-emerald-700 text-xl">task_alt</span>
+                      <span className="material-symbols-outlined text-emerald-700 text-xl" aria-hidden="true">task_alt</span>
                       <h4 className="text-xs font-bold text-emerald-950">
                         نجح الاستخراج! تم التعرف على {extractedData.rows.length} صفوف من خط اليد
                       </h4>
@@ -571,7 +571,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                           onClick={() => handleConfirmApplication('merge')}
                           className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
                         >
-                          <span className="material-symbols-outlined text-sm">merge_type</span>
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">merge_type</span>
                           <span>دمج مع الجدول الحالي (+{extractedData.rows.length})</span>
                         </button>
                       )}
@@ -585,7 +585,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                             : 'bg-[#005c55] hover:bg-[#1b6b51] text-white'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-sm">
+                        <span className="material-symbols-outlined text-sm" aria-hidden="true">
                           {existingCount > 0 ? 'restart_alt' : 'check'}
                         </span>
                         <span>

@@ -51,7 +51,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             placeholder="بحث بالشيخ، المكان، الكتاب، أو الرقم..."
             className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl pr-9 pl-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
           />
-          <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-base text-[#6e7977]">
+          <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-base text-[#6e7977]" aria-hidden="true">
             search
           </span>
           {searchQuery && (
@@ -73,7 +73,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             onClick={onOpenUpload}
             className="px-3.5 py-2 bg-[#005c55] hover:bg-[#1b6b51] text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-transform active:scale-95"
           >
-            <span className="material-symbols-outlined text-base">document_scanner</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">document_scanner</span>
             <span>مسح جدول خط اليد (AI)</span>
           </button>
 
@@ -83,7 +83,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             onClick={onOpenAddRow}
             className="px-3 py-2 bg-white border border-[#bdc9c6] hover:bg-gray-50 text-[#005c55] rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base">add</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
             <span>إضافة صف يدوياً</span>
           </button>
 
@@ -94,7 +94,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer"
             title="تصدير ملف Microsoft Excel (.xlsx)"
           >
-            <span className="material-symbols-outlined text-base text-emerald-700">file_download</span>
+            <span className="material-symbols-outlined text-base text-emerald-700" aria-hidden="true">file_download</span>
             <span>Excel</span>
           </button>
 
@@ -105,7 +105,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer"
             title="تصدير كشف CSV مع ترميز UTF-8"
           >
-            <span className="material-symbols-outlined text-base text-blue-700">csv</span>
+            <span className="material-symbols-outlined text-base text-blue-700" aria-hidden="true">csv</span>
             <span>CSV</span>
           </button>
 
@@ -116,7 +116,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             className="p-2 bg-white border border-[#bdc9c6] hover:bg-gray-50 text-[#3e4947] rounded-xl text-xs font-bold shadow-2xs flex items-center justify-center cursor-pointer"
             title="طباعة الكشف"
           >
-            <span className="material-symbols-outlined text-base">print</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">print</span>
           </button>
         </div>
       </div>
@@ -140,7 +140,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 }`}
               >
                 {tab.icon && (
-                  <span className="material-symbols-outlined text-sm">
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
                     {tab.icon}
                   </span>
                 )}

@@ -45,7 +45,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-amber-100/60 border-b border-amber-200/60 flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-amber-900">
             <span className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
-              <span className="material-symbols-outlined text-xl">library_add</span>
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">library_add</span>
             </span>
             <div>
               <h3 className="font-bold text-base text-amber-950">إضافة كتاب مقرر جديد</h3>
@@ -58,7 +58,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -136,7 +136,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
           {/* Quick Info Box */}
           <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
-            <span className="material-symbols-outlined text-base text-amber-600 shrink-0">info</span>
+            <span className="material-symbols-outlined text-base text-amber-600 shrink-0" aria-hidden="true">info</span>
             <span>
               عند إضافة الكتاب سيظهر فوراً كخيار معتمد في كافة نماذج تسجيل اللجان، وتصفية البيانات، ورفع نماذج الامتحانات.
             </span>
@@ -155,7 +155,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
               type="submit"
               className="px-5 py-2 rounded-xl font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm">library_add</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">library_add</span>
               <span>حفظ الكتاب واعتماده</span>
             </button>
           </div>

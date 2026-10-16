@@ -17,7 +17,7 @@ export const HeroStats: React.FC<HeroStatsProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="text-[11px] text-emerald-900 font-extrabold bg-emerald-100/70 px-3 py-0.5 rounded-full inline-flex items-center gap-1.5 border border-emerald-300">
-              <span className="material-symbols-outlined text-sm text-[#005c55]">verified</span>
+              <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">verified</span>
               <span>مسابقات مسجد الإمام البخاري العلمية</span>
             </span>
             <span className="text-slate-500 text-[11px] font-semibold">• الدورة العلمية الصيفية</span>

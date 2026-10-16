@@ -17,13 +17,17 @@ import {
   Course,
   ScheduleTask,
 } from './types';
-import {
-  INITIAL_COMMITTEES,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_EXAMS,
-  DEFAULT_COMPETITION_BOOKS,
-} from './data/initialCommittees';
-import { INITIAL_COURSES, INITIAL_SCHEDULE_TASKS } from './data/initialCourses';
+export const DEFAULT_COMPETITION_BOOKS: string[] = [
+  'مسابقة كتاب الأصول الثلاثة',
+  'كتاب التوحيد الذي هو حق الله على العبيد',
+  'مسابقة كتاب القواعد الأربع',
+  'مسابقة العقيدة الواسطية',
+  'مسابقة لمعة الاعتقاد الهادي إلى سبيل الرشاد',
+  'مسابقة كتاب كشف الشبهات',
+  'مسابقة الأربعين النووية',
+  'مسابقة متن الآجرومية',
+  'مسابقة كتاب نخبة الفكر في مصطلح أهل الأثر',
+];
 import { calculateCurrentStage, getCurrentFormattedDateTime } from './utils/stageUtils';
 import { SummerCourseRow } from './types/summerCourse';
 import { Sidebar, NavTab } from './components/Sidebar';
@@ -50,6 +54,8 @@ import { CeremoniesView } from './components/CeremoniesView';
 import { Footer } from './components/Footer';
 import { CentralLoginPortal } from './components/CentralLoginPortal';
 import { useAuth, AuthService } from './services/AuthService';
+import { SupabaseService } from './services/SupabaseService';
+import { SupabaseDatabaseModal } from './components/SupabaseDatabaseModal';
 import { SYSTEM_PERMISSIONS } from './types';
 
 const STORAGE_KEY_COMMITTEES = 'bukhari_competition_committees_v2';
@@ -98,7 +104,7 @@ export default function App() {
     } catch (e) {
       console.error('Failed to load committees from localStorage', e);
     }
-    return INITIAL_COMMITTEES;
+    return [];
   });
 
   // Exams state with persistent LocalStorage
@@ -109,7 +115,7 @@ export default function App() {
     } catch (e) {
       console.error('Failed to load exams from localStorage', e);
     }
-    return INITIAL_EXAMS;
+    return [];
   });
 
   // Saved competition books with persistent LocalStorage
@@ -144,19 +150,26 @@ export default function App() {
   const {
     currentUser,
     users,
+    profiles,
     isAuthenticated,
     quickLogin,
     logout,
     registerUser,
     updateUser,
     approveUser,
+    scheduleInterview,
     rejectUser,
     deleteUser,
     addDirectUser,
+    saveProfile,
+    deleteProfile,
+    assignProfileToUser,
+    setSuperAdmin,
     isSuperAdmin,
   } = useAuth();
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
   // Custom permissions state with persistent LocalStorage
   const [customPermissions, setCustomPermissions] = useState<PermissionDefinition[]>(() => {
@@ -222,7 +235,7 @@ export default function App() {
     } catch (e) {
       console.error('Failed to load courses from localStorage', e);
     }
-    return INITIAL_COURSES;
+    return [];
   });
 
   // Schedule / Calendar Tasks state with persistent LocalStorage
@@ -230,18 +243,12 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SCHEDULE_TASKS);
       if (saved) {
-        const parsed: ScheduleTask[] = JSON.parse(saved);
-        const hasAhmedTask = parsed.some((t) => t.id === 'task-ahmed-1');
-        if (!hasAhmedTask) {
-          const ahmedTask = INITIAL_SCHEDULE_TASKS.find((t) => t.id === 'task-ahmed-1');
-          if (ahmedTask) return [ahmedTask, ...parsed];
-        }
-        return parsed;
+        return JSON.parse(saved);
       }
     } catch (e) {
       console.error('Failed to load schedule tasks from localStorage', e);
     }
-    return INITIAL_SCHEDULE_TASKS;
+    return [];
   });
 
   // Persist courses
@@ -252,6 +259,55 @@ export default function App() {
       console.error('Failed to save courses', e);
     }
   }, [courses]);
+
+  // Loading state while retrieving database records from Supabase
+  const [isLoadingDatabase, setIsLoadingDatabase] = useState(true);
+
+  // Retrieve all live database records directly from Supabase PostgreSQL on startup
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAllFromSupabase() {
+      setIsLoadingDatabase(true);
+      try {
+        const [dbCommittees, dbCourses, dbExams, dbTasks, dbNotifs] = await Promise.all([
+          SupabaseService.getCommittees(),
+          SupabaseService.getCourses(),
+          SupabaseService.getExams(),
+          SupabaseService.getTasks(),
+          SupabaseService.getNotifications(),
+        ]);
+
+        if (isMounted) {
+          if (Array.isArray(dbCommittees) && dbCommittees.length > 0) {
+            setCommittees(dbCommittees);
+          }
+          if (Array.isArray(dbCourses) && dbCourses.length > 0) {
+            setCourses(dbCourses);
+          }
+          if (Array.isArray(dbExams) && dbExams.length > 0) {
+            setExams(dbExams);
+          }
+          if (Array.isArray(dbTasks) && dbTasks.length > 0) {
+            setScheduleTasks(dbTasks);
+          }
+          if (Array.isArray(dbNotifs) && dbNotifs.length > 0) {
+            setNotifications(dbNotifs);
+          }
+        }
+      } catch (err) {
+        console.error('فشل جلب البيانات من سوبابيز:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingDatabase(false);
+        }
+      }
+    }
+
+    loadAllFromSupabase();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Persist schedule tasks
   useEffect(() => {
@@ -332,18 +388,21 @@ export default function App() {
     if (!currentUser) return;
     if (currentUser.role === 'super_admin') return;
 
-    const perms = currentUser.permissions || [];
-    const allowedTabs: NavTab[] = [];
-    if (perms.includes('database_sheets')) allowedTabs.push('summer_course');
-    if (perms.includes('manage_committees')) allowedTabs.push('committees');
-    if (perms.includes('exams_pdf')) allowedTabs.push('exams');
-    if (perms.includes('manage_courses')) allowedTabs.push('courses');
-    if (perms.includes('calendar_schedule')) allowedTabs.push('calendar');
-    if (perms.includes('progress_stats')) allowedTabs.push('stats');
-    if (perms.includes('manage_assistants')) allowedTabs.push('assistants');
-
-    if (allowedTabs.length > 0 && !allowedTabs.includes(activeTab)) {
-      setActiveTab(allowedTabs[0]);
+    if (!AuthService.canAccessTab(activeTab, currentUser)) {
+      const allTabs: NavTab[] = [
+        'home',
+        'summer_course',
+        'committees',
+        'exams',
+        'ceremonies',
+        'calendar',
+        'courses',
+        'assistants',
+        'stats',
+        'daily_alerts',
+      ];
+      const firstAllowed = allTabs.find((t) => AuthService.canAccessTab(t, currentUser)) || 'home';
+      setActiveTab(firstAllowed);
     }
   }, [currentUser, activeTab]);
 
@@ -360,7 +419,7 @@ export default function App() {
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
 
   // Notifications state
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Sync to Google Sheets Webhook in background
   const triggerGoogleSheetsSync = async (currentList: Committee[] = committees) => {
@@ -416,7 +475,7 @@ export default function App() {
       const updated = prev.map((c) => {
         if (c.id === committeeId) {
           const isDone = c.stages[stageKey]?.completed;
-          return {
+          const updatedComm = {
             ...c,
             stages: {
               ...c.stages,
@@ -426,6 +485,9 @@ export default function App() {
               },
             },
           };
+          // Persist directly to Supabase
+          SupabaseService.saveCommittee(updatedComm);
+          return updatedComm;
         }
         return c;
       });
@@ -445,6 +507,9 @@ export default function App() {
       return newList;
     });
     setSelectedCommitteeForDetails(updated);
+
+    // Persist directly to Supabase PostgreSQL database
+    SupabaseService.saveCommittee(updated);
 
     // Sync ceremony details with schedule tasks if ceremonyDate is set
     const cDetails = updated.ceremonyDetails;
@@ -567,6 +632,9 @@ export default function App() {
       return newList;
     });
 
+    // Save directly to Supabase PostgreSQL database
+    SupabaseService.saveCommittee(newComm);
+
     if (newBookName && !savedBooks.includes(newBookName)) {
       setSavedBooks((prev) => [newBookName, ...prev]);
     }
@@ -574,7 +642,7 @@ export default function App() {
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `تسجيل لجنة جديدة: ${newComm.committeeName}`,
-      description: `تم إدراج لجنة #${newComm.committeeNumber} في ${newComm.competitionBook} ومزامنة السطر في Google Sheets.`,
+      description: `تم إدراج لجنة #${newComm.committeeNumber} في ${newComm.competitionBook} ومزامنة البيانات في Supabase.`,
       time: 'الآن',
       type: 'info',
       read: false,
@@ -590,11 +658,15 @@ export default function App() {
       triggerGoogleSheetsSync(filtered);
       return filtered;
     });
+
+    // Delete directly from Supabase PostgreSQL database
+    SupabaseService.deleteCommittee(committeeId);
   };
 
   // Add new exam
   const handleAddExam = (newExam: ExamItem) => {
     setExams((prev) => [newExam, ...prev]);
+    SupabaseService.saveExam(newExam).catch(console.error);
     if (newExam.book && !savedBooks.includes(newExam.book)) {
       setSavedBooks((prev) => [newExam.book, ...prev]);
     }
@@ -636,15 +708,17 @@ export default function App() {
   // Delete exam
   const handleDeleteExam = (examId: string) => {
     setExams((prev) => prev.filter((e) => e.id !== examId));
+    SupabaseService.deleteExam(examId).catch(console.error);
   };
 
-  // Approve assistant
+  // Approve assistant & join request
   const handleApproveAssistant = (
     userId: string,
     permissions: AssistantPermission[],
-    assignedCommittees: number[]
+    assignedCommittees: number[],
+    role: any = 'assistant'
   ) => {
-    approveUser(userId, permissions, assignedCommittees);
+    approveUser(userId, permissions, assignedCommittees, role);
     const approvedUser = users.find((u) => u.id === userId);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
@@ -657,13 +731,33 @@ export default function App() {
     setNotifications((prev) => [newNotif, ...prev]);
   };
 
-  // Reject assistant
-  const handleRejectAssistant = (userId: string) => {
-    rejectUser(userId);
+  // Schedule interview for applicant
+  const handleScheduleInterview = (
+    userId: string,
+    interviewDate: string,
+    interviewNotes?: string
+  ) => {
+    scheduleInterview(userId, interviewDate, interviewNotes);
+    const applicant = users.find((u) => u.id === userId);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: 'رفض طلب الانضمام',
-      description: 'تم رفض طلب الانضمام وحذفه من قائمة الانتظار.',
+      title: `موعد مقابلة: ${applicant?.name || ''}`,
+      description: `تم تحديد موعد مقابلة شخصية واختبار تجريبي ليوم (${interviewDate}).`,
+      time: 'الآن',
+      type: 'info',
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+  };
+
+  // Reject assistant with formal reason
+  const handleRejectAssistant = (userId: string, reason?: string) => {
+    rejectUser(userId, reason);
+    const rejectedUser = users.find((u) => u.id === userId);
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: `اعتذار عن طلب: ${rejectedUser?.name || ''}`,
+      description: 'تم توثيق الاعتذار عن الطلب وتحديث السجل.',
       time: 'الآن',
       type: 'info',
       read: false,
@@ -736,10 +830,13 @@ export default function App() {
       return [newCourse, ...updated];
     });
 
+    // Persist directly to Supabase PostgreSQL
+    SupabaseService.saveCourse(newCourse);
+
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `إضافة دورة جديدة: ${newCourse.name}`,
-      description: `تم إنشاء الدورة بنجاح وربط اللجان المسابقاتية بها.`,
+      description: `تم إنشاء الدورة بنجاح وحفظها مباشرة في قاعدة بيانات Supabase.`,
       time: 'الآن',
       type: 'success',
       read: false,
@@ -753,10 +850,14 @@ export default function App() {
     setCourses((prev) =>
       prev.map((c) => (c.id === updatedCourse.id ? updatedCourse : c))
     );
+
+    // Persist directly to Supabase PostgreSQL
+    SupabaseService.saveCourse(updatedCourse);
+
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `تحديث دورة: ${updatedCourse.name}`,
-      description: `تم حفظ التعديلات على الدورة بنجاح.`,
+      description: `تم حفظ التعديلات على الدورة في Supabase بنجاح.`,
       time: 'الآن',
       type: 'info',
       read: false,
@@ -767,6 +868,9 @@ export default function App() {
   // Delete course
   const handleDeleteCourse = (courseId: string) => {
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
+
+    // Delete directly from Supabase PostgreSQL
+    SupabaseService.deleteCourse(courseId);
   };
 
   // Set default active course
@@ -787,6 +891,7 @@ export default function App() {
       id: `task-${Date.now()}`,
     };
     setScheduleTasks((prev) => [newTask, ...prev]);
+    SupabaseService.saveTask(newTask).catch(console.error);
 
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
@@ -801,24 +906,31 @@ export default function App() {
 
   // Toggle schedule task completed
   const handleToggleTaskComplete = (taskId: string) => {
+    let nextState = false;
+    let timeStamp: string | undefined;
+
     setScheduleTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
-          const next = !t.completed;
+          nextState = !t.completed;
+          timeStamp = nextState ? getCurrentFormattedDateTime() : undefined;
           return {
             ...t,
-            completed: next,
-            completedAt: next ? getCurrentFormattedDateTime() : undefined,
+            completed: nextState,
+            completedAt: timeStamp,
           };
         }
         return t;
       })
     );
+
+    SupabaseService.toggleTask(taskId, nextState, timeStamp).catch(console.error);
   };
 
   // Delete schedule task
   const handleDeleteScheduleTask = (taskId: string) => {
     setScheduleTasks((prev) => prev.filter((t) => t.id !== taskId));
+    SupabaseService.deleteTask(taskId).catch(console.error);
   };
 
   // Update committee ceremony details & sync with database
@@ -834,10 +946,11 @@ export default function App() {
       attendingSheikhs?: string[];
     }
   ) => {
+    let targetUpdated: Committee | undefined;
     setCommittees((prev) =>
       prev.map((c) => {
         if (c.id === committeeId) {
-          return {
+          targetUpdated = {
             ...c,
             associationName: ceremonyInfo.place || c.associationName,
             ceremonyDetails: {
@@ -861,10 +974,15 @@ export default function App() {
               },
             },
           };
+          return targetUpdated;
         }
         return c;
       })
     );
+
+    if (targetUpdated) {
+      SupabaseService.saveCommittee(targetUpdated).catch(console.error);
+    }
 
     const comm = committees.find((c) => c.id === committeeId);
     const newNotif: NotificationItem = {
@@ -916,38 +1034,45 @@ export default function App() {
     logout();
   };
 
-  // Register new staff/assistant (instantly connected to assistants and permissions)
+  // Register new staff/assistant / Join Request
   const handleRegisterAssistant = (
-    name: string,
-    phone: string,
-    email: string,
+    newUserData: Partial<AppUser> | string,
+    phone = '',
+    email = '',
     notes?: string,
     role: any = 'assistant',
     password = '',
     passportNumber = '',
-    status: any = 'approved',
+    status: any = 'pending',
     permissions?: any[],
     assignedCommittees?: number[]
   ) => {
-    const isApproved = status === 'approved';
-    const created = registerUser({
-      name,
-      passportNumber,
-      phone,
-      email,
-      notes,
-      role,
-      password,
-      status: isApproved ? 'approved' : 'pending',
-      permissions,
-      assignedCommittees,
-    });
+    const payload: Partial<AppUser> =
+      typeof newUserData === 'object'
+        ? newUserData
+        : {
+            name: newUserData,
+            phone,
+            email,
+            notes,
+            role,
+            password,
+            passportNumber,
+            status,
+            permissions,
+            assignedCommittees,
+          };
+
+    const isApproved = payload.status === 'approved';
+    const created = registerUser(payload);
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: isApproved ? `انضمام معاون معتمد: ${name}` : `طلب انضمام جديد: ${name}`,
+      title: isApproved
+        ? `انضمام كادر معتمد: ${created.name}`
+        : `طلب انضمام جديد (${created.requestCode || 'REQ'}): ${created.name}`,
       description: isApproved
-        ? `المعاون (${name} - ${phone}) تم تسجيله واعتماده فوراً وربطه بقاعدة بيانات المعاونين ومنحه الصلاحيات الميدانية.`
-        : `المتقدم (${name} - ${phone}) أتم إرسال طلبه وبانتظار دراسته واعتماده في لوحة «المعاونون والصلاحيات».`,
+        ? `المعاون (${created.name} - ${created.phone}) تم تفعيله ومنحه الصلاحيات الميدانية مباشرة.`
+        : `المتقدم (${created.name} - ${created.phone}) أرسل طلب انضمام كـ (${AuthService.getRoleLabel(created.role)}) وهو بانتظار دراسة المشرف العام.`,
       time: 'الآن',
       type: isApproved ? 'success' : 'urgent',
       read: false,
@@ -1023,7 +1148,12 @@ export default function App() {
 
   // Mark notifications as read
   const handleMarkNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => {
+      prev.forEach((n) => {
+        if (!n.read) SupabaseService.markNotificationRead(n.id).catch(console.error);
+      });
+      return prev.map((n) => ({ ...n, read: true }));
+    });
   };
 
   // Stage counts for filter tabs
@@ -1146,18 +1276,7 @@ export default function App() {
         users={users}
         onLogin={handleLogin}
         onRegisterUser={(newUser) => {
-          handleRegisterAssistant(
-            newUser.name || '',
-            newUser.phone || '',
-            newUser.email || '',
-            newUser.notes,
-            newUser.role || 'assistant',
-            newUser.password || '',
-            newUser.passportNumber || '',
-            newUser.status || 'approved',
-            newUser.permissions,
-            newUser.assignedCommittees
-          );
+          handleRegisterAssistant(newUser);
         }}
       />
     );
@@ -1192,6 +1311,7 @@ export default function App() {
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
           onOpenExport={() => setIsExportOpen(true)}
+          onOpenDatabaseModal={() => setIsSupabaseModalOpen(true)}
           onSignOut={handleLogout}
           notifications={notifications}
           onOpenNotificationCommittee={(commId) => {
@@ -1238,11 +1358,16 @@ export default function App() {
               onToggleCommitteeStage={handleQuickToggleStage}
               onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
               onUpdateCommitteeCourse={(committeeId, courseId, courseName) => {
-                setCommittees((prev) =>
-                  prev.map((c) =>
+                setCommittees((prev) => {
+                  const updated = prev.map((c) =>
                     c.id === committeeId ? { ...c, courseId, courseName } : c
-                  )
-                );
+                  );
+                  const target = updated.find((c) => c.id === committeeId);
+                  if (target) {
+                    SupabaseService.saveCommittee(target);
+                  }
+                  return updated;
+                });
               }}
               onAddCourse={handleAddCourse}
               onNavigateToCommittees={() => setActiveTab('committees')}
@@ -1265,8 +1390,15 @@ export default function App() {
             <AssistantsView
               users={users}
               committees={committees}
+              exams={exams}
               currentUser={currentUser}
+              profiles={profiles}
+              onSaveProfile={saveProfile}
+              onDeleteProfile={deleteProfile}
+              onAssignProfile={assignProfileToUser}
+              onSetSuperAdmin={setSuperAdmin}
               onApproveAssistant={handleApproveAssistant}
+              onScheduleInterview={handleScheduleInterview}
               onRejectAssistant={handleRejectAssistant}
               onUpdateAssistantPermissions={handleUpdateAssistantPermissions}
               onUpdateAssistantUser={handleUpdateAssistantUser}
@@ -1350,7 +1482,7 @@ export default function App() {
                 <div className="mb-6 p-4 rounded-2xl bg-gradient-to-l from-emerald-50 via-teal-50 to-white border border-teal-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
                   <div>
                     <span className="font-bold text-[#005c55] text-sm block flex items-center gap-1.5 mb-1">
-                      <span className="material-symbols-outlined text-lg">person_pin</span>
+                      <span className="material-symbols-outlined text-lg" aria-hidden="true">person_pin</span>
                       <span>مرحباً بك: {currentUser.name} (معاون ميداني)</span>
                     </span>
                     <span className="text-[#3e4947] block leading-relaxed">
@@ -1372,7 +1504,7 @@ export default function App() {
                           : 'bg-white border border-[#bdc9c6] text-[#0d1c2e] hover:bg-emerald-50'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm">filter_alt</span>
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">filter_alt</span>
                       <span>لجاني المسندة فقط ({currentUser.assignedCommittees.length})</span>
                     </button>
 
@@ -1389,7 +1521,7 @@ export default function App() {
                           : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-50'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm">edit_note</span>
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">edit_note</span>
                       <span>لجان بها أسئلة تحتاج تصحيح</span>
                     </button>
                   </div>
@@ -1449,7 +1581,7 @@ export default function App() {
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl p-12 text-center border border-[#bdc9c6]/40 shadow-xs">
-                  <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block">
+                  <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block" aria-hidden="true">
                     search_off
                   </span>
                   <h3 className="font-bold text-base text-[#0d1c2e] mb-1">
@@ -1493,7 +1625,7 @@ export default function App() {
                     className="p-2 rounded-lg border border-[#bdc9c6]/60 text-[#6e7977] hover:text-[#0d1c2e] hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                     title="الصفحة السابقة"
                   >
-                    <span className="material-symbols-outlined text-lg">chevron_right</span>
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_right</span>
                   </button>
 
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
@@ -1516,7 +1648,7 @@ export default function App() {
                     className="p-2 rounded-lg border border-[#bdc9c6]/60 text-[#0d1c2e] hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                     title="الصفحة التالية"
                   >
-                    <span className="material-symbols-outlined text-lg">chevron_left</span>
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_left</span>
                   </button>
                 </div>
               </div>
@@ -1587,6 +1719,21 @@ export default function App() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         committees={filteredCommittees}
+      />
+
+      <SupabaseDatabaseModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+        onRefreshData={async () => {
+          try {
+            const dbComms = await SupabaseService.getCommittees();
+            if (dbComms && dbComms.length > 0) setCommittees(dbComms);
+            const dbCourses = await SupabaseService.getCourses();
+            if (dbCourses && dbCourses.length > 0) setCourses(dbCourses);
+          } catch (e) {
+            console.error('Error refreshing data from Supabase:', e);
+          }
+        }}
       />
     </div>
   );

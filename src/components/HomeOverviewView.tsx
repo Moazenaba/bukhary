@@ -46,7 +46,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       <div className="bg-gradient-to-l from-[#005c55] via-[#0f766e] to-[#005c55] rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-3">
-            <span className="material-symbols-outlined text-sm">verified</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">verified</span>
             مسابقات مسجد البخاري العلمية
           </span>
 
@@ -69,14 +69,14 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                   onClick={onOpenNewCommittee}
                   className="px-4 py-2 rounded-xl bg-[#9cf2e8]/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-sm">add_circle</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">add_circle</span>
                   <span>تسجيل لجنة جديدة</span>
                 </button>
                 <button
                   onClick={() => onNavigateTab('calendar')}
                   className="px-4 py-2 rounded-xl bg-emerald-900/60 border border-white/30 text-white font-semibold text-xs hover:bg-emerald-900/80 transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-sm">calendar_month</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_month</span>
                   <span>جدول تسليمات الجمعة (10/2)</span>
                 </button>
               </div>
@@ -97,14 +97,14 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                   onClick={() => onNavigateCommittees()}
                   className="px-4 py-2 rounded-xl bg-white text-[#005c55] font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-sm">groups</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
                   <span>عرض لجاني المسندة ({myAssignedCommittees.length})</span>
                 </button>
                 <button
                   onClick={() => onNavigateTab('calendar')}
                   className="px-4 py-2 rounded-xl bg-[#9cf2e8]/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-sm">calendar_month</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_month</span>
                   <span>جدول أعمالي وتسليماتي في التقويم</span>
                 </button>
               </div>
@@ -114,7 +114,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
         {/* Decorative background shape */}
         <div className="absolute left-6 -bottom-10 opacity-15 pointer-events-none">
-          <span className="material-symbols-outlined text-[180px]">mosque</span>
+          <span className="material-symbols-outlined text-[180px]" aria-hidden="true">mosque</span>
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-xl">calendar_today</span>
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">calendar_today</span>
             </span>
             <div>
               <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
           >
             <span>فتح التقويم والكاليندر بالكامل</span>
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span>
           </button>
         </div>
 
@@ -193,7 +193,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         <div className="bg-white rounded-2xl p-5 border border-[#bdc9c6]/50 shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#bdc9c6]/30">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-xl text-[#005c55]">event_repeat</span>
+              <span className="material-symbols-outlined text-xl text-[#005c55]" aria-hidden="true">event_repeat</span>
               <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
                 الدورات والمسابقات الموسمية واللجان المربوطة بها:
               </h3>
@@ -297,7 +297,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         >
           <div className="flex items-center justify-between mb-2">
             <span className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#005c55] flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined">menu_book</span>
+              <span className="material-symbols-outlined" aria-hidden="true">menu_book</span>
             </span>
             <span className="text-2xl font-bold font-mono text-[#005c55]">{total}</span>
           </div>

@@ -24,12 +24,12 @@ export const DataTable: React.FC<DataTableProps> = ({
 }) => {
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) {
-      return <span className="material-symbols-outlined text-xs text-slate-400">unfold_more</span>;
+      return <span className="material-symbols-outlined text-xs text-slate-400" aria-hidden="true">unfold_more</span>;
     }
     return sortOrder === 'asc' ? (
-      <span className="material-symbols-outlined text-xs text-[#005c55]">arrow_upward</span>
+      <span className="material-symbols-outlined text-xs text-[#005c55]" aria-hidden="true">arrow_upward</span>
     ) : (
-      <span className="material-symbols-outlined text-xs text-[#005c55]">arrow_downward</span>
+      <span className="material-symbols-outlined text-xs text-[#005c55]" aria-hidden="true">arrow_downward</span>
     );
   };
 
@@ -37,7 +37,7 @@ export const DataTable: React.FC<DataTableProps> = ({
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-xs">
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
-          <span className="material-symbols-outlined text-3xl">inbox</span>
+          <span className="material-symbols-outlined text-3xl" aria-hidden="true">inbox</span>
         </div>
         <h3 className="text-base font-bold text-slate-800 mb-1">لا توجد صفوف تطابق معايير البحث والفلترة</h3>
         <p className="text-xs text-slate-500 mb-4">
@@ -48,7 +48,7 @@ export const DataTable: React.FC<DataTableProps> = ({
           onClick={onAddRow}
           className="px-4 py-2 bg-[#005c55] text-white font-bold rounded-xl text-xs hover:bg-[#004742] transition-all cursor-pointer inline-flex items-center gap-1.5"
         >
-          <span className="material-symbols-outlined text-sm">add</span>
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
           <span>إضافة صف جديد الآن</span>
         </button>
       </div>
@@ -320,7 +320,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                         }`}
                         title={isUncertain ? 'إلغاء وسم التدقيق (البيانات مؤكدة)' : 'وضع علامة يحتاج تدقيق'}
                       >
-                        <span className="material-symbols-outlined text-base">warning</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">warning</span>
                       </button>
 
                       {/* Toggle Struck out */}
@@ -334,7 +334,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                         }`}
                         title={isStruck ? 'إلغاء الشطب وتفعيل الصف' : 'شطب هذا الصف'}
                       >
-                        <span className="material-symbols-outlined text-base">strikethrough_s</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">strikethrough_s</span>
                       </button>
 
                       {/* Duplicate Row */}
@@ -344,7 +344,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                         className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
                         title="تكرار الصف"
                       >
-                        <span className="material-symbols-outlined text-base">content_copy</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">content_copy</span>
                       </button>
 
                       {/* Delete Row */}
@@ -358,7 +358,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                         className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                         title="حذف هذا الصف"
                       >
-                        <span className="material-symbols-outlined text-base">delete</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
                       </button>
                     </div>
                   </td>
@@ -372,7 +372,7 @@ export const DataTable: React.FC<DataTableProps> = ({
       {/* Footer info bar */}
       <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-slate-500 text-[11px] flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-sm text-[#005c55]">check_circle</span>
+          <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">check_circle</span>
           <span>كل خلية قابلة للتعديل الفوري، والحفظ تلقائي مستمر في المتصفح</span>
         </div>
         <div className="flex items-center gap-3">

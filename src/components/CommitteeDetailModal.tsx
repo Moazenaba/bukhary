@@ -382,7 +382,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
             onClick={onClose}
             className="w-9 h-9 rounded-xl border border-[#bdc9c6]/40 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -485,7 +485,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
           {committee.examApprovedBy && (
             <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 flex items-center justify-between text-xs">
               <span className="font-bold text-blue-900 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-blue-700">verified</span>
+                <span className="material-symbols-outlined text-blue-700" aria-hidden="true">verified</span>
                 <span>جاهزية وتوزيع الامتحان معتمدة بواسطة: <strong>{committee.examApprovedBy.assistantName}</strong></span>
               </span>
               <span className="text-[11px] text-blue-700 font-mono">
@@ -498,7 +498,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-sm text-[#0d1c2e] flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[#005c55]">timeline</span>
+                <span className="material-symbols-outlined text-[#005c55]" aria-hidden="true">timeline</span>
                 <span>مراحل عمل اللجنة (تبديل الحالة وتوثيق الوقت):</span>
               </h3>
               <span className="text-xs text-[#6e7977]">
@@ -547,7 +547,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
 
                             {stageData?.completedAt && (
                               <div className="flex items-center gap-1 text-[11px] text-amber-800 mt-1">
-                                <span className="material-symbols-outlined text-xs">schedule</span>
+                                <span className="material-symbols-outlined text-xs" aria-hidden="true">schedule</span>
                                 <span>تاريخ إتمام التصحيح: {stageData.completedAt}</span>
                               </div>
                             )}
@@ -574,7 +574,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                             className="p-1.5 text-amber-900 hover:bg-amber-200/50 rounded-lg cursor-pointer"
                             title="عرض / إخفاء تفاصيل الأسئلة والمصححين"
                           >
-                            <span className="material-symbols-outlined text-lg">
+                            <span className="material-symbols-outlined text-lg" aria-hidden="true">
                               {isScoringExpanded ? 'expand_less' : 'expand_more'}
                             </span>
                           </button>
@@ -627,7 +627,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1">
-                                <span className="material-symbols-outlined text-amber-600 text-sm">
+                                <span className="material-symbols-outlined text-amber-600 text-sm" aria-hidden="true">
                                   checklist
                                 </span>
                                 <span>خطوات تصحيح الأسئلة (سؤال بسؤال):</span>
@@ -637,7 +637,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                                 onClick={handleAddQuestion}
                                 className="text-[11px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                               >
-                                <span className="material-symbols-outlined text-xs">add</span>
+                                <span className="material-symbols-outlined text-xs" aria-hidden="true">add</span>
                                 <span>إضافة سؤال</span>
                               </button>
                             </div>
@@ -693,7 +693,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                                       <div className="flex items-center gap-2">
                                         {q.completed && q.completedAt ? (
                                           <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-100/70 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-xs">
+                                            <span className="material-symbols-outlined text-xs" aria-hidden="true">
                                               schedule
                                             </span>
                                             <span>{q.completedAt.split(' - ')[1] || q.completedAt}</span>
@@ -711,7 +711,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                                             className="text-gray-400 hover:text-red-500 p-1 rounded-md"
                                             title="حذف هذا السؤال"
                                           >
-                                            <span className="material-symbols-outlined text-sm">
+                                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
                                               close
                                             </span>
                                           </button>
@@ -723,7 +723,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                                     <div className="mt-2.5 space-y-2">
                                       <div className="flex items-center justify-between">
                                         <span className="text-[11px] font-bold text-[#0d1c2e] flex items-center gap-1">
-                                          <span className="material-symbols-outlined text-xs text-amber-700">
+                                          <span className="material-symbols-outlined text-xs text-amber-700" aria-hidden="true">
                                             edit_note
                                           </span>
                                           <span>مصحح (أو مصححو) هذا السؤال:</span>
@@ -741,7 +741,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                                               key={sIdx}
                                               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300/80 text-xs font-bold shadow-2xs"
                                             >
-                                              <span className="material-symbols-outlined text-xs text-amber-800">
+                                              <span className="material-symbols-outlined text-xs text-amber-800" aria-hidden="true">
                                                 person
                                               </span>
                                               <span>{scorerName}</span>
@@ -858,7 +858,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
 
                             {stageData?.completedAt && (
                               <div className="flex items-center gap-1 text-[11px] text-indigo-800 mt-1">
-                                <span className="material-symbols-outlined text-xs">schedule</span>
+                                <span className="material-symbols-outlined text-xs" aria-hidden="true">schedule</span>
                                 <span>تاريخ إتمام التجميع: {stageData.completedAt}</span>
                               </div>
                             )}
@@ -881,7 +881,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                             onClick={() => setIsAggregationExpanded(!isAggregationExpanded)}
                             className="p-1.5 text-indigo-900 hover:bg-indigo-200/50 rounded-lg cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-lg">
+                            <span className="material-symbols-outlined text-lg" aria-hidden="true">
                               {isAggregationExpanded ? 'expand_less' : 'expand_more'}
                             </span>
                           </button>
@@ -969,7 +969,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
 
                             {isCompleted && stageData?.completedAt && (
                               <div className="flex items-center gap-1 text-[11px] text-emerald-800 mt-1 font-mono">
-                                <span className="material-symbols-outlined text-xs">schedule</span>
+                                <span className="material-symbols-outlined text-xs" aria-hidden="true">schedule</span>
                                 <span>تاريخ التمام: {stageData.completedAt}</span>
                               </div>
                             )}
@@ -995,7 +995,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                             className="p-1.5 text-amber-900 hover:bg-amber-200/50 rounded-lg cursor-pointer"
                             title="عرض / إخفاء تفاصيل الحفل"
                           >
-                            <span className="material-symbols-outlined text-lg">
+                            <span className="material-symbols-outlined text-lg" aria-hidden="true">
                               {isCeremonyExpanded ? 'expand_less' : 'expand_more'}
                             </span>
                           </button>
@@ -1088,7 +1088,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-sm text-[#005c55]">
+                                <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">
                                   person_add
                                 </span>
                                 <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
@@ -1138,7 +1138,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                                 onClick={handleAddSheikh}
                                 className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                               >
-                                <span className="material-symbols-outlined text-sm">add</span>
+                                <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
                                 <span>+ إضافة عضو آخر</span>
                               </button>
                             </div>
@@ -1250,7 +1250,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
                         {/* Exact timestamp if completed */}
                         {isCompleted && stageData?.completedAt && (
                           <div className="flex items-center gap-1 text-[11px] text-emerald-700 mt-0.5">
-                            <span className="material-symbols-outlined text-xs">schedule</span>
+                            <span className="material-symbols-outlined text-xs" aria-hidden="true">schedule</span>
                             <span>تاريخ الإتمام: {stageData.completedAt}</span>
                           </div>
                         )}
@@ -1281,7 +1281,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
             <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-base">person_pin</span>
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">person_pin</span>
                   <span>تعديل بيانات الشيخ المرسل إليه، عدد الطلاب، ونوع اللجنة:</span>
                 </span>
                 <span className="text-[11px] text-[#6e7977]">
@@ -1388,7 +1388,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
           <div className="flex items-center gap-2">
             {isSavedToast && (
               <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 animate-in fade-in">
-                <span className="material-symbols-outlined text-sm">check</span>
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>
                 تم حفظ وتحديث بيانات اللجنة فورياً
               </span>
             )}
@@ -1406,7 +1406,7 @@ export const CommitteeDetailModal: React.FC<CommitteeDetailModalProps> = ({
               onClick={handleSave}
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#005c55] hover:bg-[#1b6b51] shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm">save</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">save</span>
               <span>حفظ الملاحظات والتعديلات</span>
             </button>
           </div>

@@ -12,7 +12,7 @@ export const Navbar: React.FC<NavbarProps> = ({ lastSavedAt, totalRows }) => {
         {/* Brand & Mosque Header */}
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#004d47] to-[#007a70] text-white flex items-center justify-center shrink-0 shadow-sm border border-emerald-600/30">
-            <span className="material-symbols-outlined text-2xl text-emerald-200">mosque</span>
+            <span className="material-symbols-outlined text-2xl text-emerald-200" aria-hidden="true">mosque</span>
           </div>
 
           <div>
@@ -43,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ lastSavedAt, totalRows }) => {
           </div>
 
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[#005c55] font-bold">
-            <span className="material-symbols-outlined text-base">psychology</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">psychology</span>
             <span>Gemini Vision 2.5 Flash</span>
           </div>
         </div>

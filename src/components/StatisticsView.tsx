@@ -75,7 +75,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         <div>
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-emerald-50 text-emerald-800">
-              <span className="material-symbols-outlined text-2xl">analytics</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">analytics</span>
             </span>
             <h2 className="text-lg sm:text-xl font-bold text-[#0d1c2e]">
               لوحة حساب نسبة الإنجاز الدورية (أسبوعية • شهرية • سنوية)
@@ -96,7 +96,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                 : 'text-[#3e4947] hover:bg-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">calendar_view_week</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_view_week</span>
             <span>نسبة هذا الأسبوع</span>
           </button>
 
@@ -108,7 +108,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                 : 'text-[#3e4947] hover:bg-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">calendar_month</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_month</span>
             <span>نسبة هذا الشهر</span>
           </button>
 
@@ -120,7 +120,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                 : 'text-[#3e4947] hover:bg-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">event_repeat</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">event_repeat</span>
             <span>النسبة السنوية (الموسم)</span>
           </button>
         </div>
@@ -139,7 +139,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         >
           <div className="flex items-center justify-between mb-3">
             <span className="p-2.5 rounded-xl bg-teal-100 text-teal-800">
-              <span className="material-symbols-outlined text-2xl">date_range</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">date_range</span>
             </span>
             <div className="text-left">
               <span className="text-3xl font-mono font-bold text-teal-800">
@@ -178,7 +178,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         >
           <div className="flex items-center justify-between mb-3">
             <span className="p-2.5 rounded-xl bg-blue-100 text-blue-800">
-              <span className="material-symbols-outlined text-2xl">calendar_month</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">calendar_month</span>
             </span>
             <div className="text-left">
               <span className="text-3xl font-mono font-bold text-blue-700">
@@ -217,7 +217,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         >
           <div className="flex items-center justify-between mb-3">
             <span className="p-2.5 rounded-xl bg-emerald-100 text-emerald-800">
-              <span className="material-symbols-outlined text-2xl">celebration</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">celebration</span>
             </span>
             <div className="text-left">
               <span className="text-3xl font-mono font-bold text-emerald-700">
@@ -250,7 +250,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
       <div className="p-4 rounded-2xl bg-gradient-to-l from-[#005c55] to-emerald-800 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
           <span className="p-2.5 rounded-xl bg-white/20 text-white">
-            <span className="material-symbols-outlined text-2xl">speed</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">speed</span>
           </span>
           <div>
             <h4 className="font-bold text-sm">
@@ -331,7 +331,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                   className="p-3 rounded-xl bg-[#f8f9ff] border border-[#bdc9c6]/40 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#005c55] text-lg">
+                    <span className="material-symbols-outlined text-[#005c55] text-lg" aria-hidden="true">
                       auto_stories
                     </span>
                     <span className="font-bold text-xs text-[#0d1c2e]">{book}</span>

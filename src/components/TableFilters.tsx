@@ -52,7 +52,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Search Field */}
         <div className="relative flex-1">
-          <span className="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
+          <span className="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg" aria-hidden="true">
             search
           </span>
           <input
@@ -81,7 +81,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
             className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#005c55] hover:bg-[#004742] text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             title="إضافة صف فارغ جديد للجدول"
           >
-            <span className="material-symbols-outlined text-base">add</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
             <span>إضافة صف جديد</span>
           </button>
 
@@ -91,7 +91,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
             className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             title="تصدير جدول البيانات لملف Excel بصيغة xlsx"
           >
-            <span className="material-symbols-outlined text-base">table_view</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">table_view</span>
             <span>تصدير Excel (xlsx)</span>
           </button>
 
@@ -101,7 +101,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
             className="px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
             title="تصدير كملف CSV يدعم الحروف العربية بترميز UTF-8 BOM"
           >
-            <span className="material-symbols-outlined text-base text-slate-500">csv</span>
+            <span className="material-symbols-outlined text-base text-slate-500" aria-hidden="true">csv</span>
             <span>تصدير CSV</span>
           </button>
 
@@ -111,7 +111,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
             className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer"
             title="طباعة الجدول"
           >
-            <span className="material-symbols-outlined text-lg">print</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">print</span>
           </button>
 
           <button
@@ -120,7 +120,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
             className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer"
             title="استعادة البيانات النموذجية الأولية"
           >
-            <span className="material-symbols-outlined text-lg">restart_alt</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">restart_alt</span>
           </button>
         </div>
       </div>
@@ -139,7 +139,7 @@ export const TableFilters: React.FC<TableFiltersProps> = ({
                   : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600'
               }`}
             >
-              <span className="material-symbols-outlined text-sm">{opt.icon}</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">{opt.icon}</span>
               <span>{opt.label}</span>
             </button>
           ))}

@@ -233,7 +233,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
-            <span className="material-symbols-outlined text-2xl">notifications_active</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">notifications_active</span>
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -259,7 +259,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg">celebration</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">celebration</span>
             <span>+ إضافة وجدولة حفلة</span>
           </button>
 
@@ -271,7 +271,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg">add_task</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">add_task</span>
             <span>+ إضافة عمل / تنبيه لليوم</span>
           </button>
 
@@ -280,7 +280,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             onClick={onNavigateToCalendar}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition-all cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg text-slate-600">calendar_month</span>
+            <span className="material-symbols-outlined text-lg text-slate-600" aria-hidden="true">calendar_month</span>
             <span>عرض جدول التقويم الكامل ↗</span>
           </button>
         </div>
@@ -291,7 +291,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-              <span className="material-symbols-outlined text-base text-[#005c55]">event</span>
+              <span className="material-symbols-outlined text-base text-[#005c55]" aria-hidden="true">event</span>
               <span>عرض المواعيد والتنبيهات حسب:</span>
             </span>
             <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
@@ -378,7 +378,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
           </div>
           <span className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl">list_alt</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">list_alt</span>
           </span>
         </div>
 
@@ -390,7 +390,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
           </div>
           <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl">pending_actions</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">pending_actions</span>
           </span>
         </div>
 
@@ -402,7 +402,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
           </div>
           <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl">check_circle</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">check_circle</span>
           </span>
         </div>
       </div>
@@ -452,7 +452,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         {/* Search */}
         <div className="relative w-full sm:w-80">
-          <span className="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">
+          <span className="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg" aria-hidden="true">
             search
           </span>
           <input
@@ -506,7 +506,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       <div className="space-y-3">
         {displayedTasks.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <span className="material-symbols-outlined text-4xl text-slate-400 mb-2 block">
+            <span className="material-symbols-outlined text-4xl text-slate-400 mb-2 block" aria-hidden="true">
               task_alt
             </span>
             <h3 className="text-base font-bold text-slate-800 mb-1">
@@ -525,7 +525,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
               }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
             >
-              <span className="material-symbols-outlined text-sm">add</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
               <span>+ إضافة عمل ليوم {formattedSelectedDate.split(' ')[0]}</span>
             </button>
           </div>
@@ -557,7 +557,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     }`}
                     title={task.completed ? 'إلغاء التحديد' : 'تحديد كمنجز الآن'}
                   >
-                    <span className="material-symbols-outlined text-xl">
+                    <span className="material-symbols-outlined text-xl" aria-hidden="true">
                       {task.completed ? 'check' : 'radio_button_unchecked'}
                     </span>
                   </button>
@@ -605,7 +605,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                       )}
 
                       <span className="text-[11px] font-bold text-slate-500 font-mono flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-xs text-slate-400">schedule</span>
+                        <span className="material-symbols-outlined text-xs text-slate-400" aria-hidden="true">schedule</span>
                         <span>{task.time || '10:00 ص'}</span>
                       </span>
 
@@ -650,7 +650,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="حذف هذا التنبيه"
                   >
-                    <span className="material-symbols-outlined text-lg">delete</span>
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">delete</span>
                   </button>
                 </div>
               </div>
@@ -666,7 +666,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black">
-                  <span className="material-symbols-outlined text-lg">add_task</span>
+                  <span className="material-symbols-outlined text-lg" aria-hidden="true">add_task</span>
                 </span>
                 <h3 className="text-base font-black text-slate-900">إضافة تنبيه / عمل جديد في التقويم</h3>
               </div>
@@ -675,7 +675,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 onClick={() => setIsAddModalOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
               </button>
             </div>
 
@@ -831,7 +831,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-xs">
-                  <span className="material-symbols-outlined text-2xl">celebration</span>
+                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">celebration</span>
                 </span>
                 <div>
                   <h3 className="text-base font-black text-slate-900">إضافة وجدولة حفل تكريم جديد</h3>
@@ -845,7 +845,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 onClick={() => setIsAddCeremonyModalOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
               </button>
             </div>
 

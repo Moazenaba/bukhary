@@ -247,7 +247,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-amber-300 font-bold text-xs mb-2.5 border border-white/20">
-              <span className="material-symbols-outlined text-sm">celebration</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">celebration</span>
               <span>منظومة الحفلات والتكريم وتوزيع الجوائز</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
@@ -265,7 +265,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                 onClick={onNavigateToDailyAlerts}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-base">notifications_active</span>
+                <span className="material-symbols-outlined text-base" aria-hidden="true">notifications_active</span>
                 <span>التنبيهات اليومية ({todayCeremoniesCount} حفل اليوم) ↗</span>
               </button>
             )}
@@ -276,7 +276,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                 onClick={onNavigateToCalendar}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/30 text-xs font-bold transition-all cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-base">calendar_month</span>
+                <span className="material-symbols-outlined text-base" aria-hidden="true">calendar_month</span>
                 <span>عرض التقويم العام ↗</span>
               </button>
             )}
@@ -294,7 +294,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
             </span>
           </div>
           <span className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">groups</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">groups</span>
           </span>
         </div>
 
@@ -306,7 +306,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
             </span>
           </div>
           <span className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">event_available</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">event_available</span>
           </span>
         </div>
 
@@ -318,7 +318,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
             </span>
           </div>
           <span className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">schedule</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">schedule</span>
           </span>
         </div>
 
@@ -332,7 +332,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
             </span>
           </div>
           <span className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">emoji_events</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">emoji_events</span>
           </span>
         </div>
       </div>
@@ -341,7 +341,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Search Input */}
         <div className="relative w-full md:w-80">
-          <span className="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">
+          <span className="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg" aria-hidden="true">
             search
           </span>
           <input
@@ -423,7 +423,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {filteredCommittees.length === 0 ? (
           <div className="col-span-full bg-white rounded-3xl border border-slate-200 p-12 text-center">
-            <span className="material-symbols-outlined text-5xl text-slate-400 mb-3 block">
+            <span className="material-symbols-outlined text-5xl text-slate-400 mb-3 block" aria-hidden="true">
               celebration
             </span>
             <h3 className="text-base font-bold text-slate-800 mb-1">
@@ -474,7 +474,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                     <div>
                       {isCompleted ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">
-                          <span className="material-symbols-outlined text-xs">verified</span>
+                          <span className="material-symbols-outlined text-xs" aria-hidden="true">verified</span>
                           <span>
                             {comm.stages.ceremony?.completedAt?.includes('تلقائياً')
                               ? 'تم الحفل تلقائياً'
@@ -483,12 +483,12 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                         </span>
                       ) : isToday ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black shadow-xs animate-pulse">
-                          <span className="material-symbols-outlined text-xs">alarm_on</span>
+                          <span className="material-symbols-outlined text-xs" aria-hidden="true">alarm_on</span>
                           <span>حفل اليوم ({getArabicDayName(linkedTask?.date)})</span>
                         </span>
                       ) : hasSchedule ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 text-[11px] font-bold border border-blue-200">
-                          <span className="material-symbols-outlined text-xs">schedule</span>
+                          <span className="material-symbols-outlined text-xs" aria-hidden="true">schedule</span>
                           <span>مجدول: يوم {getArabicDayName(linkedTask?.date)}</span>
                         </span>
                       ) : (
@@ -520,7 +520,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                     {hasSchedule && (
                       <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-2.5 mt-2 space-y-1">
                         <div className="flex items-center gap-1.5 font-bold text-blue-950">
-                          <span className="material-symbols-outlined text-sm text-blue-700">event</span>
+                          <span className="material-symbols-outlined text-sm text-blue-700" aria-hidden="true">event</span>
                           <span>
                             الموعد: يوم {getArabicDayName(linkedTask?.date)} ({linkedTask?.date}) — {linkedTask?.time || '08:00 م'}
                           </span>
@@ -544,7 +544,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                       onClick={() => handleOpenScheduleModal(comm)}
                       className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer transition-all active:scale-95"
                     >
-                      <span className="material-symbols-outlined text-sm text-slate-600">edit_calendar</span>
+                      <span className="material-symbols-outlined text-sm text-slate-600" aria-hidden="true">edit_calendar</span>
                       <span>{hasSchedule ? 'تعديل الميعاد واليوم' : 'جدولة الميعاد واليوم'}</span>
                     </button>
 
@@ -557,7 +557,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                           : 'bg-[#005c55] hover:bg-[#004742] text-white shadow-xs'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm">
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">
                         {isCompleted ? 'published_with_changes' : 'done_all'}
                       </span>
                       <span>{isCompleted ? 'إلغاء التمام' : 'إتمام الحفل الآن'}</span>
@@ -571,7 +571,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                       onClick={() => setHonorRollCommittee(comm)}
                       className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-sm">workspace_premium</span>
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">workspace_premium</span>
                       <span>كشف التكريم والشهادات</span>
                     </button>
 
@@ -599,7 +599,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
               <div className="flex items-center gap-3">
                 <span className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black">
-                  <span className="material-symbols-outlined text-2xl">celebration</span>
+                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">celebration</span>
                 </span>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
@@ -618,7 +618,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                 }}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
               </button>
             </div>
 
@@ -779,7 +779,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-black">
-                  <span className="material-symbols-outlined text-2xl">workspace_premium</span>
+                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">workspace_premium</span>
                 </span>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
@@ -795,7 +795,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                 onClick={() => setHonorRollCommittee(null)}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
               </button>
             </div>
 
@@ -827,7 +827,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                 onClick={() => window.print()}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs cursor-pointer shadow-xs"
               >
-                <span className="material-symbols-outlined text-base">print</span>
+                <span className="material-symbols-outlined text-base" aria-hidden="true">print</span>
                 <span>طباعة شهادات التكريم</span>
               </button>
 

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ExamItem } from '../types';
+import { ExamItem, AppUser } from '../types';
+import { AuthService } from '../services/AuthService';
 
 interface ExamsViewProps {
   exams: ExamItem[];
   savedBooks: string[];
+  currentUser?: AppUser;
   onOpenAddExam: () => void;
   onOpenAddBook: () => void;
   onDeleteExam: (examId: string) => void;
@@ -13,6 +15,7 @@ interface ExamsViewProps {
 export const ExamsView: React.FC<ExamsViewProps> = ({
   exams,
   savedBooks,
+  currentUser,
   onOpenAddExam,
   onOpenAddBook,
   onDeleteExam,
@@ -23,8 +26,16 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   const [selectedBook, setSelectedBook] = useState<string>('all');
   const [viewingExam, setViewingExam] = useState<ExamItem | null>(null);
 
-  // Filtered exams
+  const isRestrictedScope =
+    currentUser &&
+    currentUser.role !== 'super_admin' &&
+    !currentUser.allExamsAllowed &&
+    currentUser.allowedExamIds &&
+    currentUser.allowedExamIds.length > 0;
+
+  // Filtered exams with Permission enforcement
   const filteredExams = exams.filter((e) => {
+    if (currentUser && !AuthService.canAccessExam(e.id, currentUser)) return false;
     if (selectedBook !== 'all' && e.book !== selectedBook) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -86,7 +97,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">menu_book</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">menu_book</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-bold">
               الامتحانات والكتب المقررة (PDF)
@@ -104,7 +115,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
             onClick={onOpenAddBook}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer shrink-0 border border-amber-400/50"
           >
-            <span className="material-symbols-outlined text-xl">library_add</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">library_add</span>
             <span>+ إضافة كتاب مقرر</span>
           </button>
 
@@ -113,7 +124,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
             onClick={onOpenAddExam}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600">upload_file</span>
+            <span className="material-symbols-outlined text-xl text-emerald-600" aria-hidden="true">upload_file</span>
             <span>+ إضافة امتحان ورفع PDF</span>
           </button>
         </div>
@@ -130,7 +141,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-[#eff4ff]'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">picture_as_pdf</span>
             <span>نماذج الامتحانات وPDF</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
               {exams.length}
@@ -145,7 +156,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-amber-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">auto_stories</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">auto_stories</span>
             <span>الكتب والمتون المقررة</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-mono">
               {savedBooks.length}
@@ -159,7 +170,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
             onClick={onOpenAddBook}
             className="text-xs text-amber-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">add_circle</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">add_circle</span>
             <span>إضافة متن جديد</span>
           </button>
         ) : (
@@ -167,7 +178,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
             onClick={onOpenAddExam}
             className="text-xs text-[#005c55] font-bold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">upload_file</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">upload_file</span>
             <span>رفع نموذج امتحان</span>
           </button>
         )}
@@ -176,6 +187,21 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
       {/* VIEW 1: EXAMS LIST */}
       {activeSubTab === 'exams' && (
         <>
+          {/* Scope Restriction Alert Banner */}
+          {isRestrictedScope && (
+            <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-300 text-purple-950 text-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-purple-700 text-lg" aria-hidden="true">lock_person</span>
+                <span>
+                  <strong>نطاق الصلاحية المخصص:</strong> يظهر لك فقط الامتحانات المصرح لك بالدخول على تفاصيلها وتصحيحها ({filteredExams.length} من أصل {exams.length}).
+                </span>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-purple-200 text-purple-950 text-[10px] font-bold">
+                مصحح معتمد
+              </span>
+            </div>
+          )}
+
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white p-4 rounded-xl border border-[#bdc9c6]/40 shadow-xs flex items-center justify-between">
@@ -184,7 +210,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 <span className="text-2xl font-mono font-bold text-[#005c55]">{exams.length}</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#005c55] flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined">description</span>
+                <span className="material-symbols-outlined" aria-hidden="true">description</span>
               </span>
             </div>
 
@@ -194,7 +220,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 <span className="text-2xl font-mono font-bold text-amber-600">{savedBooks.length}</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined">auto_stories</span>
+                <span className="material-symbols-outlined" aria-hidden="true">auto_stories</span>
               </span>
             </div>
 
@@ -204,7 +230,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 <span className="text-2xl font-mono font-bold text-blue-700">{exams.length} ملفات</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined">file_present</span>
+                <span className="material-symbols-outlined" aria-hidden="true">file_present</span>
               </span>
             </div>
           </div>
@@ -213,7 +239,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           <div className="bg-white p-4 rounded-2xl border border-[#bdc9c6]/50 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="relative w-full md:flex-1">
               <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[#6e7977]">
-                <span className="material-symbols-outlined text-lg">search</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">search</span>
               </span>
               <input
                 type="text"
@@ -258,7 +284,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                         {exam.title}
                       </h3>
                       <span className="inline-flex items-center gap-1 text-[11px] text-[#005c55] font-semibold mt-1">
-                        <span className="material-symbols-outlined text-xs">auto_stories</span>
+                        <span className="material-symbols-outlined text-xs" aria-hidden="true">auto_stories</span>
                         <span>{exam.book}</span>
                       </span>
                     </div>
@@ -288,7 +314,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                   <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 mb-4">
                     <div className="flex items-center gap-2.5">
                       <span className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
-                        <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                        <span className="material-symbols-outlined text-xl" aria-hidden="true">picture_as_pdf</span>
                       </span>
                       <div className="text-right">
                         <span className="font-bold text-xs text-emerald-950 block truncate max-w-[200px]">
@@ -320,7 +346,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                     onClick={() => handleOpenPdf(exam)}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#005c55] text-white text-xs font-bold hover:bg-[#1b6b51] transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">visibility</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">visibility</span>
                     <span>معاينة ورقة الامتحان (PDF)</span>
                   </button>
 
@@ -329,7 +355,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                     title="تنزيل الملف"
                     className="p-2 rounded-xl border border-[#bdc9c6] text-[#3e4947] hover:bg-[#eff4ff] transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-base">download</span>
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">download</span>
                   </button>
 
                   <button
@@ -341,7 +367,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                     title="حذف الامتحان"
                     className="p-2 rounded-xl border border-[#bdc9c6] text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-base">delete</span>
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
                   </button>
                 </div>
               </div>
@@ -350,7 +376,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
 
           {filteredExams.length === 0 && (
             <div className="bg-white rounded-2xl p-12 text-center border border-[#bdc9c6]/40 shadow-xs">
-              <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block">
+              <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block" aria-hidden="true">
                 find_in_page
               </span>
               <h3 className="font-bold text-base text-[#0d1c2e] mb-1">لا توجد امتحانات مطابقة للبحث</h3>
@@ -374,7 +400,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           <div className="bg-white p-4 rounded-2xl border border-[#bdc9c6]/50 shadow-xs flex items-center justify-between">
             <div className="relative flex-1">
               <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[#6e7977]">
-                <span className="material-symbols-outlined text-lg">search</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">search</span>
               </span>
               <input
                 type="text"
@@ -388,7 +414,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
               onClick={onOpenAddBook}
               className="mr-3 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm">library_add</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">library_add</span>
               <span>+ إضافة كتاب جديد</span>
             </button>
           </div>
@@ -448,7 +474,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                         className="text-gray-400 hover:text-red-600 p-1"
                         title="حذف هذا الكتاب"
                       >
-                        <span className="material-symbols-outlined text-sm">delete</span>
+                        <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
                       </button>
                     )}
                   </div>
@@ -465,14 +491,14 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-[#bdc9c6]/50 text-right animate-in fade-in">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#bdc9c6]/30">
               <div className="flex items-center gap-2 text-[#005c55]">
-                <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>
+                <span className="material-symbols-outlined text-2xl" aria-hidden="true">picture_as_pdf</span>
                 <h3 className="font-bold text-base text-[#0d1c2e]">{viewingExam.title}</h3>
               </div>
               <button
                 onClick={() => setViewingExam(null)}
                 className="p-1 rounded-lg text-gray-400 hover:text-gray-700"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
               </button>
             </div>
 
@@ -512,7 +538,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 onClick={() => handleDownloadMockPdf(viewingExam)}
                 className="px-4 py-2 bg-emerald-700 text-white rounded-xl font-bold text-xs hover:bg-emerald-800 flex items-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm">download</span>
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">download</span>
                 <span>تنزيل ورقة الامتحان</span>
               </button>
 

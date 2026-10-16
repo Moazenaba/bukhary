@@ -329,7 +329,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">calendar_month</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">calendar_month</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-bold">
               جدول المواعيد وأعمال اللجان والتسليمات
@@ -346,7 +346,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             onClick={() => handleOpenAddModal(selectedDateStr)}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600">add_task</span>
+            <span className="material-symbols-outlined text-xl text-emerald-600" aria-hidden="true">add_task</span>
             <span>+ إضافة عمل / تسليم جديد</span>
           </button>
 
@@ -354,7 +354,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             onClick={goToToday}
             className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-lg">today</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">today</span>
             <span>الذهاب ليوم الجمعة (10/2)</span>
           </button>
         </div>
@@ -365,7 +365,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-lg">event_upcoming</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">event_upcoming</span>
             </span>
             <div>
               <span className="font-bold text-xs sm:text-sm text-[#0d1c2e] block">
@@ -442,7 +442,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
                 title="الشهر السابق"
               >
-                <span className="material-symbols-outlined text-lg">chevron_right</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_right</span>
               </button>
               <button
                 type="button"
@@ -450,7 +450,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
                 title="الشهر التالي"
               >
-                <span className="material-symbols-outlined text-lg">chevron_left</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_left</span>
               </button>
             </div>
           </div>
@@ -582,7 +582,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold text-sm">
-                    <span className="material-symbols-outlined text-lg">event</span>
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">event</span>
                   </span>
                   <div>
                     <h3 className="font-bold text-base text-[#0d1c2e] leading-snug">
@@ -611,7 +611,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   onClick={() => handleOpenAddModal(selectedDateStr)}
                   className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                 >
-                  <span className="material-symbols-outlined text-sm">add</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
                   <span>إضافة تسليم</span>
                 </button>
               </div>
@@ -628,7 +628,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-xl text-emerald-700">checklist</span>
+                <span className="material-symbols-outlined text-xl text-emerald-700" aria-hidden="true">checklist</span>
                 <div>
                   <span className="font-bold block text-sm">
                     {selectedDayTasks.length > 0
@@ -774,12 +774,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           onClick={() => onOpenCommitteeDetails && onOpenCommitteeDetails(linkedCommittee)}
                           className="text-[11px] text-[#005c55] font-bold flex items-center gap-1 hover:underline cursor-pointer"
                         >
-                          <span className="material-symbols-outlined text-sm">groups</span>
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
                           <span>لجنة #{linkedCommittee.committeeNumber}: {linkedCommittee.committeeName} &larr;</span>
                         </button>
                       ) : task.committeeNumber ? (
                         <span className="text-[11px] text-[#005c55] font-bold flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm">groups</span>
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
                           <span>مرتبط بلجنة #{task.committeeNumber}</span>
                         </span>
                       ) : (
@@ -800,7 +800,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
               {selectedDayTasks.length === 0 && (
                 <div className="p-8 text-center bg-[#f8f9ff] rounded-xl border border-dashed border-[#bdc9c6]/60">
-                  <span className="material-symbols-outlined text-3xl text-gray-400 mb-1 block">
+                  <span className="material-symbols-outlined text-3xl text-gray-400 mb-1 block" aria-hidden="true">
                     event_available
                   </span>
                   <p className="text-xs font-bold text-gray-600">
@@ -821,7 +821,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               onClick={() => handleOpenAddModal(selectedDateStr)}
               className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-[#005c55]/40 text-[#005c55] hover:bg-[#eff4ff] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
             >
-              <span className="material-symbols-outlined text-sm">add_circle</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">add_circle</span>
               <span>+ إضافة مهمة أو تسليم ليوم {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})</span>
             </button>
           </div>
@@ -835,7 +835,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl">add_task</span>
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">add_task</span>
                 </span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
@@ -850,7 +850,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 onClick={() => setIsAddModalOpen(false)}
                 className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
               </button>
             </div>
 
@@ -865,7 +865,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                <span className="material-symbols-outlined text-sm">inventory_2</span>
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">inventory_2</span>
                 <span>تسليم يدوي / استلام أوراق ومهام</span>
               </button>
 
@@ -991,7 +991,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm text-[#005c55]">person_add</span>
+                        <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">person_add</span>
                         <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
                       </label>
                       <span className="text-[11px] font-bold text-slate-500 font-mono">
@@ -1039,7 +1039,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         onClick={handleAddCeremonySheikh}
                         className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-sm">add</span>
+                        <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
                         <span>+ إضافة عضو آخر</span>
                       </button>
                     </div>

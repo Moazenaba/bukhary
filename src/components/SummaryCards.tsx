@@ -109,7 +109,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ rows }) => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-bold text-slate-600 truncate">{item.title}</span>
-              <span className="material-symbols-outlined text-lg text-slate-500">{item.icon}</span>
+              <span className="material-symbols-outlined text-lg text-slate-500" aria-hidden="true">{item.icon}</span>
             </div>
 
             <div className="flex items-baseline justify-between gap-1 mb-2">
@@ -140,7 +140,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ rows }) => {
       {uncertainCount > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-amber-900">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-600 text-lg">warning</span>
+            <span className="material-symbols-outlined text-amber-600 text-lg" aria-hidden="true">warning</span>
             <span>
               يوجد <strong className="font-bold underline">{uncertainCount} صفاً</strong> يتضمن كلمات غير واضحة تماماً بالخط اليدوي ومظللة باللون الأصفر للمراجعة والتدقيق.
             </span>

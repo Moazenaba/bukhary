@@ -64,7 +64,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="px-5 py-4 bg-gradient-to-l from-[#005c55] to-emerald-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-2xl">admin_panel_settings</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">admin_panel_settings</span>
             </span>
             <div>
               <h3 className="font-bold text-base sm:text-lg">
@@ -80,7 +80,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-white/80 hover:text-white flex items-center justify-center cursor-pointer"
           >
-            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -141,7 +141,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }}
                     className="text-[11px] text-rose-600 hover:text-rose-800 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-xs">logout</span>
+                    <span className="material-symbols-outlined text-xs" aria-hidden="true">logout</span>
                     <span>تسجيل الخروج للبوابة</span>
                   </button>
                 </div>
@@ -213,7 +213,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             staff.role === 'auditor' ? 'bg-purple-100 text-purple-800' :
                             'bg-emerald-100 text-emerald-800'
                           }`}>
-                            <span className="material-symbols-outlined text-base">
+                            <span className="material-symbols-outlined text-base" aria-hidden="true">
                               {staff.role === 'auditor' ? 'policy' : 'person'}
                             </span>
                           </span>
@@ -273,7 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               ) : (
                 <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
                   <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
-                    <span className="material-symbols-outlined text-base text-amber-600 shrink-0">info</span>
+                    <span className="material-symbols-outlined text-base text-amber-600 shrink-0" aria-hidden="true">info</span>
                     <span>
                       <strong>نظام الاعتماد:</strong> تسجيل الحساب هنا يعتبر طلب انضمام كمعاون، ولن يتم تفعيل الحساب أو منحه صلاحيات استلام اللجان إلا بعد موافقة المشرف العام للمسجد.
                     </span>

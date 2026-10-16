@@ -10,6 +10,7 @@ interface TopNavBarProps {
   onMarkNotificationsAsRead: () => void;
   onOpenSheetsSync?: () => void;
   sheetsSyncStatus?: { isConnected: boolean; lastSynced?: string };
+  onOpenDatabaseModal?: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen?: boolean;
   currentUser: AppUser;
@@ -27,6 +28,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onMarkNotificationsAsRead,
   onOpenSheetsSync,
   sheetsSyncStatus,
+  onOpenDatabaseModal,
   onToggleSidebar,
   isSidebarOpen = true,
   currentUser,
@@ -49,7 +51,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             title={isSidebarOpen ? "إغلاق القائمة الجانبية (Slide bar)" : "فتح القائمة الجانبية (Slide bar)"}
             aria-label="القائمة الجانبية"
           >
-            <span className="material-symbols-outlined text-2xl">
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">
               {isSidebarOpen ? "menu_open" : "menu"}
             </span>
             <span className="hidden sm:inline text-xs font-bold">
@@ -59,7 +61,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#005c55]/10 flex items-center justify-center text-[#005c55] shrink-0 hidden sm:flex">
-              <span className="material-symbols-outlined text-xl">mosque</span>
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">mosque</span>
             </div>
             <div>
               <span className="text-[16px] sm:text-[18px] font-extrabold text-[#005c55] block leading-tight">
@@ -74,11 +76,15 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
         {/* Left: Actions Cluster */}
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Database Connection Pill */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+          {/* Database Connection Button / Pill */}
+          <button
+            onClick={onOpenDatabaseModal}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 text-emerald-800 text-[11px] font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+            title="قاعدة بيانات Supabase المباشرة (انقر لإدارة الجداول ورفع المخطط الشامل)"
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>قاعدة البيانات متصلة</span>
-          </div>
+            <span>Supabase Cloud ✓</span>
+          </button>
 
           {/* User Profile / Switcher Button */}
           <button
@@ -115,7 +121,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                  currentUser.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
               </span>
             </div>
-            <span className="material-symbols-outlined text-xs text-[#6e7977]">expand_more</span>
+            <span className="material-symbols-outlined text-xs text-[#6e7977]" aria-hidden="true">expand_more</span>
           </button>
 
           {/* Sign Out Button (Central Service Exit) */}
@@ -125,7 +131,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
               title="تسجيل الخروج والرجوع لبوابة الدخول الخارجية"
             >
-              <span className="material-symbols-outlined text-base">logout</span>
+              <span className="material-symbols-outlined text-base" aria-hidden="true">logout</span>
               <span className="hidden sm:inline">تسجيل الخروج</span>
             </button>
           )}
@@ -136,7 +142,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               onClick={onOpenNewCommittee}
               className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-[#005c55] shadow-xs active:scale-[0.98] transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-base">add_circle</span>
+              <span className="material-symbols-outlined text-base" aria-hidden="true">add_circle</span>
               <span>إضافة لجنة</span>
             </button>
           )}
@@ -148,7 +154,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               title="تصدير الكشوف"
               className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer hidden sm:flex"
             >
-              <span className="material-symbols-outlined text-lg">file_download</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">file_download</span>
             </button>
           )}
 
@@ -160,7 +166,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
               title={`يوجد ${todaysTasksCount} أعمال وتنبيهات مجدولة اليوم - اضغط لفتح شاشة التنبيهات والمهام اليومية`}
             >
-              <span className="material-symbols-outlined text-sm text-amber-700 animate-bounce">notifications_active</span>
+              <span className="material-symbols-outlined text-sm text-amber-700 animate-bounce" aria-hidden="true">notifications_active</span>
               <span className="font-mono text-[11px] font-black">{todaysTasksCount} مهام اليوم</span>
             </button>
           )}
@@ -177,7 +183,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               aria-label="الإشعارات"
               className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors relative cursor-pointer"
             >
-              <span className="material-symbols-outlined text-lg">notifications</span>
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">notifications</span>
               {unreadCount > 0 && (
                 <span className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full bg-[#ba1a1a] animate-pulse"></span>
               )}

@@ -21,7 +21,7 @@ export const CourseTable: React.FC<CourseTableProps> = ({
   if (rows.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-[#bdc9c6]/40 p-12 text-center text-[#6e7977] space-y-3 shadow-xs">
-        <span className="material-symbols-outlined text-5xl text-gray-300">search_off</span>
+        <span className="material-symbols-outlined text-5xl text-gray-300" aria-hidden="true">search_off</span>
         <h4 className="text-sm font-bold text-[#0d1c2e]">لا توجد صفوف تطابق معايير البحث أو التصفية</h4>
         <p className="text-xs max-w-sm mx-auto">
           جرب تغيير الفلتر أو إضافة صف جديد أو رفع صورة جدول مكتوب باليد ليقوم الذكاء الاصطناعي بقراءته.
@@ -128,7 +128,7 @@ export const CourseTable: React.FC<CourseTableProps> = ({
                       />
                       {isUncertain && (
                         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-amber-800 font-bold px-1.5 py-0.2 rounded bg-amber-200/70 w-fit">
-                          <span className="material-symbols-outlined text-xs">help</span>
+                          <span className="material-symbols-outlined text-xs" aria-hidden="true">help</span>
                           <span>مراجعة القراءة</span>
                           <button
                             type="button"
@@ -241,7 +241,7 @@ export const CourseTable: React.FC<CourseTableProps> = ({
                         }`}
                         title={isStruck ? 'إلغاء الشطب عن هذا الصف' : 'شطب هذا الصف'}
                       >
-                        <span className="material-symbols-outlined text-base">strikethrough_s</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">strikethrough_s</span>
                       </button>
 
                       {/* Notes toggle */}
@@ -257,7 +257,7 @@ export const CourseTable: React.FC<CourseTableProps> = ({
                         }`}
                         title={row.notes ? `ملاحظة: ${row.notes}` : 'إضافة ملاحظة'}
                       >
-                        <span className="material-symbols-outlined text-base">chat_bubble</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">chat_bubble</span>
                       </button>
 
                       {/* Delete Row */}
@@ -271,7 +271,7 @@ export const CourseTable: React.FC<CourseTableProps> = ({
                         className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                         title="حذف هذا الصف"
                       >
-                        <span className="material-symbols-outlined text-base">delete</span>
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
                       </button>
                     </div>
 

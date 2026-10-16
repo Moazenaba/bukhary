@@ -17,7 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Brand & Mosque Emblem */}
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#005c55] to-[#0f766e] text-white flex items-center justify-center shadow-xs">
-            <span className="material-symbols-outlined text-2xl">auto_stories</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">auto_stories</span>
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenUpload}
             className="px-3.5 py-2 bg-[#005c55] hover:bg-[#1b6b51] text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-transform active:scale-95"
           >
-            <span className="material-symbols-outlined text-base">document_scanner</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">document_scanner</span>
             <span className="hidden sm:inline">مسح جدول خط اليد</span>
             <span className="sm:hidden">مسح AI</span>
           </button>
@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenAddRow}
             className="px-3 py-2 bg-white border border-[#bdc9c6] hover:bg-gray-50 text-[#0d1c2e] rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base text-[#005c55]">add</span>
+            <span className="material-symbols-outlined text-base text-[#005c55]" aria-hidden="true">add</span>
             <span className="hidden sm:inline">صف جديد</span>
           </button>
 
@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl"
             title="استعادة البيانات النموذجية"
           >
-            <span className="material-symbols-outlined text-base">restart_alt</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">restart_alt</span>
           </button>
         </div>
       </div>

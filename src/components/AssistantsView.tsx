@@ -1,13 +1,38 @@
 import React, { useState } from 'react';
-import { AppUser, AssistantPermission, Committee, PermissionDefinition } from '../types';
+import {
+  AppUser,
+  AssistantPermission,
+  Committee,
+  PermissionDefinition,
+  UserRole,
+  PermissionProfile,
+  ExamItem,
+} from '../types';
+import { AuthService } from '../services/AuthService';
 
 interface AssistantsViewProps {
   users: AppUser[];
   committees: Committee[];
+  exams?: ExamItem[];
   currentUser: AppUser;
-  onApproveAssistant: (userId: string, permissions: AssistantPermission[], assignedCommittees: number[]) => void;
-  onRejectAssistant: (userId: string) => void;
-  onUpdateAssistantPermissions: (userId: string, permissions: AssistantPermission[], assignedCommittees: number[]) => void;
+  profiles?: PermissionProfile[];
+  onSaveProfile?: (profile: PermissionProfile) => void;
+  onDeleteProfile?: (profileId: string) => void;
+  onAssignProfile?: (userId: string, profileId: string) => void;
+  onSetSuperAdmin?: (userId: string, isSuper: boolean) => { success: boolean; message: string };
+  onApproveAssistant: (
+    userId: string,
+    permissions: AssistantPermission[],
+    assignedCommittees: number[],
+    role?: UserRole
+  ) => void;
+  onScheduleInterview?: (userId: string, date: string, notes?: string) => void;
+  onRejectAssistant: (userId: string, reason?: string) => void;
+  onUpdateAssistantPermissions: (
+    userId: string,
+    permissions: AssistantPermission[],
+    assignedCommittees: number[]
+  ) => void;
   onUpdateAssistantUser: (updatedUser: AppUser) => void;
   onAddAssistantDirect: (user: Omit<AppUser, 'id' | 'createdAt'>) => void;
   onDeleteAssistant: (userId: string) => void;
@@ -21,8 +46,15 @@ interface AssistantsViewProps {
 export const AssistantsView: React.FC<AssistantsViewProps> = ({
   users,
   committees,
+  exams = [],
   currentUser,
+  profiles = [],
+  onSaveProfile,
+  onDeleteProfile,
+  onAssignProfile,
+  onSetSuperAdmin,
   onApproveAssistant,
+  onScheduleInterview,
   onRejectAssistant,
   onUpdateAssistantPermissions,
   onUpdateAssistantUser,
@@ -34,29 +66,114 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   onAddCustomPermission,
   onDeleteCustomPermission,
 }) => {
-  const [activeTab, setActiveTab] = useState<'approved' | 'pending' | 'permissions'>('approved');
+  // Tabs: 'approved' (المعاونون والمستخدمون), 'profiles' (مركز بناء أنظمة الصلاحيات المخصصة), 'requests' (طلبات الانضمام والمقابلات)
+  const [activeTab, setActiveTab] = useState<'approved' | 'profiles' | 'requests'>('approved');
+  const [requestsSubFilter, setRequestsSubFilter] = useState<'all' | 'pending' | 'interview' | 'rejected'>('all');
+
+  // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [dossierUser, setDossierUser] = useState<AppUser | null>(null);
+  const [interviewingUser, setInterviewingUser] = useState<AppUser | null>(null);
+  const [rejectingUser, setRejectingUser] = useState<AppUser | null>(null);
+  const [approvingUser, setApprovingUser] = useState<AppUser | null>(null);
+  const [assigningProfileUser, setAssigningProfileUser] = useState<AppUser | null>(null);
 
-  // Custom permission input state
-  const [newCustomPermInput, setNewCustomPermInput] = useState('');
+  // Profile Builder Modal State
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<PermissionProfile | null>(null);
+  const [profileName, setProfileName] = useState('');
+  const [profileDescription, setProfileDescription] = useState('');
+  const [profileBadgeColor, setProfileBadgeColor] = useState<'emerald' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal'>('emerald');
+  const [profileAllowedTabs, setProfileAllowedTabs] = useState<string[]>([
+    'summer_course',
+    'committees',
+    'daily_alerts',
+  ]);
+  const [profileAllCommittees, setProfileAllCommittees] = useState(true);
+  const [profileAllowedCommittees, setProfileAllowedCommittees] = useState<number[]>([1, 2]);
+  const [profileAllExams, setProfileAllExams] = useState(true);
+  const [profileAllowedExamIds, setProfileAllowedExamIds] = useState<string[]>([]);
+  const [profilePermissions, setProfilePermissions] = useState<AssistantPermission[]>([
+    'database_sheets',
+    'manage_committees',
+  ]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [superAdminAlert, setSuperAdminAlert] = useState<string | null>(null);
+
+  // Interview state
+  const [interviewDate, setInterviewDate] = useState('2026-10-06 17:00');
+  const [interviewNotes, setInterviewNotes] = useState('يرجى الحضور لمقر إدارة لجان المسابقة لإجراء اختبار حفظ القرآن والمقابلة الشخصية.');
+
+  // Rejection state
+  const [rejectionReason, setRejectionReason] = useState('نعتذر عن قبول الطلب حالياً لاكتمال النصاب المطلوب في لجان هذه الدورة، مع تمنياتنا بالتوفيق في الدورات القادمة.');
+
+  // Approval modal custom state
+  const [approvalRole, setApprovalRole] = useState<UserRole>('assistant');
+  const [approvalProfileId, setApprovalProfileId] = useState<string>('');
+  const [approvalPermissions, setApprovalPermissions] = useState<AssistantPermission[]>([
+    'database_sheets',
+    'manage_committees',
+    'calendar_schedule',
+  ]);
+  const [approvalCommittees, setApprovalCommittees] = useState<number[]>([1]);
 
   // Form state for adding direct assistant
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newNotes, setNewNotes] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>('assistant');
+  const [newProfileId, setNewProfileId] = useState<string>('');
   const [newPermissions, setNewPermissions] = useState<AssistantPermission[]>([
     'database_sheets',
     'manage_committees',
+    'calendar_schedule',
   ]);
-  const [newAssignedCommittees, setNewAssignedCommittees] = useState<number[]>([]);
+  const [newAssignedCommittees, setNewAssignedCommittees] = useState<number[]>([1]);
+
+  // Available All Tabs Meta
+  const ALL_SYSTEM_TABS: Array<{ id: string; label: string; icon: string; desc: string }> = [
+    { id: 'home', label: 'الرئيسية ونظرة عامة', icon: 'dashboard', desc: 'الشاشة الترحيبية والملخص الميداني' },
+    { id: 'summer_course', label: 'قاعدة البيانات والكشوفات', icon: 'table_chart', desc: 'كشوفات الطلاب ورصد الحضور' },
+    { id: 'committees', label: 'إدارة اللجان الميدانية', icon: 'groups', desc: 'متابعة اللجان والمراحل وسير الاختبارات' },
+    { id: 'exams', label: 'الامتحانات ونماذج PDF', icon: 'description', desc: 'بنك الأسئلة والامتحانات المعتمدة' },
+    { id: 'calendar', label: 'الجدول وتقويم المواعيد', icon: 'calendar_month', desc: 'تقويم المواعيد ومهام التسليم' },
+    { id: 'ceremonies', label: 'الحفلات والتكريم', icon: 'celebration', desc: 'تكريم الطلاب وتجهيز الدروع والشهادات' },
+    { id: 'daily_alerts', label: 'التنبيهات والمهام اليومية', icon: 'notifications_active', desc: 'المهام اليومية العاجلة للمعاونين' },
+    { id: 'stats', label: 'حساب ونسبة الإنجاز', icon: 'donut_large', desc: 'لوحة الإحصائيات الشاملة والنسب' },
+    { id: 'courses', label: 'إضافة وإدارة الدورات', icon: 'event_repeat', desc: 'إدارة الدورات العلمية الصيفية' },
+    { id: 'assistants', label: 'المعاونون والصلاحيات', icon: 'badge', desc: 'إدارة المستخدمين وبناء الصلاحيات (للسوبر أدمن)' },
+  ];
+
+  // Fallback to AuthService & LocalStorage if props are syncing
+  const effectiveProfiles: PermissionProfile[] =
+    profiles && profiles.length > 0 ? profiles : AuthService.getProfiles();
+  const effectiveExams: ExamItem[] =
+    exams && exams.length > 0
+      ? exams
+      : (() => {
+          try {
+            const stored = localStorage.getItem('bukhari_exams_v4');
+            return stored ? JSON.parse(stored) : [];
+          } catch {
+            return [];
+          }
+        })();
 
   // Filtering
-  const approvedUsers = users.filter((u) => u.role !== 'super_admin' && u.status === 'approved');
-  const pendingUsers = users.filter((u) => u.status === 'pending');
+  const isSuperAdmin = currentUser.role === 'super_admin';
+  const superAdminsCount = users.filter((u) => u.role === 'super_admin').length;
+  const approvedUsers = users.filter((u) => u.status === 'approved');
+  const joinRequests = users.filter((u) => u.role !== 'super_admin' && u.status !== 'approved');
+  const pendingRequests = users.filter((u) => u.status === 'pending');
+  const interviewRequests = users.filter((u) => u.status === 'interview');
+  const rejectedRequests = users.filter((u) => u.status === 'rejected');
+
+  const [approvedPage, setApprovedPage] = useState(1);
+  const approvedPageSize = 8;
 
   const filteredApproved = approvedUsers.filter((u) => {
     if (!searchQuery.trim()) return true;
@@ -64,48 +181,234 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     return u.name.toLowerCase().includes(q) || u.phone.includes(q) || u.email.toLowerCase().includes(q);
   });
 
-  const filteredPending = pendingUsers.filter((u) => {
+  const totalApprovedPages = Math.max(1, Math.ceil(filteredApproved.length / approvedPageSize));
+  const safeApprovedPage = Math.min(approvedPage, totalApprovedPages);
+  const paginatedApproved = filteredApproved.slice(
+    (safeApprovedPage - 1) * approvedPageSize,
+    safeApprovedPage * approvedPageSize
+  );
+
+  const filteredRequests = joinRequests.filter((u) => {
+    if (requestsSubFilter === 'pending' && u.status !== 'pending') return false;
+    if (requestsSubFilter === 'interview' && u.status !== 'interview') return false;
+    if (requestsSubFilter === 'rejected' && u.status !== 'rejected') return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return u.name.toLowerCase().includes(q) || u.phone.includes(q) || u.email.toLowerCase().includes(q);
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.phone.includes(q) ||
+      (u.requestCode && u.requestCode.toLowerCase().includes(q)) ||
+      (u.quranLevel && u.quranLevel.toLowerCase().includes(q))
+    );
   });
 
-  const togglePermission = (
-    user: AppUser,
-    perm: AssistantPermission,
-    currentPerms: AssistantPermission[],
-    currentAssigned: number[]
-  ) => {
-    const updatedPerms = currentPerms.includes(perm)
-      ? currentPerms.filter((p) => p !== perm)
-      : [...currentPerms, perm];
-    onUpdateAssistantPermissions(user.id, updatedPerms, currentAssigned);
+  // Profile Builder Actions
+  const handleOpenCreateProfile = () => {
+    setEditingProfile(null);
+    setProfileName('');
+    setProfileDescription('');
+    setProfileBadgeColor('emerald');
+    setProfileAllowedTabs(['summer_course', 'committees', 'daily_alerts']);
+    setProfileAllCommittees(true);
+    setProfileAllowedCommittees([1, 2]);
+    setProfileAllExams(true);
+    setProfileAllowedExamIds([]);
+    setProfilePermissions(['database_sheets', 'manage_committees']);
+    setIsProfileModalOpen(true);
   };
 
-  const toggleCommitteeAssignment = (
-    user: AppUser,
-    commNum: number,
-    currentPerms: AssistantPermission[],
-    currentAssigned: number[]
-  ) => {
-    const updatedAssigned = currentAssigned.includes(commNum)
-      ? currentAssigned.filter((c) => c !== commNum)
-      : [...currentAssigned, commNum];
-    onUpdateAssistantPermissions(user.id, currentPerms, updatedAssigned);
+  const handleOpenEditProfile = (profile: PermissionProfile) => {
+    setEditingProfile(profile);
+    setProfileName(profile.name);
+    setProfileDescription(profile.description);
+    setProfileBadgeColor(profile.badgeColor || 'emerald');
+    setProfileAllowedTabs(profile.allowedTabs || ['summer_course', 'committees']);
+    setProfileAllCommittees(Boolean(profile.allCommitteesAllowed));
+    setProfileAllowedCommittees(profile.allowedCommittees || []);
+    setProfileAllExams(Boolean(profile.allExamsAllowed));
+    setProfileAllowedExamIds(profile.allowedExamIds || []);
+    setProfilePermissions(profile.permissions || []);
+    setIsProfileModalOpen(true);
+  };
+
+  const handleSaveProfileSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName.trim()) return;
+
+    const newProf: PermissionProfile = {
+      id: editingProfile ? editingProfile.id : `profile_${Date.now()}`,
+      name: profileName.trim(),
+      description: profileDescription.trim() || 'نظام صلاحيات مخصص ومعتمد',
+      badgeColor: profileBadgeColor,
+      allowedTabs: profileAllowedTabs,
+      allowedCommittees: profileAllCommittees ? [] : profileAllowedCommittees,
+      allCommitteesAllowed: profileAllCommittees,
+      allowedExamIds: profileAllExams ? [] : profileAllowedExamIds,
+      allExamsAllowed: profileAllExams,
+      permissions: profilePermissions,
+      createdAt: editingProfile ? editingProfile.createdAt : new Date().toLocaleDateString('ar-EG'),
+      createdBy: currentUser.name,
+      isDefault: editingProfile ? editingProfile.isDefault : false,
+    };
+
+    if (onSaveProfile) {
+      onSaveProfile(newProf);
+    } else {
+      AuthService.saveProfile(newProf);
+    }
+
+    setIsProfileModalOpen(false);
+  };
+
+  const handleToggleSuperAdmin = (targetUser: AppUser) => {
+    if (!isSuperAdmin) {
+      alert('عذراً، فقط المشرف العام (سوبر أدمن) يملك صلاحية تغيير رتبة السوبر أدمن.');
+      return;
+    }
+
+    const willBeSuper = targetUser.role !== 'super_admin';
+    const result = onSetSuperAdmin
+      ? onSetSuperAdmin(targetUser.id, willBeSuper)
+      : AuthService.setSuperAdmin(targetUser.id, willBeSuper);
+
+    if (!result.success) {
+      setSuperAdminAlert(result.message);
+      setTimeout(() => setSuperAdminAlert(null), 5000);
+    } else {
+      setSuperAdminAlert(result.message);
+      setTimeout(() => setSuperAdminAlert(null), 4000);
+    }
+  };
+
+  const handleAssignProfileToUser = (targetUser: AppUser, profileId: string) => {
+    if (onAssignProfile) {
+      onAssignProfile(targetUser.id, profileId);
+    } else {
+      AuthService.assignProfileToUser(targetUser.id, profileId);
+    }
+    const prof = effectiveProfiles.find((p) => p.id === profileId);
+    if (prof && onUpdateAssistantUser) {
+      onUpdateAssistantUser({
+        ...targetUser,
+        profileId,
+        permissions: prof.permissions,
+        assignedCommittees: prof.allCommitteesAllowed ? [] : prof.allowedCommittees,
+        allCommitteesAllowed: prof.allCommitteesAllowed,
+        allowedExamIds: prof.allowedExamIds,
+        allExamsAllowed: prof.allExamsAllowed,
+      });
+    }
+    setAssigningProfileUser(null);
+  };
+
+  const handleOpenApproveModal = (user: AppUser) => {
+    setApprovingUser(user);
+    setApprovalRole(user.role || 'assistant');
+    setApprovalProfileId(user.profileId || '');
+    setApprovalPermissions(
+      user.permissions && user.permissions.length > 0
+        ? user.permissions
+        : ['database_sheets', 'manage_committees', 'calendar_schedule']
+    );
+    setApprovalCommittees(
+      user.assignedCommittees && user.assignedCommittees.length > 0
+        ? user.assignedCommittees
+        : user.preferredCommittees && user.preferredCommittees.length > 0
+        ? user.preferredCommittees
+        : [1]
+    );
+  };
+
+  const handleConfirmApproval = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingUser) return;
+
+    if (approvalProfileId) {
+      const prof = effectiveProfiles.find((p) => p.id === approvalProfileId);
+      if (prof) {
+        onApproveAssistant(
+          approvingUser.id,
+          prof.permissions,
+          prof.allCommitteesAllowed ? [] : prof.allowedCommittees,
+          approvalRole
+        );
+        handleAssignProfileToUser(approvingUser, approvalProfileId);
+        setApprovingUser(null);
+        return;
+      }
+    }
+
+    onApproveAssistant(
+      approvingUser.id,
+      approvalPermissions,
+      approvalCommittees,
+      approvalRole
+    );
+    setApprovingUser(null);
+  };
+
+  const handleOpenInterviewModal = (user: AppUser) => {
+    setInterviewingUser(user);
+    setInterviewDate('2026-10-06 17:00');
+    setInterviewNotes('يرجى الحضور لمقر إدارة لجان المسجد لإجراء اختبار حفظ القرآن والمقابلة.');
+  };
+
+  const handleConfirmInterview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!interviewingUser) return;
+    if (onScheduleInterview) {
+      onScheduleInterview(interviewingUser.id, interviewDate, interviewNotes);
+    } else {
+      AuthService.scheduleInterview(interviewingUser.id, interviewDate, interviewNotes);
+    }
+    setInterviewingUser(null);
+  };
+
+  const handleOpenRejectModal = (user: AppUser) => {
+    setRejectingUser(user);
+    setRejectionReason('نعتذر عن قبول الطلب حالياً لاكتمال النصاب المطلوب في لجان هذه الدورة، مع تمنياتنا بالتوفيق.');
+  };
+
+  const handleConfirmReject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingUser) return;
+    onRejectAssistant(rejectingUser.id, rejectionReason);
+    setRejectingUser(null);
   };
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
 
+    let perms = newPermissions;
+    let comms = newAssignedCommittees;
+    let allComms = true;
+    let examIds: string[] = [];
+    let allExams = true;
+
+    if (newProfileId) {
+      const prof = effectiveProfiles.find((p) => p.id === newProfileId);
+      if (prof) {
+        perms = prof.permissions;
+        comms = prof.allCommitteesAllowed ? [] : prof.allowedCommittees;
+        allComms = prof.allCommitteesAllowed;
+        examIds = prof.allowedExamIds || [];
+        allExams = prof.allExamsAllowed;
+      }
+    }
+
     onAddAssistantDirect({
       name: newName.trim(),
       phone: newPhone.trim() || '0500000000',
       email: newEmail.trim() || `${Date.now()}@bukhari.org`,
-      role: 'assistant',
+      role: newRole,
+      profileId: newProfileId || undefined,
       status: 'approved',
-      assignedCommittees: newAssignedCommittees,
-      permissions: newPermissions,
+      assignedCommittees: comms,
+      allCommitteesAllowed: allComms,
+      allowedExamIds: examIds,
+      allExamsAllowed: allExams,
+      permissions: perms,
       approvedAt: new Date().toLocaleDateString('ar-EG'),
       approvedBy: currentUser.name,
       notes: newNotes.trim() || 'معاون مضاف ومفعل مباشرة من المشرف العام',
@@ -116,313 +419,225 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     setNewPhone('');
     setNewEmail('');
     setNewNotes('');
-    setNewAssignedCommittees([]);
+    setNewAssignedCommittees([1]);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
-    onUpdateAssistantUser(editingUser);
+    let updated = { ...editingUser };
+    if (updated.profileId) {
+      const prof = effectiveProfiles.find((p) => p.id === updated.profileId);
+      if (prof) {
+        updated.permissions = prof.permissions;
+        updated.assignedCommittees = prof.allCommitteesAllowed ? [] : prof.allowedCommittees;
+        updated.allCommitteesAllowed = prof.allCommitteesAllowed;
+        updated.allowedExamIds = prof.allowedExamIds || [];
+        updated.allExamsAllowed = prof.allExamsAllowed;
+      }
+    }
+    onUpdateAssistantUser(updated);
     setEditingUser(null);
   };
 
-  const handleCreateCustomPermission = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = newCustomPermInput.trim();
-    if (!trimmed) return;
-    onAddCustomPermission(trimmed);
-    setNewCustomPermInput('');
-  };
-
-  // Helper to get questions not yet scored in a committee
-  const getUnscoredQuestions = (committee: Committee) => {
-    if (!committee.scoringDetails?.questions) return [];
-    return committee.scoringDetails.questions.filter((q) => !q.completed);
-  };
-
   return (
-    <div className="space-y-6 text-right">
+    <div className="space-y-6 text-right font-sans">
       {/* Header Banner */}
-      <div className="bg-gradient-to-l from-[#005c55] to-emerald-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-l from-[#005c55] via-emerald-800 to-[#004742] rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">badge</span>
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <span className="p-2 rounded-2xl bg-white/20 text-white shadow-inner">
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">admin_panel_settings</span>
             </span>
-            <h2 className="text-xl sm:text-2xl font-bold">
-              إدارة المعاونين وتعيين الصلاحيات
+            <h2 className="text-xl sm:text-2xl font-black tracking-wide">
+              نظام الصلاحيات والأدوار وإدارة الكوادر
             </h2>
           </div>
-          <p className="text-xs text-teal-100 mt-1 max-w-2xl leading-relaxed">
-            منظومة التحكم بالمعاونين الميدانيين وتعديل بياناتهم (الاسم، الجوال، البريد)، وإسناد اللجان والأسئلة غير المكتملة، وإضافة صلاحيات مخصصة يحددها المشرف العام.
+          <p className="text-xs sm:text-sm text-emerald-100 max-w-2xl leading-relaxed">
+            التحكم المركزي في الصلاحيات والأدوار. يتيح للسوبر أدمن إنشاء أنظمة صلاحية مخصصة، تحديد الصفحات واللجان والامتحانات المتاحة لكل مستخدم بدقة متناهية.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {isSuperAdmin && (
+            <button
+              onClick={handleOpenCreateProfile}
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-amber-950 font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">add_moderator</span>
+              <span>+ إنشاء نظام صلاحية جديد</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
+            className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/30 transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600">person_add</span>
-            <span>+ إضافة معاون مباشرة</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">person_add</span>
+            <span>+ إضافة مستخدم</span>
           </button>
 
           <button
             onClick={onOpenAuthModal}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-black/20 hover:bg-black/30 text-emerald-200 border border-emerald-400/30 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-lg">sync_alt</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">sync_alt</span>
             <span>تبديل الحساب</span>
           </button>
         </div>
       </div>
 
-      {/* Alert Banner for Pending Join Requests from Login Portal */}
-      {pendingUsers.length > 0 && (
-        <div className="bg-gradient-to-l from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-400 p-4 rounded-2xl shadow-sm text-right space-y-3 animate-in fade-in">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 text-amber-950 font-black text-sm">
-              <span className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-lg">notification_important</span>
-              </span>
-              <div>
-                <span className="block leading-tight">
-                  يوجد ({pendingUsers.length}) طلب انضمام جديد مسجل عبر بوابة الدخول بانتظار الاعتماد وتفعيل الصلاحيات!
-                </span>
-                <span className="text-[11px] text-amber-800 font-normal">
-                  سجل المعاونون بياناتهم وبانتظار اعتماد فضيلتكم للبدء في استلام اللجان الميدانية.
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  pendingUsers.forEach((u) => {
-                    onApproveAssistant(
-                      u.id,
-                      ['database_sheets', 'manage_committees', 'calendar_schedule'],
-                      []
-                    );
-                  });
-                }}
-                className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs cursor-pointer shadow-xs shrink-0 flex items-center gap-1 active:scale-95 transition-all"
-              >
-                <span>✓ اعتماد فوري لجميع الطلبات وتفعيل الصلاحيات</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('pending')}
-                className="px-3 py-2 rounded-xl bg-white border border-amber-300 hover:bg-amber-100/50 text-amber-950 font-bold text-xs cursor-pointer"
-              >
-                عرض في تبويب الطلبات
-              </button>
-            </div>
+      {/* Super Admin Alert Notification */}
+      {superAdminAlert && (
+        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-400 text-amber-950 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 animate-in fade-in shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-600 text-xl" aria-hidden="true">info</span>
+            <span>{superAdminAlert}</span>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
-            {pendingUsers.map((pUser) => (
-              <div
-                key={pUser.id}
-                className="bg-white p-3 rounded-xl border border-amber-300 shadow-2xs text-xs flex items-center justify-between gap-2"
-              >
-                <div>
-                  <span className="font-bold text-slate-900 block text-xs">{pUser.name}</span>
-                  <span className="text-[10px] text-slate-500 font-mono block">{pUser.phone}</span>
-                  <span className="text-[10px] text-[#005c55] font-semibold">{pUser.notes}</span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onApproveAssistant(
-                        pUser.id,
-                        ['database_sheets', 'manage_committees', 'calendar_schedule'],
-                        []
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 cursor-pointer shadow-2xs"
-                  >
-                    اعتماد
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onRejectAssistant(pUser.id)}
-                    className="px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-[11px] font-bold cursor-pointer"
-                  >
-                    رفض
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <button onClick={() => setSuperAdminAlert(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+            ✕
+          </button>
         </div>
       )}
 
-      {/* Stats Cluster */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-[#bdc9c6]/40 shadow-xs flex items-center justify-between">
+      {/* KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div
+          onClick={() => setActiveTab('approved')}
+          className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
+            activeTab === 'approved' ? 'border-[#005c55] ring-2 ring-emerald-200' : 'border-slate-200'
+          }`}
+        >
           <div>
-            <span className="text-[11px] text-[#6e7977] block font-semibold">المعاونون المعتمدون</span>
-            <span className="text-2xl font-mono font-bold text-[#005c55]">{approvedUsers.length}</span>
+            <span className="text-xs text-slate-500 block font-bold">المستخدمون المعتمدون</span>
+            <span className="text-2xl font-black text-emerald-800 font-mono">{approvedUsers.length}</span>
           </div>
-          <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-            <span className="material-symbols-outlined">verified_user</span>
+          <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">group</span>
           </span>
         </div>
 
         <div
-          onClick={() => setActiveTab('pending')}
-          className={`bg-white p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-            pendingUsers.length > 0
-              ? 'border-amber-400 bg-amber-50/30 ring-2 ring-amber-300/40'
-              : 'border-[#bdc9c6]/40 shadow-xs'
+          onClick={() => setActiveTab('profiles')}
+          className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
+            activeTab === 'profiles' ? 'border-purple-600 ring-2 ring-purple-200 bg-purple-50/20' : 'border-slate-200'
           }`}
         >
           <div>
-            <span className="text-[11px] text-amber-800 block font-semibold">
-              طلبات الانضمام قيد الاعتماد
-            </span>
-            <span className="text-2xl font-mono font-bold text-amber-600">
-              {pendingUsers.length}
-            </span>
+            <span className="text-xs text-purple-900 block font-bold">أنظمة الصلاحيات المخصصة</span>
+            <span className="text-2xl font-black text-purple-700 font-mono">{effectiveProfiles.length}</span>
           </div>
-          <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
-            <span className="material-symbols-outlined">pending_actions</span>
+          <span className="w-11 h-11 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">tune</span>
           </span>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-[#bdc9c6]/40 shadow-xs flex items-center justify-between">
+        <div
+          onClick={() => {
+            setActiveTab('requests');
+            setRequestsSubFilter('pending');
+          }}
+          className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
+            pendingRequests.length > 0 ? 'border-amber-400 bg-amber-50/40 ring-2 ring-amber-300' : 'border-slate-200'
+          }`}
+        >
           <div>
-            <span className="text-[11px] text-[#6e7977] block font-semibold">صلاحيات مخصصة بالنظام</span>
-            <span className="text-2xl font-mono font-bold text-[#005c55]">
-              {customPermissions.length}
-            </span>
+            <span className="text-xs text-amber-900 block font-bold">طلبات انضمام معلقة</span>
+            <span className="text-2xl font-black text-amber-600 font-mono">{pendingRequests.length}</span>
           </div>
-          <span className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#005c55] flex items-center justify-center font-bold">
-            <span className="material-symbols-outlined">tune</span>
+          <span className="w-11 h-11 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">pending_actions</span>
           </span>
         </div>
-      </div>
 
-      {/* Custom Permission Quick Add Bar (أنا عايز أضيف صلاحية أكتبها أنا بمزاجي) */}
-      <div className="bg-gradient-to-l from-emerald-50/70 to-teal-50/50 p-4 rounded-2xl border border-emerald-200">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-[#005c55] text-white flex items-center justify-center text-sm font-bold">
-              <span className="material-symbols-outlined text-base">add_moderator</span>
-            </span>
-            <div>
-              <span className="font-bold text-xs text-[#0d1c2e] block">
-                إضافة صلاحيات جديدة ومخصصة للمسجد:
-              </span>
-              <span className="text-[11px] text-[#6e7977]">
-                اكتب أي صلاحية بمزاجك (مثل: استلام أوراق الإجابة، ختم الأسئلة، مراجعة توقيع الطلاب...)
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs">
+          <div>
+            <span className="text-xs text-slate-500 block font-bold">المشرفون العامون (سوبر أدمن)</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-2xl font-black text-slate-900 font-mono">{superAdminsCount}</span>
+              <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">
+                أقصى حد (2)
               </span>
             </div>
           </div>
-
-          <form onSubmit={handleCreateCustomPermission} className="flex items-center gap-2 w-full sm:w-auto">
-            <input
-              type="text"
-              placeholder="اكتب اسم الصلاحية الجديدة هنا..."
-              value={newCustomPermInput}
-              onChange={(e) => setNewCustomPermInput(e.target.value)}
-              className="bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#005c55] w-full sm:w-64 text-[#0d1c2e]"
-            />
-            <button
-              type="submit"
-              disabled={!newCustomPermInput.trim()}
-              className="px-3.5 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-all shrink-0"
-            >
-              <span className="material-symbols-outlined text-sm">add</span>
-              <span>إضافة الصلاحية</span>
-            </button>
-          </form>
-        </div>
-
-        {/* Existing Custom Permissions Badges */}
-        <div className="mt-3 pt-3 border-t border-emerald-200/60 flex items-center gap-1.5 flex-wrap text-xs">
-          <span className="text-[11px] font-bold text-[#3e4947]">الصلاحيات المتاحة حالياً:</span>
-          {customPermissions.map((perm) => (
-            <span
-              key={perm.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#bdc9c6] text-[#0d1c2e] text-[11px] font-semibold shadow-2xs"
-            >
-              <span>{perm.label}</span>
-              {perm.isCustom && (
-                <button
-                  type="button"
-                  onClick={() => onDeleteCustomPermission(perm.id)}
-                  className="text-gray-400 hover:text-red-600 cursor-pointer p-0.5"
-                  title="حذف هذه الصلاحية المخصصة"
-                >
-                  ✕
-                </button>
-              )}
-            </span>
-          ))}
+          <span className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">military_tech</span>
+          </span>
         </div>
       </div>
 
-      {/* Tabs Switcher: Approved vs Pending */}
-      <div className="flex items-center justify-between border-b border-[#bdc9c6]/40 pb-3">
-        <div className="flex items-center gap-2">
+      {/* Main Tabs Navigation Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
           <button
             onClick={() => setActiveTab('approved')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'approved'
-                ? 'bg-[#005c55] text-white shadow-xs'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-[#eff4ff]'
+                ? 'bg-[#005c55] text-white shadow-sm'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">verified</span>
-            <span>المعاونون المعتمدون</span>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">manage_accounts</span>
+            <span>المستخدمون وتعيين الأدوار</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
               {approvedUsers.length}
             </span>
           </button>
 
           <button
-            onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'pending'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-amber-50'
+            onClick={() => setActiveTab('profiles')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'profiles'
+                ? 'bg-purple-700 text-white shadow-sm'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-purple-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">hourglass_top</span>
-            <span>طلبات الانضمام قيد الاعتماد</span>
-            {pendingUsers.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-mono animate-pulse font-bold">
-                {pendingUsers.length} جديد
+            <span className="material-symbols-outlined text-base" aria-hidden="true">tune</span>
+            <span>مركز بناء وتصميم أنظمة الصلاحيات</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-200 text-purple-950 font-mono font-bold">
+              {effectiveProfiles.length} نظام
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'requests'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-amber-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">how_to_reg</span>
+            <span>طلبات الانضمام والمقابلات</span>
+            {pendingRequests.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200 text-amber-950 font-mono font-black animate-pulse">
+                {pendingRequests.length} جديد
               </span>
             )}
           </button>
         </div>
 
         {/* Search */}
-        <div className="relative w-48 sm:w-64">
-          <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[#6e7977]">
-            <span className="material-symbols-outlined text-sm">search</span>
+        <div className="relative w-full sm:w-64">
+          <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+            <span className="material-symbols-outlined text-base" aria-hidden="true">search</span>
           </span>
           <input
             type="text"
             placeholder="بحث بالاسم أو الهاتف..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-[#bdc9c6] rounded-xl pr-9 pl-3 py-1.5 text-xs outline-none focus:border-[#005c55]"
+            className="w-full bg-white border border-slate-300 rounded-xl pr-9 pl-3 py-2 text-xs outline-none focus:border-[#005c55]"
           />
         </div>
       </div>
 
-      {/* VIEW 1: APPROVED ASSISTANTS */}
+      {/* VIEW 1: APPROVED USERS & ROLE ASSIGNMENTS */}
       {activeTab === 'approved' && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {filteredApproved.map((user) => {
-              // Find committees assigned to this assistant
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {paginatedApproved.map((user) => {
+              const userProfile = effectiveProfiles.find((p) => p.id === user.profileId);
               const assignedComms = committees.filter((c) =>
                 user.assignedCommittees.includes(c.committeeNumber)
               );
@@ -430,726 +645,1326 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               return (
                 <div
                   key={user.id}
-                  className="bg-white rounded-2xl border border-[#bdc9c6]/60 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition-all space-y-4"
                 >
-                  <div>
-                    {/* Assistant Header with Edit Button */}
-                    <div className="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-[#bdc9c6]/30">
-                      <div className="flex items-center gap-3">
-                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                          user.role === 'committee_head' ? 'bg-blue-100 text-blue-800' :
-                          user.role === 'teacher' ? 'bg-indigo-100 text-indigo-800' :
-                          user.role === 'auditor' ? 'bg-purple-100 text-purple-800' :
-                          'bg-emerald-100 text-emerald-800'
-                        }`}>
-                          <span className="material-symbols-outlined text-xl">
-                            {user.role === 'auditor' ? 'policy' : user.role === 'teacher' ? 'school' : 'person'}
-                          </span>
+                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-base shadow-xs ${
+                          user.role === 'super_admin'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : 'bg-emerald-100 text-[#005c55]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+                          {user.role === 'super_admin' ? 'military_tech' : 'person'}
                         </span>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-bold text-sm text-[#0d1c2e] leading-snug">
-                              {user.name}
-                            </h4>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              user.role === 'committee_head' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                              user.role === 'teacher' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
-                              user.role === 'auditor' ? 'bg-purple-50 text-purple-800 border-purple-200' :
-                              'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}>
-                              {user.role === 'committee_head' ? 'رئيس لجنة' :
-                               user.role === 'teacher' ? 'معلم ومقرئ' :
-                               user.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm sm:text-base text-slate-900">{user.name}</h4>
+                          {user.role === 'super_admin' && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
+                              👑 سوبر أدمن
                             </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5 flex-wrap">
-                            {user.passportNumber && (
-                              <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300 text-slate-800 text-[10px]">
-                                🛂 {user.passportNumber}
-                              </span>
-                            )}
-                            <span className="font-mono">📞 {user.phone}</span>
-                            <span>•</span>
-                            <span>✉️ {user.email}</span>
-                            {user.password && (
-                              <>
-                                <span>•</span>
-                                <span className="text-emerald-700 font-mono text-[10px]">🔑 {user.password}</span>
-                              </>
-                            )}
-                          </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                          <span className="font-mono text-emerald-900 font-bold">📞 {user.phone}</span>
+                          <span className="text-slate-400">•</span>
+                          <span className="text-slate-700 font-semibold">{AuthService.getRoleLabel(user.role)}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Notes / Bio */}
-                    {user.notes && (
-                      <p className="text-[11px] text-[#3e4947] bg-[#f8f9ff] p-2.5 rounded-xl border border-[#bdc9c6]/30 mb-3.5">
-                        {user.notes}
-                      </p>
-                    )}
-
-                    {/* Permissions Badges */}
-                    <div className="bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/40 mb-3.5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-[#005c55]">security</span>
-                          <span>الصلاحيات الممنوحة للمعاون ({user.permissions.length}):</span>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        {user.permissions.length > 0 ? (
-                          user.permissions.map((pId) => {
-                            const def = customPermissions.find((cp) => cp.id === pId);
-                            const label = def ? def.label : pId;
-                            return (
-                              <span
-                                key={pId}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-950 border border-emerald-300 text-[11px] font-bold"
-                              >
-                                <span>✓</span>
-                                <span>{label}</span>
-                              </span>
-                            );
-                          })
-                        ) : (
-                          <span className="text-[11px] text-gray-400 italic">
-                            لم تُمنح له صلاحيات بعد (اضغط على "تعديل البيانات والصلاحيات" لإضافة صلاحيات)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Committee Inspection & Uncorrected Questions Section */}
-                    <div className="space-y-2 mb-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-amber-600">assignment_turned_in</span>
-                          <span>اللجان المسندة وحالة تصحيح أسئلتها:</span>
-                        </span>
-                        <span className="text-[10px] text-[#6e7977]">
-                          (انقر على أي لجنة للدخول والعمل عليها)
-                        </span>
-                      </div>
-
-                      {assignedComms.length > 0 ? (
-                        <div className="space-y-2">
-                          {assignedComms.map((comm) => {
-                            const unscoredQuestions = getUnscoredQuestions(comm);
-                            const totalQuestions = comm.scoringDetails?.questions?.length || 0;
-                            const isFullyScored = totalQuestions > 0 && unscoredQuestions.length === 0;
-
-                            return (
-                              <div
-                                key={comm.id}
-                                className={`p-3 rounded-xl border transition-all text-xs ${
-                                  unscoredQuestions.length > 0
-                                    ? 'bg-amber-50/50 border-amber-300/80 hover:bg-amber-50'
-                                    : 'bg-emerald-50/40 border-emerald-300/70'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="w-6 h-6 rounded-md bg-[#005c55] text-white flex items-center justify-center font-bold text-[10px]">
-                                      #{comm.committeeNumber}
-                                    </span>
-                                    <span className="font-bold text-[#0d1c2e]">
-                                      {comm.committeeName}
-                                    </span>
-                                    <span className="text-[10px] text-[#6e7977]">
-                                      ({comm.competitionBook})
-                                    </span>
-                                  </div>
-
-                                  {onOpenCommitteeDetails && (
-                                    <button
-                                      type="button"
-                                      onClick={() => onOpenCommitteeDetails(comm)}
-                                      className="px-2.5 py-1 rounded-lg bg-[#005c55] hover:bg-[#1b6b51] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                    >
-                                      <span>فتح اللجنة والعمل عليها</span>
-                                      <span className="material-symbols-outlined text-xs">arrow_forward</span>
-                                    </button>
-                                  )}
-                                </div>
-
-                                {/* Questions Breakdown */}
-                                {totalQuestions > 0 ? (
-                                  <div className="pt-1.5 border-t border-gray-200/50">
-                                    {isFullyScored ? (
-                                      <span className="text-emerald-800 font-bold flex items-center gap-1 text-[11px]">
-                                        <span>✓</span>
-                                        <span>تم تصحيح كافة الأسئلة بنجاح ({totalQuestions} أسئلة)</span>
-                                      </span>
-                                    ) : (
-                                      <div className="space-y-1">
-                                        <div className="flex items-center justify-between text-[11px]">
-                                          <span className="text-amber-900 font-bold">
-                                            ⚠️ أسئلة لم يتم تصحيحها بعد ({unscoredQuestions.length} من {totalQuestions}):
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          {unscoredQuestions.map((uq) => (
-                                            <span
-                                              key={uq.id}
-                                              onClick={() => onOpenCommitteeDetails && onOpenCommitteeDetails(comm)}
-                                              className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold border border-amber-300 text-[10px] cursor-pointer hover:bg-amber-200 transition-colors"
-                                              title="اضغط للدخول وتصحيح هذا السؤال"
-                                            >
-                                              ✎ {uq.label} (غير مصحح)
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="text-[10px] text-gray-400">
-                                    لم يتم إعداد أسئلة التصحيح بعد لهذه اللجنة
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="p-3 rounded-xl bg-gray-50 border border-dashed border-gray-300 text-center text-[11px] text-gray-500">
-                          لم يتم إسناد لجان لهذا المعاون حتى الآن.
-                        </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingUser(user)}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                        title="تعديل البيانات والصلاحيات"
+                      >
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">edit</span>
+                      </button>
+                      {user.role !== 'super_admin' && (
+                        <button
+                          onClick={() => setUserToDelete(user)}
+                          className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
+                          title="حذف الحساب"
+                        >
+                          <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
+                        </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Footer Actions */}
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs mt-3 flex-wrap gap-2">
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      تاريخ الاعتماد: {user.approvedAt || user.createdAt}
-                    </span>
+                  {/* Active Permission Profile Badge */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500 text-[11px] block">نظام الصلاحية المطبق:</span>
+                      <strong className="text-purple-900 font-bold">
+                        {userProfile ? userProfile.name : user.role === 'super_admin' ? 'كامل الصلاحيات (سوبر أدمن)' : 'صلاحيات مخصصة يدوياً'}
+                      </strong>
+                    </div>
 
-                    <div className="flex items-center gap-2">
+                    {isSuperAdmin && (
                       <button
-                        type="button"
-                        onClick={() => setEditingUser(user)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-                        title="تعديل بيانات المعاون والصلاحيات واللجان"
+                        onClick={() => setAssigningProfileUser(user)}
+                        className="px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-950 font-bold text-xs cursor-pointer flex items-center gap-1"
                       >
-                        <span className="material-symbols-outlined text-sm text-amber-700">edit</span>
-                        <span>تعديل الصلاحيات</span>
+                        <span className="material-symbols-outlined text-sm" aria-hidden="true">swap_horiz</span>
+                        <span>تغيير نظام الصلاحية</span>
                       </button>
+                    )}
+                  </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setUserToDelete(user)}
-                        className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 font-bold px-2.5 py-1.5 rounded-xl hover:bg-rose-50 border border-rose-200 transition-colors cursor-pointer active:scale-95"
-                        title="حذف هذا المعاون"
-                      >
-                        <span className="material-symbols-outlined text-sm">delete_outline</span>
-                        <span>حذف المعاون</span>
-                      </button>
+                  {/* Scopes Summary (Committees & Exams) */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                      <span className="text-[11px] text-slate-500 block font-bold">اللجان المسموح بها:</span>
+                      <span className="text-emerald-950 font-semibold mt-0.5 block">
+                        {user.role === 'super_admin' || user.allCommitteesAllowed
+                          ? 'كافة اللجان العامة ✓'
+                          : assignedComms.length > 0
+                          ? assignedComms.map((c) => `#${c.committeeNumber}`).join('، ')
+                          : 'لا توجد لجان مسندة'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                      <span className="text-[11px] text-slate-500 block font-bold">الامتحانات المصرح بها:</span>
+                      <span className="text-blue-950 font-semibold mt-0.5 block">
+                        {user.role === 'super_admin' || user.allExamsAllowed
+                          ? 'كافة الامتحانات ✓'
+                          : user.allowedExamIds && user.allowedExamIds.length > 0
+                          ? `${user.allowedExamIds.length} امتحان محدد`
+                          : 'كافة الامتحانات المعتمدة'}
+                      </span>
                     </div>
                   </div>
+
+                  {/* Super Admin Promotion / Demotion Action (Only Super Admin can do this) */}
+                  {isSuperAdmin && currentUser.id !== user.id && (
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-[11px] text-slate-500">التحكم في رتبة السوبر أدمن:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSuperAdmin(user)}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer transition-all flex items-center gap-1 ${
+                          user.role === 'super_admin'
+                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                            : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                          {user.role === 'super_admin' ? 'remove_moderator' : 'military_tech'}
+                        </span>
+                        <span>{user.role === 'super_admin' ? 'تنزيل من سوبر أدمن' : 'ترقية إلى سوبر أدمن'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {filteredApproved.length === 0 && (
-            <div className="bg-white rounded-2xl p-10 text-center border border-[#bdc9c6]/40">
-              <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block">
-                group_off
-              </span>
-              <p className="text-sm font-bold text-[#0d1c2e]">لا يوجد معاونون معتمدون مطابقون للبحث</p>
+          {/* Pagination Controls for Approved Users */}
+          {totalApprovedPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs mt-4">
+              <div className="text-xs text-slate-600 font-medium">
+                عرض <span className="font-bold font-mono">{(safeApprovedPage - 1) * approvedPageSize + 1}</span> إلى{' '}
+                <span className="font-bold font-mono">{Math.min(safeApprovedPage * approvedPageSize, filteredApproved.length)}</span> من إجمالي{' '}
+                <span className="font-bold font-mono">{filteredApproved.length}</span> مستخدم
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safeApprovedPage <= 1}
+                  onClick={() => setApprovedPage((prev) => Math.max(1, prev - 1))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                    arrow_forward
+                  </span>
+                  <span>السابق</span>
+                </button>
+
+                {Array.from({ length: totalApprovedPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setApprovedPage(p)}
+                    className={`w-8 h-8 rounded-xl text-xs font-bold font-mono transition-all ${
+                      p === safeApprovedPage
+                        ? 'bg-[#005c55] text-white shadow-xs'
+                        : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  disabled={safeApprovedPage >= totalApprovedPages}
+                  onClick={() => setApprovedPage((prev) => Math.min(totalApprovedPages, prev + 1))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                >
+                  <span>التالي</span>
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                    arrow_back
+                  </span>
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* VIEW 2: PENDING APPROVAL REQUESTS */}
-      {activeTab === 'pending' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center gap-2">
-            <span className="material-symbols-outlined text-xl text-amber-600 shrink-0">
-              admin_panel_settings
-            </span>
-            <span>
-              <strong>تنبيه المشرف العام:</strong> هؤلاء المتقدمون سجلوا كمعاونين ولن يتمكنوا من دخول لوحة اللجان أو اتخاذ أي إجراء إلا بعد موافقتك واعتمادهم رسمياً وتحديد صلاحياتهم.
-            </span>
+      {/* VIEW 2: PERMISSION PROFILES BUILDER (مركز بناء وتصميم أنظمة الصلاحيات) */}
+      {activeTab === 'profiles' && (
+        <div className="space-y-5">
+          <div className="bg-gradient-to-l from-purple-50 to-indigo-50 border-2 border-purple-300 p-5 rounded-3xl space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-base text-purple-950 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-purple-700" aria-hidden="true">tune</span>
+                  <span>أنظمة الصلاحيات المخصصة (Permission Profiles Builder)</span>
+                </h3>
+                <p className="text-xs text-purple-900 mt-1 max-w-2xl leading-relaxed">
+                  يمكن للسوبر أدمن إنشاء أي بروفايل صلاحية جديد، وتحديد التابات المفتوحة، اللجان المسموح بها، والامتحانات التي يستطيع المستخدم الدخول على تفاصيلها وتصحيحها فقط.
+                </p>
+              </div>
+
+              {isSuperAdmin && (
+                <button
+                  onClick={handleOpenCreateProfile}
+                  className="px-5 py-2.5 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs sm:text-sm cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 transition-all shrink-0"
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">add_circle</span>
+                  <span>+ إنشاء نظام صلاحية جديد</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filteredPending.map((user) => (
+          {/* Profiles Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {effectiveProfiles.map((prof) => {
+              const assignedCount = users.filter((u) => u.profileId === prof.id).length;
+
+              return (
+                <div
+                  key={prof.id}
+                  className="bg-white rounded-3xl border-2 border-slate-200 hover:border-purple-300 p-6 shadow-xs hover:shadow-md transition-all space-y-4 text-right flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-black text-base text-slate-900">{prof.name}</h4>
+                          {prof.isDefault && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
+                              نظام أساسي
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{prof.description}</p>
+                      </div>
+
+                      <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200 shrink-0">
+                        {assignedCount} مستخدم
+                      </span>
+                    </div>
+
+                    {/* Profile Details & Scope Matrix */}
+                    <div className="py-3 space-y-2.5 text-xs">
+                      {/* Allowed Pages / Tabs */}
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">visibility</span>
+                          <span>الصفحات والتابات المفتوحة للمستخدم:</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {prof.allowedTabs.map((tId) => {
+                            const tabMeta = ALL_SYSTEM_TABS.find((t) => t.id === tId);
+                            return (
+                              <span
+                                key={tId}
+                                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-[11px] font-bold"
+                              >
+                                {tabMeta?.label || tId}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Allowed Committees Scope */}
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm text-emerald-700" aria-hidden="true">groups</span>
+                          <span>نطاق اللجان الميدانية:</span>
+                        </span>
+                        <span className="text-xs font-semibold text-emerald-950">
+                          {prof.allCommitteesAllowed
+                            ? '✓ مسموح بكافة اللجان العامة دون استثناء'
+                            : prof.allowedCommittees && prof.allowedCommittees.length > 0
+                            ? `مقتصر على اللجان: (${prof.allowedCommittees.map((c) => `#${c}`).join('، ')}) فقط`
+                            : 'لا توجد لجان محددة'}
+                        </span>
+                      </div>
+
+                      {/* Allowed Exams Scope */}
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm text-blue-700" aria-hidden="true">description</span>
+                          <span>نطاق الامتحانات وبنك الأسئلة:</span>
+                        </span>
+                        <span className="text-xs font-semibold text-blue-950">
+                          {prof.allExamsAllowed
+                            ? '✓ مسموح بكافة الامتحانات والنماذج'
+                            : prof.allowedExamIds && prof.allowedExamIds.length > 0
+                            ? `مقتصر على (${prof.allowedExamIds.length}) امتحانات محددة فقط`
+                            : 'كافة الامتحانات المعتمدة'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => handleOpenEditProfile(prof)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-purple-100 text-slate-800 hover:text-purple-950 font-bold text-xs cursor-pointer flex items-center gap-1 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">edit_note</span>
+                      <span>تعديل هذا النظام</span>
+                    </button>
+
+                    {!prof.isDefault && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`هل أنت متأكد من حذف نظام الصلاحية "${prof.name}"؟`)) {
+                            if (onDeleteProfile) onDeleteProfile(prof.id);
+                            else AuthService.deleteProfile(prof.id);
+                          }
+                        }}
+                        className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        title="حذف هذا النظام"
+                      >
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: JOIN REQUESTS & RECRUITMENT HUB */}
+      {activeTab === 'requests' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap pb-1">
+            <button
+              onClick={() => setRequestsSubFilter('all')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer border ${
+                requestsSubFilter === 'all'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              كافة الطلبات ({joinRequests.length})
+            </button>
+
+            <button
+              onClick={() => setRequestsSubFilter('pending')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer border ${
+                requestsSubFilter === 'pending'
+                  ? 'bg-amber-600 text-white border-amber-600'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50'
+              }`}
+            >
+              ⏳ قيد المراجعة ({pendingRequests.length})
+            </button>
+
+            <button
+              onClick={() => setRequestsSubFilter('interview')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer border ${
+                requestsSubFilter === 'interview'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-blue-50'
+              }`}
+            >
+              🎙️ المقابلات والاختبارات ({interviewRequests.length})
+            </button>
+
+            <button
+              onClick={() => setRequestsSubFilter('rejected')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer border ${
+                requestsSubFilter === 'rejected'
+                  ? 'bg-rose-600 text-white border-rose-600'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-rose-50'
+              }`}
+            >
+              ❌ المعتذر لهم ({rejectedRequests.length})
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredRequests.map((user) => (
               <div
                 key={user.id}
-                className="bg-white rounded-2xl border-2 border-amber-300/80 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                className={`bg-white rounded-3xl border-2 p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all ${
+                  user.status === 'pending'
+                    ? 'border-amber-400 bg-amber-50/10'
+                    : user.status === 'interview'
+                    ? 'border-blue-400 bg-blue-50/10'
+                    : 'border-slate-200'
+                }`}
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-[#bdc9c6]/30">
+                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                      <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-sm shrink-0">
-                        <span className="material-symbols-outlined text-xl">person_pin</span>
+                      <span
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-lg shadow-xs ${
+                          user.status === 'pending'
+                            ? 'bg-amber-100 text-amber-900'
+                            : user.status === 'interview'
+                            ? 'bg-blue-100 text-blue-900'
+                            : 'bg-rose-100 text-rose-900'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          {user.status === 'interview' ? 'mic' : user.status === 'rejected' ? 'person_cancel' : 'person_pin'}
+                        </span>
                       </span>
                       <div>
-                        <h4 className="font-bold text-sm text-[#0d1c2e]">{user.name}</h4>
-                        <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5">
+                        <h4 className="font-bold text-sm sm:text-base text-slate-900">{user.name}</h4>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                           <span className="font-mono text-emerald-900 font-bold">📞 {user.phone}</span>
+                          {user.requestCode && (
+                            <span className="font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
+                              {user.requestCode}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0 animate-pulse">
-                      قيد اعتماد المشرف
-                    </span>
+                    {user.status === 'pending' && (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0 animate-pulse">
+                        قيد دراسة المشرف
+                      </span>
+                    )}
+                    {user.status === 'interview' && (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300 shrink-0">
+                        مقابلة مجدولة
+                      </span>
+                    )}
+                    {user.status === 'rejected' && (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300 shrink-0">
+                        معتذر عنه
+                      </span>
+                    )}
                   </div>
 
-                  <p className="text-xs text-[#3e4947] bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/30 mb-3.5 leading-relaxed">
-                    <strong className="text-[#0d1c2e]">بيان الطلب: </strong>
-                    {user.notes || 'طلب انضمام جديد للعمل في لجان مسجد البخاري.'}
-                  </p>
-
-                  <div className="text-[11px] text-[#6e7977] mb-3">
-                    <span>تاريخ تقديم الطلب: </span>
-                    <strong className="text-[#0d1c2e] font-mono">{user.createdAt}</strong>
+                  <div className="py-3 space-y-2 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                      <div>
+                        <span className="text-slate-500 text-[11px]">مقدار حفظ القرآن: </span>
+                        <strong className="text-emerald-950 font-bold">{user.quranLevel || 'حافظ لكامل القرآن'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[11px]">الدور المرغوب: </span>
+                        <strong className="text-[#005c55] font-bold">{AuthService.getRoleLabel(user.role)}</strong>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Approval & Reject buttons */}
-                <div className="pt-3 border-t border-[#bdc9c6]/30 flex flex-wrap items-center justify-between gap-2">
+                <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() =>
-                      setEditingUser({
-                        ...user,
-                        status: 'approved',
-                        role: user.role || 'assistant',
-                        permissions: user.permissions.length > 0 ? user.permissions : ['database_sheets', 'manage_committees'],
-                        assignedCommittees: user.assignedCommittees.length > 0 ? user.assignedCommittees : [1],
-                      })
-                    }
-                    className="flex-1 py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98] transition-all"
-                    title="فتح نافذة اختيار الدور وتحديد الصلاحيات واللجان للمتقدم"
+                    onClick={() => handleOpenApproveModal(user)}
+                    className="flex-1 py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
                   >
-                    <span className="material-symbols-outlined text-sm">how_to_reg</span>
-                    <span>✓ قبول وتحديد الدور والصلاحيات</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">how_to_reg</span>
+                    <span>✓ قبول واعتماد</span>
                   </button>
 
                   <button
-                    onClick={() =>
-                      onApproveAssistant(
-                        user.id,
-                        ['database_sheets', 'manage_committees'],
-                        [1]
-                      )
-                    }
-                    className="py-2 px-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
-                    title="قبول فوري بصلاحيات معاون ميداني"
+                    onClick={() => handleOpenInterviewModal(user)}
+                    className="py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">done_all</span>
-                    <span>قبول فوري</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">mic</span>
+                    <span>مقابلة</span>
                   </button>
 
                   <button
-                    onClick={() => {
-                      if (window.confirm(`هل أنت متأكد من رفض طلب المعاون "${user.name}"؟`)) {
-                        onRejectAssistant(user.id);
-                      }
-                    }}
-                    className="py-2 px-3 rounded-xl border border-red-300 text-red-600 hover:bg-red-50 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    onClick={() => setDossierUser(user)}
+                    className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">close</span>
-                    <span>رفض</span>
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">visibility</span>
+                    <span>الملف</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenRejectModal(user)}
+                    className="py-2 px-2.5 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
+                    <span>اعتذار</span>
                   </button>
                 </div>
               </div>
             ))}
           </div>
-
-          {filteredPending.length === 0 && (
-            <div className="bg-white rounded-2xl p-10 text-center border border-[#bdc9c6]/40">
-              <span className="material-symbols-outlined text-4xl text-emerald-600 mb-2 block">
-                task_alt
-              </span>
-              <p className="text-sm font-bold text-[#0d1c2e]">لا توجد طلبات انضمام معلقة حالياً</p>
-              <p className="text-xs text-[#6e7977] mt-1">كافة طلبات المعاونين تم اعتمادها رسمياً.</p>
-            </div>
-          )}
         </div>
       )}
 
-      {/* FULL EDIT ASSISTANT MODAL (تعديل بيانات وصلاحيات معاذ بن سعد العتيبي أو أي معاون) */}
-      {editingUser && (
+      {/* CREATE / EDIT PERMISSION PROFILE MODAL (بناء وتصميم الصلاحية المخصصة) */}
+      {isProfileModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
-            <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+          <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl border border-purple-200 overflow-hidden animate-in fade-in">
+            <div className="p-5 bg-gradient-to-l from-purple-700 to-indigo-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl">edit</span>
+                <span className="w-10 h-10 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">tune</span>
                 </span>
                 <div>
-                  <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
-                    تعديل بيانات وصلاحيات: {editingUser.name}
+                  <h3 className="font-black text-base sm:text-lg">
+                    {editingProfile ? `تعديل نظام الصلاحية: ${editingProfile.name}` : 'إنشاء وتصميم نظام صلاحية مخصص جديد'}
                   </h3>
-                  <p className="text-[11px] text-[#6e7977]">
-                    تعديل الاسم، رقم الجوال المحدث، اللجان المسندة، والصلاحيات
+                  <p className="text-xs text-purple-200">
+                    حدد التابات واللجان والامتحانات المصرح بها بدقة متناهية
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setEditingUser(null)}
-                className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
+                onClick={() => setIsProfileModalOpen(false)}
+                className="w-8 h-8 rounded-lg text-white/80 hover:text-white flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                ✕
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="p-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">
-                    اسم المعاون / العضو <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editingUser.name}
-                    onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
-                    required
-                  />
-                </div>
+            <form onSubmit={handleSaveProfileSubmit} className="p-6 space-y-5 text-xs max-h-[80vh] overflow-y-auto">
+              {/* Profile Name & Description */}
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
+                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">badge</span>
+                  <span>١. اسم نظام الصلاحية ووصفه:</span>
+                </h4>
 
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">
-                    رقم الهاتف / الجوال <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={editingUser.phone}
-                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-mono text-left font-bold"
-                    required
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      اسم الصلاحية <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثال: مصحح متن الجزرية ولجان #1 و #2"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-purple-600 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">اللون المميز للشارة</label>
+                    <select
+                      value={profileBadgeColor}
+                      onChange={(e) => setProfileBadgeColor(e.target.value as any)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-purple-600 font-bold"
+                    >
+                      <option value="emerald">أخضر زمردي (Emerald)</option>
+                      <option value="blue">أزرق ملكي (Blue)</option>
+                      <option value="purple">بنفسجي (Purple)</option>
+                      <option value="amber">كهرماني (Amber)</option>
+                      <option value="rose">وردي (Rose)</option>
+                      <option value="teal">تيل مائي (Teal)</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-slate-700 mb-1">الوصف والمهام المحددة لهذا النظام</label>
+                    <input
+                      type="text"
+                      placeholder="وصف مختصر لما يفتحه هذا النظام..."
+                      value={profileDescription}
+                      onChange={(e) => setProfileDescription(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-purple-600"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Role Selection by Super Admin */}
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
-                  الدور الوظيفي في المنظومة (يحدده المشرف العام) <span className="text-red-500">*</span>:
-                </label>
-                <select
-                  value={editingUser.role}
-                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
-                  className="w-full bg-emerald-50 border border-emerald-300 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-bold text-emerald-950"
-                >
-                  <option value="assistant">معاون ميداني تنفيذي (استلام وتجهيز اللجان وتوزيع الامتحانات)</option>
-                  <option value="teacher">معلم ومقرئ معتمد (اختبار الطلاب ورصد وتصحيح الدرجات)</option>
-                  <option value="committee_head">رئيس لجنة واختبارات (إشراف ميداني واعتماد جاهزية وتدقيق)</option>
-                  <option value="auditor">مراجع ومدقق جودة (رقابي وإحصائي)</option>
-                </select>
-              </div>
+              {/* Allowed View Tabs Checklist (الصفحات والتابات المفتوحة) */}
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
+                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">visibility</span>
+                  <span>٢. الصفحات والتابات المصرح للمستخدم برؤيتها والدخول عليها:</span>
+                </h4>
 
-              {/* Permissions Checklist in Edit Modal */}
-              <div className="bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/40 space-y-2">
-                <span className="font-bold text-[#0d1c2e] block">
-                  الصلاحيات الممنوحة لهذا المعاون (حدد ما تشاء):
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  {customPermissions.map((perm) => {
-                    const isChecked = editingUser.permissions.includes(perm.id);
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {ALL_SYSTEM_TABS.map((tab) => {
+                    const isChecked = profileAllowedTabs.includes(tab.id);
                     return (
                       <label
-                        key={perm.id}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                          isChecked ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold' : 'bg-white border-gray-200 text-gray-600'
+                        key={tab.id}
+                        className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2.5 transition-all ${
+                          isChecked
+                            ? 'bg-purple-50 border-purple-300 text-purple-950 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={(e) => {
-                            const updated = e.target.checked
-                              ? [...editingUser.permissions, perm.id]
-                              : editingUser.permissions.filter((p) => p !== perm.id);
-                            setEditingUser({ ...editingUser, permissions: updated });
+                            setProfileAllowedTabs((prev) =>
+                              e.target.checked ? [...prev, tab.id] : prev.filter((id) => id !== tab.id)
+                            );
                           }}
+                          className="rounded text-purple-600 focus:ring-purple-600"
                         />
-                        <span>{perm.label}</span>
+                        <div>
+                          <span className="block text-xs">{tab.label}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">{tab.desc}</span>
+                        </div>
                       </label>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Committee Assignment in Edit Modal */}
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1.5">
-                  اللجان المسندة لهذا المعاون لمتابعتها وتصحيحها:
-                </label>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {committees.map((c) => {
-                    const isSelected = editingUser.assignedCommittees.includes(c.committeeNumber);
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          const updated = isSelected
-                            ? editingUser.assignedCommittees.filter((num) => num !== c.committeeNumber)
-                            : [...editingUser.assignedCommittees, c.committeeNumber];
-                          setEditingUser({ ...editingUser, assignedCommittees: updated });
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-[#005c55] text-white border-[#005c55]'
-                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        لجنة #{c.committeeNumber}
-                      </button>
-                    );
-                  })}
+              {/* Allowed Committees Scope (نطاق اللجان الميدانية) */}
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
+                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">groups</span>
+                  <span>٣. نطاق اللجان الميدانية المصرح بها:</span>
+                </h4>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                    <input
+                      type="radio"
+                      name="allCommittees"
+                      checked={profileAllCommittees}
+                      onChange={() => setProfileAllCommittees(true)}
+                    />
+                    <span>سماح بكافة اللجان العامة (الكل)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                    <input
+                      type="radio"
+                      name="allCommittees"
+                      checked={!profileAllCommittees}
+                      onChange={() => setProfileAllCommittees(false)}
+                    />
+                    <span>تحديد لجان معينة فقط</span>
+                  </label>
                 </div>
+
+                {!profileAllCommittees && (
+                  <div className="pt-2 flex flex-wrap gap-1.5">
+                    {committees.map((c) => {
+                      const isSelected = profileAllowedCommittees.includes(c.committeeNumber);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setProfileAllowedCommittees((prev) =>
+                              isSelected
+                                ? prev.filter((num) => num !== c.committeeNumber)
+                                : [...prev, c.committeeNumber].sort((a, b) => a - b)
+                            );
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-purple-700 text-white border-purple-700'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          لجنة #{c.committeeNumber}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">ملاحظات / تكليفات</label>
-                <textarea
-                  rows={2}
-                  value={editingUser.notes || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, notes: e.target.value })}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
-                />
+              {/* Allowed Exams Scope (نطاق الامتحانات المصرح بها) */}
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
+                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">description</span>
+                  <span>٤. نطاق الامتحانات وبنك الأسئلة المصرح بالدخول عليها وتصحيحها:</span>
+                </h4>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                    <input
+                      type="radio"
+                      name="allExams"
+                      checked={profileAllExams}
+                      onChange={() => setProfileAllExams(true)}
+                    />
+                    <span>سماح بكافة الامتحانات</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                    <input
+                      type="radio"
+                      name="allExams"
+                      checked={!profileAllExams}
+                      onChange={() => setProfileAllExams(false)}
+                    />
+                    <span>تحديد امتحانات معينة فقط (مصحح لامتحان محدد)</span>
+                  </label>
+                </div>
+
+                {!profileAllExams && (
+                  <div className="pt-2 space-y-2">
+                    {effectiveExams.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {effectiveExams.map((ex) => {
+                          const isSelected = profileAllowedExamIds.includes(ex.id);
+                          return (
+                            <label
+                              key={ex.id}
+                              className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2 transition-all ${
+                                isSelected
+                                  ? 'bg-blue-50 border-blue-400 text-blue-950 font-bold'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  setProfileAllowedExamIds((prev) =>
+                                    e.target.checked ? [...prev, ex.id] : prev.filter((id) => id !== ex.id)
+                                  );
+                                }}
+                                className="rounded text-blue-600 focus:ring-blue-600"
+                              />
+                              <div>
+                                <span className="block text-xs">{ex.title}</span>
+                                <span className="text-[10px] text-slate-400 font-normal">الكتاب: {ex.book}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">لا توجد امتحانات مسجلة في بنك الامتحانات حالياً.</span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+              {/* Submit Buttons */}
+              <div className="pt-3 border-t flex justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setUserToDelete(editingUser);
-                  }}
-                  className="px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <span className="material-symbols-outlined text-base">delete</span>
-                  <span>حذف هذا المعاون</span>
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingUser(null)}
-                    className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 hover:bg-slate-50 font-bold text-xs cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs cursor-pointer shadow-xs active:scale-[0.98]"
-                  >
-                    حفظ التعديلات فوراً
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* DIRECT ADD ASSISTANT MODAL */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
-            <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl">person_add</span>
-                </span>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
-                    إضافة معاون جديد وتحديد صلاحياته
-                  </h3>
-                  <p className="text-[11px] text-[#6e7977]">
-                    تفعيل الحساب مباشرة ومنحه صلاحيات استلام اللجان وتصحيح الأسئلة
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleAddSubmit} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
-                  اسم المعاون ثلاثياً <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="مثال: الشيخ عبد الرحمن بن صالح..."
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">رقم الهاتف / الجوال</label>
-                  <input
-                    type="tel"
-                    placeholder="05xxxxxxxx"
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">البريد الإلكتروني</label>
-                  <input
-                    type="email"
-                    placeholder="assistant@bukhari.org"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
-                  />
-                </div>
-              </div>
-
-              {/* Permissions checklist */}
-              <div className="bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/40 space-y-2">
-                <span className="font-bold text-[#0d1c2e] block">الصلاحيات المبدئية:</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  {customPermissions.map((perm) => (
-                    <label key={perm.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newPermissions.includes(perm.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) setNewPermissions([...newPermissions, perm.id]);
-                          else setNewPermissions(newPermissions.filter((p) => p !== perm.id));
-                        }}
-                      />
-                      <span>{perm.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Committee assignment */}
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1.5">
-                  إسناد لجان أولية للمعاون:
-                </label>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {committees.map((c) => {
-                    const isSelected = newAssignedCommittees.includes(c.committeeNumber);
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            setNewAssignedCommittees(newAssignedCommittees.filter((num) => num !== c.committeeNumber));
-                          } else {
-                            setNewAssignedCommittees([...newAssignedCommittees, c.committeeNumber]);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#005c55] text-white border-[#005c55]'
-                            : 'bg-white text-gray-600 border-gray-300'
-                        }`}
-                      >
-                        لجنة #{c.committeeNumber}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">ملاحظات / تكليفات</label>
-                <textarea
-                  rows={2}
-                  placeholder="مهام المعاون في القاعة أو توجيهات المشرف العام..."
-                  value={newNotes}
-                  onChange={(e) => setNewNotes(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-gray-600 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="px-5 py-2.5 rounded-xl text-slate-600 border border-slate-300 font-bold"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black shadow-md cursor-pointer"
                 >
-                  حفظ وتفعيل المعاون فوراً
+                  حفظ وتثبيت نظام الصلاحية
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      {/* DELETE CONFIRMATION MODAL (No window.confirm!) */}
+
+      {/* ASSIGN PROFILE QUICK MODAL */}
+      {assigningProfileUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-purple-200 p-6 space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-black text-base text-slate-900">
+                  تطبيق نظام صلاحية على: {assigningProfileUser.name}
+                </h3>
+                <p className="text-xs text-slate-500">اختر البروفايل الذي تريد منحه لهذا المستخدم</p>
+              </div>
+              <button
+                onClick={() => setAssigningProfileUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              {effectiveProfiles.map((prof) => {
+                const isSelected = assigningProfileUser.profileId === prof.id;
+                return (
+                  <button
+                    key={prof.id}
+                    type="button"
+                    onClick={() => handleAssignProfileToUser(assigningProfileUser, prof.id)}
+                    className={`w-full p-3 rounded-2xl border text-right cursor-pointer transition-all flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 font-bold ring-2 ring-purple-200'
+                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <span className="block font-bold text-xs">{prof.name}</span>
+                      <span className="text-[10px] text-slate-500">{prof.description}</span>
+                    </div>
+                    {isSelected && <span className="text-purple-700 font-bold">✓ المطبق حالياً</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* APPROVE APPLICANT MODAL */}
+      {approvingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+            <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">how_to_reg</span>
+                </span>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-slate-900">
+                    اعتماد وتفعيل المتقدم: {approvingUser.name}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">اختر نظام الصلاحية أو حدد الصلاحيات الميدانية</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setApprovingUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmApproval} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">المسمى والدور في المنظومة:</label>
+                <select
+                  value={approvalRole}
+                  onChange={(e) => setApprovalRole(e.target.value as UserRole)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-[#005c55] outline-none"
+                >
+                  <option value="assistant">معاون ميداني معتمد</option>
+                  <option value="teacher">معلم ومقرئ معتمد</option>
+                  <option value="committee_head">رئيس لجنة ومقرئ</option>
+                  <option value="auditor">مراجع ومدقق جودة</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">اختر نظام الصلاحية المخصص المطبق:</label>
+                <select
+                  value={approvalProfileId}
+                  onChange={(e) => setApprovalProfileId(e.target.value)}
+                  className="w-full bg-purple-50 border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-purple-950 outline-none"
+                >
+                  <option value="">صلاحيات مخصصة يدوياً (حسب الاختيارات أدناه)</option>
+                  {effectiveProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {!approvalProfileId && (
+                <>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">إسناد اللجان الميدانية:</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {committees.map((c) => {
+                        const isSelected = approvalCommittees.includes(c.committeeNumber);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setApprovalCommittees((prev) =>
+                                prev.includes(c.committeeNumber)
+                                  ? prev.filter((n) => n !== c.committeeNumber)
+                                  : [...prev, c.committeeNumber].sort((a, b) => a - b)
+                              );
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#005c55] text-white border-[#005c55]'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            لجنة #{c.committeeNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                    <span className="font-bold text-slate-900 block">الصلاحيات الممنوحة:</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {customPermissions.map((perm) => (
+                        <label key={perm.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={approvalPermissions.includes(perm.id)}
+                            onChange={(e) => {
+                              setApprovalPermissions((prev) =>
+                                e.target.checked ? [...prev, perm.id] : prev.filter((p) => p !== perm.id)
+                              );
+                            }}
+                            className="rounded text-[#005c55] focus:ring-[#005c55]"
+                          />
+                          <span>{perm.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovingUser(null)}
+                  className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 hover:bg-slate-50 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                >
+                  اعتماد وتفعيل الصلاحيات فوراً
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SCHEDULE INTERVIEW MODAL */}
+      {interviewingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-600" aria-hidden="true">event</span>
+                <span>جدولة مقابلة شخصية واختبار: {interviewingUser.name}</span>
+              </h3>
+              <button
+                onClick={() => setInterviewingUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmInterview} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">موعد وتوقيت المقابلة:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: غداً الثلاثاء 2026-10-06 الساعة 5:00 مساءً"
+                  value={interviewDate}
+                  onChange={(e) => setInterviewDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">ملاحظات وتعليمات المشرف للمتقدم:</label>
+                <textarea
+                  rows={3}
+                  value={interviewNotes}
+                  onChange={(e) => setInterviewNotes(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInterviewingUser(null)}
+                  className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md cursor-pointer"
+                >
+                  حفظ وتأكيد الموعد
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REJECTION MODAL */}
+      {rejectingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-black text-sm sm:text-base text-rose-950 flex items-center gap-2">
+                <span className="material-symbols-outlined text-rose-600" aria-hidden="true">person_cancel</span>
+                <span>الاعتذار عن طلب المتقدم: {rejectingUser.name}</span>
+              </h3>
+              <button
+                onClick={() => setRejectingUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmReject} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">سبب الاعتذار الموجه للمتقدم:</label>
+                <textarea
+                  rows={3}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs outline-none focus:border-rose-600"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectingUser(null)}
+                  className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 font-bold"
+                >
+                  تراجع
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black shadow-md cursor-pointer"
+                >
+                  تأكيد الاعتذار
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FULL APPLICANT DOSSIER MODAL */}
+      {dossierUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+            <div className="p-5 bg-gradient-to-l from-slate-900 to-slate-800 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-base">ملف وسيرة المتقدم: {dossierUser.name}</h3>
+                <span className="text-xs text-slate-300 font-mono">
+                  كود الطلب: {dossierUser.requestCode || 'REQ-2026-N/A'} • تاريخ التقديم: {dossierUser.createdAt}
+                </span>
+              </div>
+              <button
+                onClick={() => setDossierUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">رقم الجوال:</span>
+                  <strong className="font-mono text-slate-900 font-bold">{dossierUser.phone}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">الواتساب:</span>
+                  <strong className="font-mono text-slate-900 font-bold">{dossierUser.whatsapp || dossierUser.phone}</strong>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <span className="font-bold text-emerald-950 block text-[11px]">مقدار حفظ القرآن الكريم والإجازات:</span>
+                  <p className="text-emerald-900 font-semibold mt-0.5">{dossierUser.quranLevel || 'حافظ لكامل القرآن'}</p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="font-bold text-slate-700 block text-[11px]">المؤهل العلمي والتخصص:</span>
+                  <p className="text-slate-900 mt-0.5">{dossierUser.qualification || 'شريعة / دراسات إسلامية'}</p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">print</span>
+                  <span>طباعة الملف</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDossierUser(null);
+                    handleOpenApproveModal(dossierUser);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                >
+                  قبول واعتماد الآن
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIRECT ADD USER MODAL */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+            <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">person_add</span>
+                </span>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-slate-900">إضافة وتفعيل مستخدم مباشر</h3>
+                  <p className="text-[11px] text-slate-500">تفعيل فوري وتطبيق نظام الصلاحيات</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSubmit} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">الاسم الرباعي <span className="text-rose-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="الاسم الكامل..."
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">رقم الجوال <span className="text-rose-500">*</span></label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="05xxxxxxxx"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">الدور الوظيفي</label>
+                  <select
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value as UserRole)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-[#005c55] outline-none"
+                  >
+                    <option value="assistant">معاون ميداني</option>
+                    <option value="teacher">معلم ومقرئ</option>
+                    <option value="committee_head">رئيس لجنة</option>
+                    <option value="auditor">مراجع ومدقق</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">تطبيق نظام صلاحية مخصص (اختياري):</label>
+                <select
+                  value={newProfileId}
+                  onChange={(e) => setNewProfileId(e.target.value)}
+                  className="w-full bg-purple-50 border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-purple-950 outline-none"
+                >
+                  <option value="">صلاحيات يدوية (افتراضية)</option>
+                  {effectiveProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                >
+                  حفظ وتفعيل الحساب فوراً
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT USER MODAL */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+            <div className="p-5 bg-gradient-to-l from-slate-100 to-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-black text-base text-slate-900">تعديل بيانات وصلاحيات: {editingUser.name}</h3>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-5 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">الاسم الكامل</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingUser.name}
+                    onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">رقم الهاتف</label>
+                  <input
+                    type="tel"
+                    required
+                    value={editingUser.phone}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">الدور في المنظومة</label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-[#005c55] outline-none"
+                >
+                  <option value="super_admin">المشرف العام (سوبر أدمن)</option>
+                  <option value="assistant">معاون ميداني</option>
+                  <option value="teacher">معلم ومقرئ</option>
+                  <option value="committee_head">رئيس لجنة</option>
+                  <option value="auditor">مراجع ومدقق</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">نظام الصلاحية المخصص المطبق:</label>
+                <select
+                  value={editingUser.profileId || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, profileId: e.target.value || undefined })}
+                  className="w-full bg-purple-50 border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-purple-950 outline-none"
+                >
+                  <option value="">صلاحيات مخصصة يدوياً</option>
+                  {effectiveProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                >
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
       {userToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right animate-fadeIn">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-rose-200 overflow-hidden">
-            <div className="p-5 bg-rose-50 border-b border-rose-100 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-                <span className="material-symbols-outlined text-2xl">delete_forever</span>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4 animate-in fade-in">
+            <div className="flex items-center gap-3 border-b border-rose-100 pb-3">
+              <span className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold">
+                <span className="material-symbols-outlined" aria-hidden="true">delete_forever</span>
               </span>
               <div>
-                <h3 className="font-extrabold text-base text-rose-950">
-                  تأكيد حذف حساب المعاون
-                </h3>
-                <p className="text-xs text-rose-700 mt-0.5">
-                  هذا الإجراء سيقوم بمسح الحساب وسحب كافة الصلاحيات
-                </p>
+                <h3 className="font-black text-base text-rose-950">تأكيد حذف الحساب</h3>
+                <p className="text-xs text-rose-700">{userToDelete.name}</p>
               </div>
             </div>
 
-            <div className="p-5 space-y-3 text-xs text-slate-700">
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="font-bold text-slate-900 text-sm">{userToDelete.name}</p>
-                <p className="text-slate-500 text-[11px] mt-1">الهاتف: {userToDelete.phone || 'غير مسجل'}</p>
-                <p className="text-slate-500 text-[11px]">اسم الدخول: {userToDelete.email}</p>
-              </div>
-              <p className="text-rose-600 font-bold text-xs leading-relaxed">
-                ⚠️ هل أنت متأكد تماماً من رغبتك في حذف هذا الحساب نهائياً من قاعدة بيانات المسجد؟
-              </p>
-            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              هل أنت متأكد من رغبتك في حذف حساب <strong>{userToDelete.name}</strong> نهائياً وسحب كافة صلاحياته؟
+            </p>
 
-            <div className="px-5 py-4 bg-slate-50 border-t border-slate-200/80 flex items-center justify-end gap-2.5">
+            <div className="pt-2 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setUserToDelete(null)}
-                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-200/80 font-bold text-xs cursor-pointer transition-colors"
+                className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 font-bold text-xs"
               >
-                تراجع وإلغاء
+                تراجع
               </button>
               <button
                 type="button"
                 onClick={() => {
                   onDeleteAssistant(userToDelete.id);
-                  if (editingUser?.id === userToDelete.id) {
-                    setEditingUser(null);
-                  }
                   setUserToDelete(null);
                 }}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md shadow-rose-900/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md cursor-pointer"
               >
-                <span className="material-symbols-outlined text-base">delete</span>
-                <span>نعم، حذف الحساب فوراً</span>
+                حذف نهائي
               </button>
             </div>
           </div>

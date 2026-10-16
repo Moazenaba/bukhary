@@ -83,7 +83,7 @@ function doPost(e) {
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-800">
-            <span className="material-symbols-outlined text-2xl text-emerald-600">table_chart</span>
+            <span className="material-symbols-outlined text-2xl text-emerald-600" aria-hidden="true">table_chart</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">
               إدارة ربط قاعدة بيانات Google Sheets
             </h3>
@@ -92,7 +92,7 @@ function doPost(e) {
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -102,7 +102,7 @@ function doPost(e) {
           <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined text-xl">cloud_sync</span>
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">cloud_sync</span>
               </span>
               <div>
                 <span className="font-bold text-sm text-emerald-900 block">
@@ -120,7 +120,7 @@ function doPost(e) {
               onClick={handleManualSyncNow}
               className="px-4 py-2 bg-emerald-700 text-white font-bold rounded-xl hover:bg-emerald-800 transition-colors shadow-xs active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm">sync</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">sync</span>
               <span>مزامنة الآن</span>
             </button>
           </div>
@@ -187,7 +187,7 @@ function doPost(e) {
                 onClick={copyAppsScript}
                 className="text-[11px] text-[#005c55] font-bold hover:underline flex items-center gap-1"
               >
-                <span className="material-symbols-outlined text-xs">content_copy</span>
+                <span className="material-symbols-outlined text-xs" aria-hidden="true">content_copy</span>
                 <span>{copiedScript ? 'تم نسخ كود الربط!' : 'نسخ كود Apps Script'}</span>
               </button>
             </div>

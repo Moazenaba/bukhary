@@ -100,7 +100,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[#005c55]">
-            <span className="material-symbols-outlined text-2xl">file_download</span>
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">file_download</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">
               تصدير كشوفات لجان مسابقات مسجد البخاري
             </h3>
@@ -109,7 +109,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -130,7 +130,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               }`}
             >
               <div className="flex items-center gap-2 mb-1 text-[#005c55] font-bold text-sm">
-                <span className="material-symbols-outlined">table_view</span>
+                <span className="material-symbols-outlined" aria-hidden="true">table_view</span>
                 <span>تنزيل ملف CSV (إكسل وGoogle Sheets)</span>
               </div>
               <p className="text-[11px] text-[#6e7977]">
@@ -147,7 +147,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               }`}
             >
               <div className="flex items-center gap-2 mb-1 text-[#005c55] font-bold text-sm">
-                <span className="material-symbols-outlined">print</span>
+                <span className="material-symbols-outlined" aria-hidden="true">print</span>
                 <span>طباعة الكشف الرسمي</span>
               </div>
               <p className="text-[11px] text-[#6e7977]">
@@ -206,7 +206,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           {downloadSuccess && (
             <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">check_circle</span>
+              <span className="material-symbols-outlined text-base" aria-hidden="true">check_circle</span>
               <span>تم تنزيل كشف مسابقات مسجد البخاري بنجاح.</span>
             </div>
           )}
@@ -226,7 +226,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={handleExportCSV}
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm">download</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">download</span>
               <span>تنزيل ملف CSV الآن</span>
             </button>
           ) : (
@@ -234,7 +234,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={handlePrint}
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm">print</span>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">print</span>
               <span>فتح نافذة الطباعة</span>
             </button>
           )}

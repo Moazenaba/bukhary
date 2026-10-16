@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppUser } from '../types';
+import { AuthService } from '../services/AuthService';
 
 export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts' | 'ceremonies';
 
@@ -63,21 +64,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: 'table_chart',
           badge: 'الكشوفات',
           highlight: true,
-          visible: isSuperAdmin || perms.includes('database_sheets'),
+          visible: AuthService.canAccessTab('summer_course', currentUser),
         },
         {
           id: 'committees',
           label: 'إدارة اللجان الميدانية',
           icon: 'groups',
           badge: isSuperAdmin ? committeesCount : currentUser.assignedCommittees.length || committeesCount,
-          visible: isSuperAdmin || perms.includes('manage_committees'),
+          visible: AuthService.canAccessTab('committees', currentUser),
         },
         {
           id: 'exams',
           label: 'الامتحانات ونماذج PDF',
           icon: 'description',
           badge: examsCount,
-          visible: isSuperAdmin || perms.includes('exams_pdf'),
+          visible: AuthService.canAccessTab('exams', currentUser),
         },
       ],
     },
@@ -90,21 +91,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: 'celebration',
           badge: ceremoniesCount > 0 ? `${ceremoniesCount} حفل` : null,
           highlight: true,
-          visible: true,
+          visible: AuthService.canAccessTab('ceremonies', currentUser),
         },
         {
           id: 'calendar',
           label: 'الجدول وتقويم المواعيد',
           icon: 'calendar_month',
           badge: calendarTasksCount > 0 ? calendarTasksCount : null,
-          visible: isSuperAdmin || perms.includes('calendar_schedule'),
+          visible: AuthService.canAccessTab('calendar', currentUser),
         },
         {
           id: 'courses',
           label: 'إضافة وإدارة الدورات',
           icon: 'event_repeat',
           badge: coursesCount,
-          visible: isSuperAdmin || perms.includes('manage_courses'),
+          visible: AuthService.canAccessTab('courses', currentUser),
         },
       ],
     },
@@ -117,14 +118,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: 'badge',
           badge: pendingAssistantsCount > 0 ? `${pendingAssistantsCount} معلق` : null,
           isPendingBadge: pendingAssistantsCount > 0,
-          visible: isSuperAdmin || perms.includes('manage_assistants'),
+          visible: AuthService.canAccessTab('assistants', currentUser),
         },
         {
           id: 'stats',
           label: 'حساب ونسبة الإنجاز',
           icon: 'donut_large',
           badge: null,
-          visible: isSuperAdmin || perms.includes('progress_stats'),
+          visible: AuthService.canAccessTab('stats', currentUser),
         },
         {
           id: 'daily_alerts',
@@ -132,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: 'notifications_active',
           badge: todaysTasksCount > 0 ? `${todaysTasksCount} اليوم` : null,
           isPendingBadge: todaysTasksCount > 0,
-          visible: true,
+          visible: AuthService.canAccessTab('daily_alerts', currentUser),
         },
       ],
     },
@@ -167,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="hidden lg:flex fixed top-20 right-0 z-40 items-center gap-2 px-3 py-2.5 bg-[#005c55] hover:bg-[#004742] text-white rounded-l-2xl shadow-xl transition-all hover:pr-4 cursor-pointer font-bold text-xs border border-white/20 active:scale-95 animate-fadeIn"
           title="فتح القائمة الجانبية (Slide bar)"
         >
-          <span className="material-symbols-outlined text-lg">menu_open</span>
+          <span className="material-symbols-outlined text-lg" aria-hidden="true">menu_open</span>
           <span>القائمة الجانبية</span>
         </button>
       )}
@@ -188,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#005c55] to-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-              <span className="material-symbols-outlined text-2xl">mosque</span>
+              <span className="material-symbols-outlined text-2xl" aria-hidden="true">mosque</span>
             </div>
             <div className="overflow-hidden">
               <h1 className="font-black text-base text-slate-900 leading-tight truncate tracking-tight">
@@ -207,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="إغلاق القائمة الجانبية"
             aria-label="إغلاق القائمة الجانبية"
           >
-            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -264,11 +265,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span
-                            className={`material-symbols-outlined text-xl ${
+                          <span className={`material-symbols-outlined text-xl ${
                               isActive ? 'text-white' : 'text-slate-400 group-hover:text-[#005c55]'
                             }`}
-                          >
+                           aria-hidden="true">
                             {item.icon}
                           </span>
                           <span>{item.label}</span>
@@ -310,7 +310,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[#005c55] transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
               >
-                <span className="material-symbols-outlined text-lg">add_circle</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">add_circle</span>
                 <span>+ إضافة لجنة جديدة</span>
               </button>
             </div>
@@ -319,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* If non-admin has no granted tabs */}
           {totalVisibleCount === 0 && (
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs text-center space-y-1">
-              <span className="material-symbols-outlined text-2xl text-amber-500 block mb-1">lock</span>
+              <span className="material-symbols-outlined text-2xl text-amber-500 block mb-1" aria-hidden="true">lock</span>
               <p className="font-bold">لا توجد أقسام مفعلة لك حالياً</p>
               <p className="text-[11px] text-slate-500">يرجى مراجعة فضيلة المشرف العام لمنحك الصلاحيات المناسبة.</p>
             </div>
