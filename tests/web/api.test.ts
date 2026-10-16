@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api, onSessionExpired, tokens } from '../../src/services/api';
+import { ApiError, api, onSessionExpired, refreshTokens, tokens } from '../../src/services/api';
 
 // Replaces the network with a list of canned responses, in order.
 function mockFetch(responses: Array<{ status: number; body?: unknown }>) {
@@ -18,44 +18,75 @@ function mockFetch(responses: Array<{ status: number; body?: unknown }>) {
   return calls;
 }
 
+const headers = (init?: RequestInit) => (init?.headers ?? {}) as Record<string, string>;
+
 beforeEach(() => {
   localStorage.clear();
+  tokens.clear();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('API client', () => {
-  it('sends the access token and returns parsed JSON', async () => {
-    tokens.set('access-1', 'refresh-1');
+  it('sends the access token and the web client header, and returns parsed JSON', async () => {
+    tokens.setAccess('access-1');
     const calls = mockFetch([{ status: 200, body: { success: true, committees: [] } }]);
     const data = await api<{ committees: unknown[] }>('/committees');
     expect(data.committees).toEqual([]);
     expect(calls[0].url).toBe('/api/committees');
-    expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer access-1');
+    expect(headers(calls[0].init).Authorization).toBe('Bearer access-1');
+    expect(headers(calls[0].init)['X-Client']).toBe('web');
+    expect(calls[0].init?.credentials).toBe('same-origin');
   });
 
-  it('refreshes once after a 401 and retries the request with the new token', async () => {
-    tokens.set('old-access', 'refresh-1');
+  it('refreshes once from the cookie after a 401 and retries with the new token', async () => {
+    tokens.setAccess('old-access');
     const calls = mockFetch([
       { status: 401, body: { message: 'expired' } },
-      { status: 200, body: { token: 'new-access', refreshToken: 'refresh-2' } },
+      { status: 200, body: { token: 'new-access' } },
       { status: 200, body: { success: true, tasks: [] } },
     ]);
     const data = await api<{ tasks: unknown[] }>('/tasks');
     expect(data.tasks).toEqual([]);
     expect(calls.map((c) => c.url)).toEqual(['/api/tasks', '/api/auth/refresh', '/api/tasks']);
+    // The refresh token is never sent from script: the HttpOnly cookie carries it (WEB-11).
+    expect(JSON.parse(String(calls[1].init?.body))).toEqual({});
     expect(tokens.access).toBe('new-access');
-    expect(tokens.refresh).toBe('refresh-2');
+  });
+
+  it('never keeps tokens in localStorage', async () => {
+    mockFetch([{ status: 200, body: { token: 'fresh' } }]);
+    await refreshTokens();
+    expect(tokens.access).toBe('fresh');
+    expect(Object.keys(localStorage)).toEqual([]);
+  });
+
+  it('moves a session from an older version (refresh token in localStorage) to the cookie once', async () => {
+    localStorage.setItem('bukhari_refresh_token', 'legacy-refresh');
+    localStorage.setItem('bukhari_access_token', 'legacy-access');
+    const calls = mockFetch([{ status: 200, body: { token: 'migrated' } }]);
+    expect(await refreshTokens()).toBe(true);
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ refreshToken: 'legacy-refresh' });
+    expect(localStorage.getItem('bukhari_refresh_token')).toBeNull();
+    expect(localStorage.getItem('bukhari_access_token')).toBeNull();
+  });
+
+  it('concurrent refreshes share one request', async () => {
+    const calls = mockFetch([{ status: 200, body: { token: 'shared' } }]);
+    const [a, b] = await Promise.all([refreshTokens(), refreshTokens()]);
+    expect([a, b]).toEqual([true, true]);
+    expect(calls).toHaveLength(1);
   });
 
   it('ends the session when the refresh fails', async () => {
-    tokens.set('old-access', 'revoked');
+    tokens.setAccess('old-access');
     mockFetch([{ status: 401, body: {} }, { status: 401, body: {} }]);
     const expired = vi.fn();
     const unsubscribe = onSessionExpired(expired);
     await expect(api('/tasks')).rejects.toBeInstanceOf(ApiError);
     expect(expired).toHaveBeenCalled();
+    expect(tokens.access).toBeNull();
     unsubscribe();
   });
 

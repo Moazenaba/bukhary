@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { ExamItem } from '../types';
-import { getCurrentFormattedDateTime } from '../utils/stageUtils';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
@@ -9,7 +8,8 @@ interface AddExamModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** The PDF (if any) is uploaded separately after the exam is saved. */
-  onAddExam: (newExam: ExamItem, file?: File) => void | Promise<void>;
+  /** Resolves to true when the exam was saved; the modal stays open otherwise. */
+  onAddExam: (newExam: ExamItem, file?: File) => boolean | Promise<boolean>;
   savedBooks: string[];
 }
 
@@ -67,13 +67,14 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
       totalMarks: Number(totalMarks) || 100,
       durationMinutes: Number(durationMinutes) || 60,
       questionsCount: Number(questionsCount) || undefined,
-      uploadedAt: getCurrentFormattedDateTime(),
+      // Set by the server (WEB-01); the display format used before was rejected.
+      uploadedAt: '',
       notes: notes.trim(),
     };
     setIsSaving(true);
-    await onAddExam(newExam, pdfFile ?? undefined);
+    const saved = await onAddExam(newExam, pdfFile ?? undefined);
     setIsSaving(false);
-    onClose();
+    if (saved) onClose();
   };
 
   return (

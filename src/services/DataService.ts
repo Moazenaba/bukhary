@@ -1,4 +1,4 @@
-import { AppUser, Committee, Course, ExamItem, NotificationItem, PermissionDefinition, PermissionProfile, ScheduleTask } from '../types';
+import { AppUser, Committee, Course, ExamItem, NotificationItem, PermissionDefinition, PermissionProfile, ScheduleTask, StageKey } from '../types';
 import { SummerCourseRow } from '../types/summerCourse';
 import { api, apiResponse } from './api';
 
@@ -23,6 +23,56 @@ export interface DatabaseStatus {
   uptimeSeconds: number;
 }
 
+/**
+ * Workflow intents (server/workflow.ts). The server decides the resulting state, stamps who and
+ * when, enforces the stage order, and owns the ceremony's calendar task.
+ */
+export type CommitteeAction =
+  | { type: 'receive'; status?: 'received' | 'in_delivery'; phone?: string | null; notes?: string | null }
+  | { type: 'cancelReception' }
+  | { type: 'approveReadiness'; notes?: string | null }
+  | { type: 'revokeReadiness' }
+  | { type: 'completeStage'; stage: StageKey; notes?: string | null }
+  | { type: 'reopenStage'; stage: StageKey }
+  | { type: 'updateQuestion'; questionId: string; completed?: boolean; scorers?: string[]; score?: number | null; notes?: string | null }
+  | {
+      type: 'updateAggregation';
+      aggregatorName?: string | null;
+      scoringReviewerName?: string | null;
+      aggregationReviewerName?: string | null;
+      reviewConfirmed?: boolean;
+      date?: string | null;
+      notes?: string | null;
+    }
+  | {
+      type: 'scheduleCeremony';
+      ceremonyDate: string | null;
+      ceremonyTime?: string | null;
+      ceremonyPlace?: string | null;
+      honoredStudentsCount?: number | null;
+      attendingSheikhs?: string[];
+      notes?: string | null;
+    };
+
+export interface AssignableUser {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  user: string;
+  role: string;
+  actorId?: string;
+  action: string;
+  details: string;
+  status: string;
+  entity?: string;
+  entityId?: string;
+}
+
 export type CommitteePatch = Partial<Pick<Committee, 'scoringDetails' | 'aggregationDetails' | 'ceremonyDetails'>> & {
   stages?: Partial<Committee['stages']>;
   receivedByAssistant?: { status?: 'received' | 'in_delivery'; notes?: string } | null;
@@ -41,16 +91,21 @@ export const DataService = {
     (await api<{ committees: Committee[] }>('/committees/bulk', { method: 'POST', body: { committees } })).committees,
   patchCommittee: async (id: string, patch: CommitteePatch) =>
     (await api<{ committee: Committee }>(`/committees/${enc(id)}`, { method: 'PATCH', body: patch })).committee,
+  committeeAction: async (id: string, action: CommitteeAction, expectedUpdatedAt?: string) =>
+    (await api<{ committee: Committee }>(`/committees/${enc(id)}/actions`, { method: 'POST', body: { action, expectedUpdatedAt } })).committee,
   deleteCommittee: (id: string) => api(`/committees/${enc(id)}`, { method: 'DELETE' }),
 
   // ---- Courses ----
   getCourses: async () => (await api<{ courses: Course[] }>('/courses')).courses,
   saveCourse: async (c: Course) => (await api<{ course: Course }>('/courses', { method: 'POST', body: c })).course,
-  deleteCourse: (id: string) => api(`/courses/${enc(id)}`, { method: 'DELETE' }),
+  /** Deleting a course that has sheet rows needs `deleteSheetRows` (the server answers 409 otherwise). */
+  deleteCourse: (id: string, deleteSheetRows = false) =>
+    api(`/courses/${enc(id)}${deleteSheetRows ? '?deleteSheetRows=true' : ''}`, { method: 'DELETE' }),
 
   // ---- Exams ----
   getExams: async () => (await api<{ exams: ExamItem[] }>('/exams')).exams,
-  saveExam: async (e: ExamItem) => (await api<{ exam: ExamItem }>('/exams', { method: 'POST', body: e })).exam,
+  /** The upload time is set by the server; it is never sent (WEB-01). */
+  saveExam: async ({ uploadedAt: _ignored, ...e }: ExamItem) => (await api<{ exam: ExamItem }>('/exams', { method: 'POST', body: e })).exam,
   uploadExamFile: (id: string, file: Blob, fileName: string) =>
     api(`/exams/${enc(id)}/file`, { method: 'PUT', raw: file, contentType: 'application/pdf', headers: { 'X-File-Name': enc(fileName) } }),
   /** Downloads the PDF (allowed roles only) and returns an object URL for viewing. */
@@ -78,6 +133,10 @@ export const DataService = {
   saveUser: async (u: Partial<AppUser> & { password?: string }) =>
     (await api<{ user: AppUser }>('/users', { method: 'POST', body: { ...u, expectedUpdatedAt: u.updatedAt } })).user,
   deleteUser: (id: string) => api(`/users/${enc(id)}`, { method: 'DELETE' }),
+  /** Super admin only. The user must choose a new password at the next login. */
+  resetUserPassword: (id: string, password: string) => api(`/users/${enc(id)}/reset-password`, { method: 'POST', body: { password } }),
+  /** People the current user may assign tasks to (id and name only). */
+  getAssignableUsers: async () => (await api<{ users: AssignableUser[] }>('/users/assignable')).users,
 
   // ---- Shared settings ----
   getBooks: async () => (await api<{ books: Book[] }>('/books')).books,
@@ -95,9 +154,19 @@ export const DataService = {
   getNotifications: async () => (await api<{ notifications: NotificationItem[] }>('/notifications')).notifications,
   markNotificationRead: (id: string) => api(`/notifications/${enc(id)}/read`, { method: 'PATCH' }),
   markAllNotificationsRead: () => api('/notifications/read-all', { method: 'POST' }),
+  /** Super admin: a notification for everyone, or for one committee's people. */
+  createNotification: (n: { title: string; description: string; type: NotificationItem['type']; committeeId?: string | null }) =>
+    api('/notifications', { method: 'POST', body: n }),
 
   // ---- Admin ----
-  getAuditLogs: async () => (await api<{ logs: any[] }>('/audit-logs')).logs,
+  getAuditLogs: async (q: { limit?: number; before?: string; entity?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (q.limit) params.set('limit', String(q.limit));
+    if (q.before) params.set('before', q.before);
+    if (q.entity) params.set('entity', q.entity);
+    const qs = params.toString();
+    return (await api<{ logs: AuditLogEntry[] }>(`/audit-logs${qs ? `?${qs}` : ''}`)).logs;
+  },
   getDatabaseStatus: () => api<DatabaseStatus>('/database/status'),
   extractTable: async (imageBase64: string, mimeType: string) =>
     (await api<{ data: { rows: any[] } }>('/extract-table', { method: 'POST', body: { imageBase64, mimeType } })).data,

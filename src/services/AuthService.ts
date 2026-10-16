@@ -1,16 +1,31 @@
 import { useEffect, useState } from 'react';
-import { AppUser, AssistantPermission, PermissionProfile, UserRole } from '../types';
-import { ApiError, api, onSessionExpired, tokens } from './api';
+import { AppUser, AssistantPermission, Committee, PermissionProfile, UserRole } from '../types';
+import { ApiError, api, onSessionExpired, refreshTokens, tokens } from './api';
 import { DataService } from './DataService';
 
-// Session and permissions come only from the server (GET /api/auth/me). Nothing about
-// the user, their role or other users is read from localStorage; only the two session
-// tokens are stored there.
+// Session and permissions come only from the server (GET /api/auth/me). Nothing about the user,
+// their role or other users is stored in the browser; the refresh token is an HttpOnly cookie.
 
 export interface ServerPermissions {
   role: UserRole;
   actions: Record<string, boolean>;
-  committeeScope: number[] | 'all';
+  /** Committee ids in scope, or 'all'. */
+  committeeScope: string[] | 'all';
+  committeeNumbers?: number[] | 'all';
+  /** Exam ids whose file and content the user may open, or 'all'. */
+  exams?: string[] | 'all';
+  mustChangePassword?: boolean;
+}
+
+/** Access changes a super admin makes when approving or editing someone; only changed fields are sent. */
+export interface AccessChanges {
+  role?: UserRole;
+  permissions?: AssistantPermission[];
+  assignedCommitteeIds?: string[];
+  allCommitteesAllowed?: boolean;
+  allExamsAllowed?: boolean;
+  allowedExamIds?: string[];
+  profileId?: string | null;
 }
 
 /** Keys from older versions that held users, passwords and cached data; removed on load and logout. */
@@ -52,15 +67,13 @@ class AuthServiceClass {
     onSessionExpired(() => this.reset());
   }
 
-  /** Restores the session from the stored tokens (once). */
+  /** Restores the session from the refresh cookie (once per page load). */
   public init(): Promise<void> {
     this.initPromise ??= (async () => {
-      if (tokens.access || tokens.refresh) {
-        try {
-          await this.loadMe();
-        } catch {
-          this.reset();
-        }
+      try {
+        if (tokens.access || (await refreshTokens())) await this.loadMe();
+      } catch {
+        this.reset();
       }
       this.ready = true;
       this.notify();
@@ -69,10 +82,11 @@ class AuthServiceClass {
   }
 
   private async loadMe() {
-    const me = await api<{ user: AppUser; permissions: ServerPermissions }>('/auth/me');
-    this.currentUser = me.user;
+    const me = await api<{ user: AppUser; permissions: ServerPermissions; mustChangePassword?: boolean }>('/auth/me');
+    this.currentUser = { ...me.user, mustChangePassword: Boolean(me.mustChangePassword ?? me.user.mustChangePassword) };
     this.permissions = me.permissions;
-    await this.refreshDirectory();
+    // Until a reset password is replaced, the server answers nothing else.
+    if (!this.currentUser.mustChangePassword) await this.refreshDirectory();
     this.notify();
   }
 
@@ -81,6 +95,16 @@ class AuthServiceClass {
     this.users = this.can('users.read') ? await DataService.getUsers() : this.currentUser ? [this.currentUser] : [];
     this.profiles = this.can('profiles.read') ? await DataService.getProfiles() : [];
     this.notify();
+  }
+
+  /** Whether the user must replace a password an admin reset before using the app. */
+  public mustChangePassword = () => Boolean(this.currentUser?.mustChangePassword);
+
+  /** Changes the own password; the server ends other sessions and returns a new access token. */
+  public async changePassword(currentPassword: string, newPassword: string) {
+    const data = await api<{ token: string }>('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } });
+    tokens.setAccess(data.token);
+    await this.loadMe();
   }
 
   private reset() {
@@ -116,12 +140,12 @@ class AuthServiceClass {
 
   public async login(identifier: string, password: string): Promise<{ success: boolean; user?: AppUser; error?: string }> {
     try {
-      const data = await api<{ token: string; refreshToken: string; user: AppUser }>('/auth/login', {
+      const data = await api<{ token: string; user: AppUser }>('/auth/login', {
         method: 'POST',
         body: { identifier: identifier.trim(), password },
         auth: false,
       });
-      tokens.set(data.token, data.refreshToken);
+      tokens.setAccess(data.token);
       await this.loadMe();
       return { success: true, user: this.currentUser ?? data.user };
     } catch (err) {
@@ -132,10 +156,11 @@ class AuthServiceClass {
     }
   }
 
+  /** Ends the session on the server (the access token stops working at once) and clears the cookie. */
   public async logout() {
-    const refreshToken = tokens.refresh;
+    const access = tokens.access;
+    await api('/auth/logout', { method: 'POST', body: {}, auth: false, headers: access ? { Authorization: `Bearer ${access}` } : {} }).catch(() => {});
     this.reset();
-    if (refreshToken) await api('/auth/logout', { method: 'POST', body: { refreshToken }, auth: false }).catch(() => {});
   }
 
   /** Public join request (no session). Returns the server-generated tracking code. */
@@ -184,25 +209,45 @@ class AuthServiceClass {
     return u;
   }
 
-  /** Staff-created account; the person logs in with `password`. */
+  /**
+   * One request per change, built from the identity fields plus only what changed, with the version
+   * the screen showed (WEB-03). Access fields that did not change are never re-sent, so a manager
+   * who may not grant permissions can still edit an assistant (WEB-05, WEB-14).
+   */
+  private changeUser(userId: string, changes: Partial<AppUser>) {
+    const u = this.findUser(userId);
+    return this.saveUser({ id: u.id, name: u.name, phone: u.phone, email: u.email, updatedAt: u.updatedAt, ...changes });
+  }
+
+  /** Staff-created account; the person logs in with `password` and must change it at first login. */
   public createUser(data: Omit<AppUser, 'id' | 'createdAt'> & { password: string }) {
     return this.saveUser({ ...data, id: `usr_${crypto.randomUUID()}` });
   }
 
-  public updateUser(user: AppUser & { password?: string }) {
-    return this.saveUser(user);
+  /** Saves profile fields and, if given, access changes, in one request. */
+  public updateUser(user: AppUser & { password?: string }, access: AccessChanges = {}) {
+    const { assignedCommittees: _n, assignedCommitteeIds: _i, permissions: _p, allCommitteesAllowed: _a, allExamsAllowed: _e,
+      allowedExamIds: _x, profileId: _f, role: _r, status: _s, mustChangePassword: _m, password: _pw, ...profile } = user;
+    return this.changeUser(user.id, { ...profile, ...access });
   }
 
-  public approveUser(userId: string, permissions: AssistantPermission[], assignedCommittees: number[], role: UserRole = 'assistant') {
-    return this.saveUser({ ...this.findUser(userId), role, status: 'approved', permissions, assignedCommittees });
+  /** Approval and any profile or access settings are one request (WEB-03). */
+  public approveUser(userId: string, access: AccessChanges = {}) {
+    return this.changeUser(userId, { status: 'approved', ...access });
   }
 
   public scheduleInterview(userId: string, interviewDate: string, interviewNotes?: string) {
-    return this.saveUser({ ...this.findUser(userId), status: 'interview', interviewDate, interviewNotes });
+    return this.changeUser(userId, { status: 'interview', interviewDate, interviewNotes });
   }
 
   public rejectUser(userId: string, reason?: string) {
-    return this.saveUser({ ...this.findUser(userId), status: 'rejected', rejectionReason: reason });
+    return this.changeUser(userId, { status: 'rejected', rejectionReason: reason });
+  }
+
+  /** Super admin: sets a temporary password the user must replace at the next login (WEB-02). */
+  public async resetPassword(userId: string, temporaryPassword: string) {
+    await DataService.resetUserPassword(userId, temporaryPassword);
+    await this.refreshDirectory();
   }
 
   public async deleteUser(userId: string) {
@@ -228,23 +273,16 @@ class AuthServiceClass {
     return this.profiles.find((p) => p.id === profileId);
   }
 
+  /** The server copies the profile's permissions, committees and exam access (super admin only). */
   public async assignProfileToUser(userId: string, profileId: string) {
-    const profile = this.getProfileById(profileId);
-    if (!profile) throw new ApiError('البروفايل غير موجود', 404);
-    return this.saveUser({
-      ...this.findUser(userId),
-      profileId,
-      permissions: profile.permissions,
-      assignedCommittees: profile.allCommitteesAllowed ? [] : profile.allowedCommittees,
-      allCommitteesAllowed: profile.allCommitteesAllowed,
-      allowedExamIds: profile.allowedExamIds,
-      allExamsAllowed: profile.allExamsAllowed,
-    });
+    if (!this.getProfileById(profileId)) throw new ApiError('البروفايل غير موجود', 404);
+    return this.changeUser(userId, { profileId });
   }
 
-  public async setSuperAdmin(userId: string, makeSuper: boolean): Promise<{ success: boolean; message: string }> {
+  /** Promotes to super admin, or demotes to the role the super admin chose (WEB-14). */
+  public async setSuperAdmin(userId: string, makeSuper: boolean, demoteTo: UserRole = 'assistant'): Promise<{ success: boolean; message: string }> {
     try {
-      await this.saveUser({ ...this.findUser(userId), role: makeSuper ? 'super_admin' : 'assistant' });
+      await this.changeUser(userId, { role: makeSuper ? 'super_admin' : demoteTo });
       return { success: true, message: 'تم تحديث الرتبة بنجاح.' };
     } catch (err) {
       return { success: false, message: err instanceof ApiError ? err.message : 'تعذر تحديث الرتبة' };
@@ -262,79 +300,64 @@ class AuthServiceClass {
     return this.currentUser.permissions.includes(permission);
   }
 
-  /** Tab visibility: the server's read rights, narrowed by the user's permission profile. */
-  public canAccessTab(tab: string, user?: AppUser): boolean {
-    const target = user || this.currentUser;
-    if (!target) return false;
-    if (target.role === 'super_admin') return true;
-    if (target.profileId) {
-      const profile = this.getProfileById(target.profileId);
-      if (profile && Array.isArray(profile.allowedTabs) && !profile.allowedTabs.includes(tab) && tab !== 'home') return false;
-    }
-    const perms = target.permissions || [];
+  /**
+   * Which screens to show, from the server's evaluated actions only (WEB-22). Hiding a screen is a
+   * convenience, not a security boundary: the server checks every request.
+   */
+  public canAccessTab(tab: string, _user?: AppUser): boolean {
+    if (!this.currentUser) return false;
     switch (tab) {
       case 'home':
       case 'ceremonies':
       case 'daily_alerts':
+      case 'committees':
         return true;
       case 'summer_course':
-        return perms.includes('database_sheets') || target.role === 'auditor';
-      case 'committees':
-        return perms.includes('manage_committees') || ['assistant', 'teacher', 'auditor'].includes(target.role);
+        return this.can('summerRows.write') || this.can('audit.read');
       case 'exams':
-        return perms.includes('exams_pdf');
+        return this.can('exams.write') || this.can('exams.file');
       case 'calendar':
-        return perms.includes('calendar_schedule') || target.role === 'assistant';
+        return this.can('tasks.write') || this.currentUser.role === 'assistant';
       case 'stats':
-        return perms.includes('progress_stats') || target.role === 'auditor';
+        return this.can('stats.read');
       case 'assistants':
-        return target.id === this.currentUser?.id ? this.can('users.read') : perms.includes('manage_assistants');
+        return this.can('users.read');
       case 'courses':
-        return perms.includes('manage_courses');
+        return this.can('courses.write');
+      case 'audit':
+        return this.can('audit.read');
       default:
         return false;
     }
   }
 
-  /** Whether the user may change this committee (server rule: heads/assistants only their assigned ones). */
-  public canAccessCommittee(committeeNumber: number, user?: AppUser): boolean {
-    const target = user || this.currentUser;
-    if (!target) return false;
-    if (target.role !== 'committee_head' && target.role !== 'assistant') return true;
-    return target.assignedCommittees?.includes(committeeNumber) || false;
+  /** Whether the committee is in the current user's scope (server rule, by committee id). */
+  public canAccessCommittee(committee: Pick<Committee, 'id'> | string): boolean {
+    const scope = this.permissions?.committeeScope;
+    if (!scope) return false;
+    if (scope === 'all') return true;
+    return scope.includes(typeof committee === 'string' ? committee : committee.id);
   }
 
-  public canAccessExam(examId: string, user?: AppUser): boolean {
-    const target = user || this.currentUser;
-    if (!target) return false;
-    if (target.role === 'super_admin' || target.allExamsAllowed) return true;
-    if (target.profileId) {
-      const profile = this.getProfileById(target.profileId);
-      if (profile?.allExamsAllowed) return true;
-      if (profile && !profile.allowedExamIds?.includes(examId)) return false;
-    }
-    return target.allowedExamIds ? target.allowedExamIds.includes(examId) : this.hasPermission('exams_pdf');
+  /** `action` is allowed and the committee is in scope: what the server will accept. */
+  public canOnCommittee(action: string, committee: Pick<Committee, 'id'> | string): boolean {
+    return this.can(action) && this.canAccessCommittee(committee);
   }
 
-  public getUserAllowedCommittees(user?: AppUser, allComms: number[] = []): number[] {
-    const target = user || this.currentUser;
-    if (!target) return [];
-    if (target.role !== 'committee_head' && target.role !== 'assistant') return allComms;
-    return target.assignedCommittees || [];
+  /** Whether the user may open this exam's file and content (server-evaluated allow-list). */
+  public canAccessExam(examId: string, _user?: AppUser): boolean {
+    if (!this.can('exams.file')) return false;
+    const exams = this.permissions?.exams;
+    return exams === undefined || exams === 'all' || exams.includes(examId);
   }
 
-  public canAccessDatabaseSheets = () => this.hasPermission('database_sheets');
-  public canAccessCommittees = () => this.hasPermission('manage_committees');
   public canAddCommittee = () => this.can('committees.create');
   public canDeleteCommittee = () => this.can('committees.delete');
-  public canAccessExams = () => this.hasPermission('exams_pdf');
   public canAddExam = () => this.can('exams.write');
-  public canAccessCourses = () => this.hasPermission('manage_courses');
   public canAddCourse = () => this.can('courses.write');
-  public canAccessCalendar = () => this.hasPermission('calendar_schedule');
-  public canAccessStats = () => this.hasPermission('progress_stats');
   public canAccessAssistants = () => this.can('users.read');
   public canManageUsers = () => this.can('users.manage');
+  public canGrant = () => this.can('users.grant');
 
   public getRoleLabel(role?: UserRole): string {
     switch (role || this.currentUser?.role) {
@@ -382,21 +405,25 @@ export function useAuth() {
     submitJoinRequest: (u: Partial<AppUser> & { password?: string }) => AuthService.submitJoinRequest(u),
     trackJoinRequest: (code: string) => AuthService.trackJoinRequest(code),
     createUser: (d: Omit<AppUser, 'id' | 'createdAt'> & { password: string }) => AuthService.createUser(d),
-    updateUser: (u: AppUser) => AuthService.updateUser(u),
-    approveUser: (id: string, p: AssistantPermission[], c: number[], r?: UserRole) => AuthService.approveUser(id, p, c, r),
+    updateUser: (u: AppUser, access?: AccessChanges) => AuthService.updateUser(u, access),
+    approveUser: (id: string, access?: AccessChanges) => AuthService.approveUser(id, access),
+    resetPassword: (id: string, temporaryPassword: string) => AuthService.resetPassword(id, temporaryPassword),
+    changePassword: (current: string, next: string) => AuthService.changePassword(current, next),
+    mustChangePassword: AuthService.mustChangePassword(),
     scheduleInterview: (id: string, date: string, notes?: string) => AuthService.scheduleInterview(id, date, notes),
     rejectUser: (id: string, reason?: string) => AuthService.rejectUser(id, reason),
     deleteUser: (id: string) => AuthService.deleteUser(id),
     saveProfile: (p: PermissionProfile) => AuthService.saveProfile(p),
     deleteProfile: (id: string) => AuthService.deleteProfile(id),
     assignProfileToUser: (uId: string, pId: string) => AuthService.assignProfileToUser(uId, pId),
-    setSuperAdmin: (uId: string, isSuper: boolean) => AuthService.setSuperAdmin(uId, isSuper),
+    setSuperAdmin: (uId: string, isSuper: boolean, demoteTo?: UserRole) => AuthService.setSuperAdmin(uId, isSuper, demoteTo),
     refreshDirectory: () => AuthService.refreshDirectory(),
     getProfileById: (pId: string) => AuthService.getProfileById(pId),
     canAccessTab: (tab: string, user?: AppUser) => AuthService.canAccessTab(tab, user),
-    canAccessCommittee: (commNum: number, user?: AppUser) => AuthService.canAccessCommittee(commNum, user),
-    canAccessExam: (examId: string, user?: AppUser) => AuthService.canAccessExam(examId, user),
-    getUserAllowedCommittees: (user?: AppUser, allComms?: number[]) => AuthService.getUserAllowedCommittees(user, allComms),
+    canAccessCommittee: (committee: Pick<Committee, 'id'> | string) => AuthService.canAccessCommittee(committee),
+    canOnCommittee: (action: string, committee: Pick<Committee, 'id'> | string) => AuthService.canOnCommittee(action, committee),
+    canAccessExam: (examId: string) => AuthService.canAccessExam(examId),
+    canGrant: AuthService.canGrant(),
     isSuperAdmin: AuthService.isSuperAdmin(),
     isCommitteeHead: AuthService.isCommitteeHead(),
     isTeacher: AuthService.isTeacher(),

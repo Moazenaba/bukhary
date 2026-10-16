@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { todayISO } from '../utils/stageUtils';
 import { Committee, ScheduleTask, AppUser, StageKey } from '../types';
+import { AuthService } from '../services/AuthService';
 
 interface CeremoniesViewProps {
   committees: Committee[];
@@ -16,9 +17,9 @@ interface CeremoniesViewProps {
       completed: boolean;
       honoredCount?: number;
     }
-  ) => void;
+  ) => unknown;
   onToggleCommitteeStage: (committeeId: string, stageKey: StageKey) => void;
-  onAddTask: (task: Omit<ScheduleTask, 'id'>) => void;
+  onAddTask: (task: Omit<ScheduleTask, 'id'>) => unknown;
   onDeleteTask: (taskId: string) => void;
   onToggleTaskComplete: (taskId: string) => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
@@ -85,7 +86,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   const [ceremonyPlace, setCeremonyPlace] = useState('');
   const [honoredCount, setHonoredCount] = useState<number>(0);
   const [ceremonyNotes, setCeremonyNotes] = useState('');
-  const [sendToDailyAlerts, setSendToDailyAlerts] = useState(true);
+
 
   // Certificate / Honor Roll Print Modal
   const [honorRollCommittee, setHonorRollCommittee] = useState<Committee | null>(null);
@@ -99,12 +100,10 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
     return Array.from(set);
   }, [committees]);
 
-  // Find linked ceremony task for a committee
-  const getLinkedCeremonyTask = (committeeNumber: number) => {
-    return scheduleTasks.find(
-      (t) => t.type === 'ceremony' && t.committeeNumber === committeeNumber
-    );
-  };
+  // The ceremony's calendar task is created and kept in step by the server, one per committee id.
+  const getLinkedCeremonyTask = (committee: Committee) =>
+    scheduleTasks.find((t) => t.id === `task-ceremony-${committee.id}`) ??
+    scheduleTasks.find((t) => t.type === 'ceremony' && t.committeeId === committee.id);
 
   // Select day handler
   const handleSelectDayName = (day: string) => {
@@ -123,7 +122,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   // Open Schedule Modal for a specific committee
   const handleOpenScheduleModal = (comm: Committee) => {
     setTargetCommittee(comm);
-    const existingTask = getLinkedCeremonyTask(comm.committeeNumber);
+    const existingTask = getLinkedCeremonyTask(comm);
     if (existingTask) {
       const d = existingTask.date || todayISO();
       setCeremonyDate(d);
@@ -141,15 +140,11 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
     setIsScheduleModalOpen(true);
   };
 
-  // Save Ceremony Schedule & Sync to Database + Daily Alerts + Calendar
-  const handleSaveCeremonySchedule = (e: React.FormEvent) => {
+  // Saves the ceremony on the committee. The server creates or moves its single calendar task (WEB-08).
+  const handleSaveCeremonySchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetCommittee) return;
-
-    const commNum = targetCommittee.committeeNumber;
-
-    // 1. Update committee ceremony info
-    onUpdateCommitteeCeremony(targetCommittee.id, {
+    const ok = await onUpdateCommitteeCeremony(targetCommittee.id, {
       date: ceremonyDate,
       time: ceremonyTime,
       place: ceremonyPlace,
@@ -157,51 +152,22 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
       completed: targetCommittee.stages.ceremony?.completed || false,
       honoredCount: Number(honoredCount) || undefined,
     });
-
-    // 2. Sync to Daily Alerts & Calendar schedule tasks if requested
-    if (sendToDailyAlerts) {
-      const existingTask = getLinkedCeremonyTask(commNum);
-      if (existingTask) {
-        // Delete old task first then re-add updated
-        onDeleteTask(existingTask.id);
-      }
-
-      onAddTask({
-        title: `🎉 حفل تكريم وتتويج لجنة #${commNum} (${targetCommittee.competitionBook}) - يوم ${ceremonyDayName}`,
-        date: ceremonyDate,
-        time: ceremonyTime,
-        deliverable: `يوم (${ceremonyDayName} ${ceremonyDate}): تسليم شهادات التقدير والدروع التكريمية لـ (${honoredCount}) طالب${targetCommittee.sheikhName ? ` والمشرف: ${targetCommittee.sheikhName}` : ''}`,
-        committeeNumber: commNum,
-        committeeId: targetCommittee.id,
-        priority: 'urgent',
-        type: 'ceremony',
-        assignedAssistantName: currentUser.name,
-        notes: `مكان الحفل: ${ceremonyPlace} • اليوم: ${ceremonyDayName}. ${ceremonyNotes}`.trim(),
-        completed: targetCommittee.stages.ceremony?.completed || false,
-      });
-    }
-
+    if (ok === false) return;
     setIsScheduleModalOpen(false);
     setTargetCommittee(null);
   };
 
-  // Toggle Ceremony Completion (Marks stage as completed in committee & in calendar tasks)
+  // Completing the ceremony stage also completes its calendar task on the server.
   const handleToggleCeremonyComplete = (comm: Committee) => {
-    const isCurrentlyDone = comm.stages.ceremony?.completed;
+    if (!AuthService.canOnCommittee('committees.finalize', comm)) return;
     onToggleCommitteeStage(comm.id, 'ceremony');
-
-    // Also toggle the linked schedule task if found
-    const linkedTask = getLinkedCeremonyTask(comm.committeeNumber);
-    if (linkedTask && linkedTask.completed === isCurrentlyDone) {
-      onToggleTaskComplete(linkedTask.id);
-    }
   };
 
   // Filtered Committees
   const filteredCommittees = useMemo(() => {
     return committees.filter((comm) => {
       const isCeremonyDone = comm.stages.ceremony?.completed;
-      const linkedTask = getLinkedCeremonyTask(comm.committeeNumber);
+      const linkedTask = getLinkedCeremonyTask(comm);
       const todayIso = todayISO();
       const isTodayCeremony = linkedTask?.date === todayIso;
       const isScheduled = !!linkedTask?.date;
@@ -237,12 +203,12 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   const completedCeremoniesCount = committees.filter((c) => c.stages.ceremony?.completed).length;
   const scheduledUpcomingCount = committees.filter((c) => {
     if (c.stages.ceremony?.completed) return false;
-    const task = getLinkedCeremonyTask(c.committeeNumber);
+    const task = getLinkedCeremonyTask(c);
     return !!task?.date;
   }).length;
   const todayIso = todayISO();
   const todayCeremoniesCount = committees.filter((c) => {
-    const task = getLinkedCeremonyTask(c.committeeNumber);
+    const task = getLinkedCeremonyTask(c);
     return task?.date === todayIso;
   }).length;
   const totalStudentsHonored = committees
@@ -447,7 +413,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
         ) : (
           filteredCommittees.map((comm) => {
             const isCompleted = comm.stages.ceremony?.completed;
-            const linkedTask = getLinkedCeremonyTask(comm.committeeNumber);
+            const linkedTask = getLinkedCeremonyTask(comm);
             const todayIso = todayISO();
             const isToday = linkedTask?.date === todayIso;
             const hasSchedule = !!linkedTask?.date;
@@ -563,6 +529,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                     <button
                       type="button"
                       onClick={() => handleToggleCeremonyComplete(comm)}
+                      disabled={!AuthService.canOnCommittee('committees.finalize', comm)}
                       className={`w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-95 ${
                         isCompleted
                           ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
@@ -747,19 +714,9 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                 />
               </div>
 
-              {/* Checkbox to sync with Daily Alerts and Calendar */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5">
-                <input
-                  type="checkbox"
-                  id="syncDaily"
-                  checked={sendToDailyAlerts}
-                  onChange={(e) => setSendToDailyAlerts(e.target.checked)}
-                  className="w-4 h-4 rounded text-brand focus:ring-0 cursor-pointer"
-                />
-                <label htmlFor="syncDaily" className="text-emerald-950 font-bold cursor-pointer text-xs">
-                  ✅ إدراج الموعد تلقائياً في <strong>التنبيهات والمهام اليومية</strong> و<strong>تقويم المواعيد</strong> ليوم ({ceremonyDate})
-                </label>
-              </div>
+              <p className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-950 font-bold text-xs">
+                يظهر الموعد تلقائياً في التنبيهات اليومية وتقويم المواعيد ليوم ({ceremonyDate}).
+              </p>
 
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button

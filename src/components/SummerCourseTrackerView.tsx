@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { DATA_ROOT_KEY } from '../data/queries';
 import { todayISO } from '../utils/stageUtils';
 import {
   Sparkles,
@@ -36,6 +38,8 @@ import {
   X,
 } from 'lucide-react';
 import { SummerCourseRow, CourseFilterStatus, SummerCourseStats } from '../types/summerCourse';
+
+const NO_ROWS: SummerCourseRow[] = [];
 import { Committee, StageKey, Course, AppUser } from '../types';
 import { mergeRowsWithCommittees, ROW_STAGE } from '../utils/committeeSync';
 import { MergeConfirmModal } from './MergeConfirmModal';
@@ -71,26 +75,21 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   onNavigateToCommittees,
   onOpenCommitteeDetails,
 }) => {
-  // Saved rows come from the server; what is displayed merges them with the committees.
-  const [savedRows, setSavedRows] = useState<SummerCourseRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Saved rows live in the query cache like every other server list, so they refresh with the rest
+  // of the data and other users' edits show up (WEB-15). What is displayed merges them with committees.
+  const queryClient = useQueryClient();
+  const rowsKey = [...DATA_ROOT_KEY, 'summerRows', currentUser?.id] as const;
+  const rowsQuery = useQuery({ queryKey: rowsKey, queryFn: () => DataService.getSummerCourseRows() });
+  const savedRows = rowsQuery.data ?? NO_ROWS;
+  const isLoading = rowsQuery.isLoading;
+  const setSavedRows = (update: SummerCourseRow[] | ((prev: SummerCourseRow[]) => SummerCourseRow[])) =>
+    queryClient.setQueryData<SummerCourseRow[]>(rowsKey, (prev) => (typeof update === 'function' ? update(prev ?? []) : update));
+  const loadRows = () => rowsQuery.refetch();
+  useEffect(() => {
+    if (rowsQuery.error) toast.error(errorMessage(rowsQuery.error));
+  }, [rowsQuery.error]);
   const rows = useMemo(() => mergeRowsWithCommittees(savedRows, committees), [savedRows, committees]);
   const canEdit = AuthService.can('summerRows.write');
-
-  const loadRows = async () => {
-    setIsLoading(true);
-    try {
-      setSavedRows(await DataService.getSummerCourseRows());
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadRows();
-  }, []);
 
   const upsertSaved = (row: SummerCourseRow) =>
     setSavedRows((prev) => (prev.some((r) => r.id === row.id) ? prev.map((r) => (r.id === row.id ? row : r)) : [...prev, row]));
@@ -456,7 +455,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       members: [],
       generalNotes: newRowNotes.trim(),
       stages: {
-        registration: { completed: true, completedAt: now.toLocaleDateString('ar-EG') },
+        registration: { completed: true, completedAt: now.toISOString() },
         exam: { completed: newRowDelivered },
         scoring: { completed: newRowCorrected },
         aggregation: { completed: false },
@@ -467,7 +466,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
         ceremony: { completed: newRowCeremony },
       },
       createdDate: todayISO(now),
-      createdAtTime: now.toLocaleTimeString('ar-EG'),
+      createdAtTime: now.toISOString().slice(11, 16),
     });
     if (created) setIsAddRowModalOpen(false);
   };
@@ -525,7 +524,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       members: [],
       generalNotes: '',
       stages: {
-        registration: { completed: true, completedAt: now.toLocaleDateString('ar-EG') },
+        registration: { completed: true, completedAt: now.toISOString() },
         exam: { completed: false },
         scoring: { completed: false },
         aggregation: { completed: false },
@@ -536,7 +535,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
         ceremony: { completed: false },
       },
       createdDate: todayISO(now),
-      createdAtTime: now.toLocaleTimeString('ar-EG'),
+      createdAtTime: now.toISOString().slice(11, 16),
     });
   };
 
@@ -1139,10 +1138,10 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               <FileSpreadsheet className="w-8 h-8" />
             </div>
             <h4 className="text-xl font-bold text-slate-800 mb-2">
-              قاعدة البيانات فارغة وعلى الزيرو (0 صفوف)
+              لا توجد صفوف في الكشف بعد
             </h4>
             <p className="text-sm text-slate-500 max-w-md mx-auto mb-6 leading-relaxed">
-              تم تصفير كافة الصفوف التجريبية بنجاح. الجدول جاهز الآن بالكامل لإدخال بياناتك الحقيقية الجديدة، سواء بإضافة صفوف مباشرة أو استيراد ملف إكسيل.
+              أضف الصفوف مباشرة أو استورد ملف إكسيل. اللجان المسجلة تظهر هنا تلقائياً.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <button

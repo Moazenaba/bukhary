@@ -1,3 +1,4 @@
+import { AuthService } from '../services/AuthService';
 import React from 'react';
 import { Committee, STAGES_LIST, AppUser, Course, ScheduleTask } from '../types';
 import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
@@ -37,9 +38,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   // Today's tasks for quick overview
   const todayIso = todayISO();
   const todayTasks = scheduleTasks.filter((t) => t.date === todayIso);
-  const myAssignedCommittees = committees.filter((c) =>
-    currentUser.assignedCommittees.includes(c.committeeNumber)
-  );
+  // Committees assigned to this user, by id (the server's scope).
+  const scope = AuthService.getPermissions()?.committeeScope;
+  const myAssignedCommittees = Array.isArray(scope) ? committees.filter((c) => scope.includes(c.id)) : [];
 
   return (
     <div className="space-y-6 text-right">

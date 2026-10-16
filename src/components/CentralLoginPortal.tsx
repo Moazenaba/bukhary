@@ -920,8 +920,8 @@ export const CentralLoginPortal: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-slate-700 leading-relaxed">
-              تواصل مع المشرف العام ليعيد تعيين كلمة المرور لحسابك من شاشة «المعاونون والصلاحيات»، ثم سجّل الدخول بالكلمة الجديدة
-              وغيّرها من إعدادات حسابك.
+              تواصل مع المشرف العام. يعيد تعيين كلمة المرور من شاشة «المعاونون والصلاحيات» ← تعديل حسابك ← «إعادة تعيين كلمة
+              المرور»، ويعطيك كلمة مؤقتة. سجّل الدخول بها، وسيطلب منك النظام اختيار كلمة مرور جديدة قبل المتابعة.
             </p>
             <div className="flex justify-end">
               <button type="button" onClick={() => setShowForgotPassword(false)} className="px-4 py-2 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer">

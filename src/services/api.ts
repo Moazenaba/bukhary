@@ -1,9 +1,15 @@
 // Single HTTP client for the API. Every call either returns the parsed body or throws
-// ApiError with a message that is safe to show; nothing is swallowed. Access tokens are
-// refreshed once automatically; when that fails the session-expired listeners run.
+// ApiError with a message that is safe to show; nothing is swallowed.
+//
+// Session storage (WEB-11): the refresh token lives only in an HttpOnly cookie that page scripts
+// cannot read, so an XSS bug cannot steal a 30-day session. The short-lived access token is kept
+// in memory; a page load gets a fresh one from the cookie. Tabs share the cookie and refresh one
+// at a time (Web Locks), so a refresh in one tab never signs the others out.
 
-const ACCESS_KEY = 'bukhari_access_token';
-const REFRESH_KEY = 'bukhari_refresh_token';
+/** Tokens from older versions, which kept both tokens in localStorage. Migrated once, then removed. */
+const LEGACY_ACCESS_KEY = 'bukhari_access_token';
+const LEGACY_REFRESH_KEY = 'bukhari_refresh_token';
+const REFRESH_LOCK = 'bukhari-refresh';
 
 export class ApiError extends Error {
   constructor(
@@ -22,7 +28,9 @@ export function onSessionExpired(listener: Listener): () => void {
   return () => expiredListeners.delete(listener);
 }
 
-function read(key: string): string | null {
+let accessToken: string | null = null;
+
+function readLegacy(key: string): string | null {
   try {
     return localStorage.getItem(key);
   } catch {
@@ -30,45 +38,66 @@ function read(key: string): string | null {
   }
 }
 
+function removeLegacy() {
+  try {
+    localStorage.removeItem(LEGACY_ACCESS_KEY);
+    localStorage.removeItem(LEGACY_REFRESH_KEY);
+  } catch {
+    // storage unavailable
+  }
+}
+
 export const tokens = {
   get access() {
-    return read(ACCESS_KEY);
+    return accessToken;
   },
-  get refresh() {
-    return read(REFRESH_KEY);
-  },
-  set(access: string, refresh: string) {
-    localStorage.setItem(ACCESS_KEY, access);
-    localStorage.setItem(REFRESH_KEY, refresh);
+  setAccess(token: string) {
+    accessToken = token;
   },
   clear() {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
+    accessToken = null;
+    removeLegacy();
   },
 };
 
+/** Every request says it is the web client: the server then uses the refresh cookie. */
+const CLIENT_HEADERS = { 'X-Client': 'web' } as const;
+
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = (globalThis.navigator as Navigator | undefined)?.locks;
+  return locks ? locks.request(REFRESH_LOCK, fn) : fn();
+}
+
 let refreshing: Promise<boolean> | null = null;
 
-async function refreshTokens(): Promise<boolean> {
-  const refresh = tokens.refresh;
-  if (!refresh) return false;
-  refreshing ??= (async () => {
+/**
+ * Gets a new access token from the refresh cookie. A token another tab already obtained while this
+ * one waited for the lock is not reused (tabs keep their own access tokens); the server accepts a
+ * cookie that was rotated a few seconds ago, so waiting tabs still succeed.
+ */
+export async function refreshTokens(): Promise<boolean> {
+  refreshing ??= withRefreshLock(async () => {
     try {
+      // One-time move of a session started by an older version (refresh token in localStorage).
+      const legacy = readLegacy(LEGACY_REFRESH_KEY);
       const res = await fetch('/api/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refresh }),
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', ...CLIENT_HEADERS },
+        body: JSON.stringify(legacy ? { refreshToken: legacy } : {}),
       });
+      removeLegacy();
       if (!res.ok) return false;
       const data = await res.json();
-      tokens.set(data.token, data.refreshToken);
-      return true;
+      accessToken = data.token;
+      return Boolean(accessToken);
     } catch {
       return false;
-    } finally {
-      setTimeout(() => (refreshing = null), 0);
     }
-  })();
+  }).finally(() => {
+    // Callers already waiting keep the result; the next 401 starts a new refresh.
+    refreshing = null;
+  });
   return refreshing;
 }
 
@@ -98,14 +127,15 @@ export interface RequestOptions {
 }
 
 async function send(path: string, opts: RequestOptions): Promise<Response> {
-  const headers: Record<string, string> = { ...(opts.headers ?? {}) };
+  const headers: Record<string, string> = { ...CLIENT_HEADERS, ...(opts.headers ?? {}) };
   if (opts.raw !== undefined) headers['Content-Type'] = opts.contentType ?? 'application/octet-stream';
   else if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (opts.auth !== false && tokens.access) headers.Authorization = `Bearer ${tokens.access}`;
+  if (opts.auth !== false && accessToken) headers.Authorization = `Bearer ${accessToken}`;
   try {
     return await fetch(`/api${path}`, {
       method: opts.method ?? 'GET',
       headers,
+      credentials: 'same-origin',
       body: opts.raw !== undefined ? opts.raw : opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
   } catch {
@@ -115,7 +145,7 @@ async function send(path: string, opts: RequestOptions): Promise<Response> {
 
 export async function apiResponse(path: string, opts: RequestOptions = {}): Promise<Response> {
   let res = await send(path, opts);
-  if (res.status === 401 && opts.auth !== false && tokens.refresh) {
+  if (res.status === 401 && opts.auth !== false) {
     if (await refreshTokens()) res = await send(path, opts);
   }
   if (res.status === 401 && opts.auth !== false) {

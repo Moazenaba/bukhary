@@ -2,7 +2,7 @@ import React from 'react';
 import { AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
 
-export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts' | 'ceremonies';
+export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts' | 'ceremonies' | 'audit';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -40,7 +40,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
 }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
-  const perms = currentUser.permissions || [];
 
   // Grouped and sorted navigation tabs in the most logical operational order
   const navSections: Array<{
@@ -70,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'committees',
           label: 'إدارة اللجان الميدانية',
           icon: 'groups',
-          badge: isSuperAdmin ? committeesCount : currentUser.assignedCommittees.length || committeesCount,
+          badge: isSuperAdmin || currentUser.allCommitteesAllowed ? committeesCount : (currentUser.assignedCommitteeIds ?? []).length,
           visible: AuthService.canAccessTab('committees', currentUser),
         },
         {
@@ -134,6 +133,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: todaysTasksCount > 0 ? `${todaysTasksCount} اليوم` : null,
           isPendingBadge: todaysTasksCount > 0,
           visible: AuthService.canAccessTab('daily_alerts', currentUser),
+        },
+        {
+          id: 'audit',
+          label: 'سجل التدقيق',
+          icon: 'history',
+          badge: null,
+          visible: AuthService.canAccessTab('audit', currentUser),
         },
       ],
     },
@@ -226,13 +232,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ? 'bg-emerald-100 text-emerald-900 border-emerald-300' 
                 : 'bg-blue-50 text-blue-900 border-blue-200'
             }`}>
-              {isSuperAdmin ? 'مدير النظام' : 'معاون معتمد'}
+              {AuthService.getRoleLabel(currentUser.role)}
             </span>
           </div>
           <div className="flex items-center justify-between mt-1.5 text-xs text-slate-500 font-semibold">
-            <span>الصلاحيات المتاحة:</span>
+            <span>الأقسام المتاحة لك:</span>
             <span className="font-mono font-bold text-brand bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
-              {isSuperAdmin ? 'كاملة (8/8)' : `${perms.length} أقسام`}
+              {isSuperAdmin ? 'كل الأقسام' : `${totalVisibleCount} أقسام`}
             </span>
           </div>
         </div>

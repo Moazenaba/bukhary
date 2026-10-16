@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { todayISO } from '../utils/stageUtils';
 import { ScheduleTask, Committee, AppUser } from '../types';
+import { AuthService } from '../services/AuthService';
+import { AssigneeSelect, CommitteeSelect } from './AssigneeSelect';
 
 interface CalendarScheduleViewProps {
   tasks: ScheduleTask[];
   committees: Committee[];
   currentUser: AppUser;
-  onAddTask: (task: Omit<ScheduleTask, 'id'>) => void;
+  /** Resolves to true once the server saved the task. */
+  onAddTask: (task: Omit<ScheduleTask, 'id'>) => boolean | void | Promise<boolean | void>;
   onToggleTaskComplete: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
@@ -21,7 +24,7 @@ interface CalendarScheduleViewProps {
       honoredCount?: number;
       attendingSheikhs?: string[];
     }
-  ) => void;
+  ) => unknown;
 }
 
 export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
@@ -45,7 +48,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   // Ceremony specific states
   const [ceremonyCommitteeId, setCeremonyCommitteeId] = useState<string>('');
-  const [ceremonyCommitteeNumber, setCeremonyCommitteeNumber] = useState<number | ''>('');
+
   const [ceremonyHonoredCount, setCeremonyHonoredCount] = useState<number | ''>('');
   const [ceremonySheikhs, setCeremonySheikhs] = useState<string[]>([]);
   const [ceremonyNewSheikhInput, setCeremonyNewSheikhInput] = useState<string>('');
@@ -75,10 +78,19 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const [newTaskDate, setNewTaskDate] = useState(todayISO());
   const [newTaskTime, setNewTaskTime] = useState('10:00 ص');
   const [newTaskDeliverable, setNewTaskDeliverable] = useState('');
-  const [newTaskCommitteeNumber, setNewTaskCommitteeNumber] = useState<number | ''>('');
+  const [newTaskCommitteeId, setNewTaskCommitteeId] = useState<string>('');
   const [newTaskPriority, setNewTaskPriority] = useState<'urgent' | 'high' | 'normal'>('urgent');
   const [newTaskType, setNewTaskType] = useState<'delivery' | 'receive' | 'exam' | 'scoring' | 'review' | 'general'>('delivery');
-  const [newTaskAssistantName, setNewTaskAssistantName] = useState(currentUser.name);
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState<string>(currentUser.id);
+  const [saving, setSaving] = useState(false);
+  // Controls follow the server's permissions (WEB-09).
+  const canWriteTasks = AuthService.can('tasks.write');
+  const canScheduleCeremonies = AuthService.can('committees.finalize');
+  // "My tasks": assigned to me (by id), or linked to a committee assigned to me.
+  const inMyCommittees = (committeeId?: string) => {
+    const scope = AuthService.getPermissions()?.committeeScope;
+    return Boolean(committeeId) && Array.isArray(scope) && scope.includes(committeeId as string);
+  };
   const [newTaskNotes, setNewTaskNotes] = useState('');
 
   const year = currentDate.getFullYear();
@@ -159,12 +171,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   const displayedDayTasks = useMemo(() => {
     let list = selectedDayTasks;
     if (taskFilter === 'mine') {
-      const myName = currentUser.name.toLowerCase();
       list = list.filter(
         (t) =>
-          (t.assignedAssistantName && t.assignedAssistantName.toLowerCase().includes(myName)) ||
-          (t.assignedAssistantId && t.assignedAssistantId === currentUser.id) ||
-          (t.committeeNumber && currentUser.assignedCommittees.includes(t.committeeNumber))
+          t.assignedAssistantId === currentUser.id || inMyCommittees(t.committeeId)
       );
     } else if (taskFilter === 'deliverables') {
       list = list.filter((t) => !!t.deliverable);
@@ -173,12 +182,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   }, [selectedDayTasks, taskFilter, currentUser]);
 
   const myTasksCount = useMemo(() => {
-    const myName = currentUser.name.toLowerCase();
     return selectedDayTasks.filter(
       (t) =>
-        (t.assignedAssistantName && t.assignedAssistantName.toLowerCase().includes(myName)) ||
-        (t.assignedAssistantId && t.assignedAssistantId === currentUser.id) ||
-        (t.committeeNumber && currentUser.assignedCommittees.includes(t.committeeNumber))
+        t.assignedAssistantId === currentUser.id || inMyCommittees(t.committeeId)
     ).length;
   }, [selectedDayTasks, currentUser]);
 
@@ -207,11 +213,11 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     setNewTaskTitle('');
     setNewTaskDeliverable('');
     setNewTaskNotes('');
-    setNewTaskCommitteeNumber('');
+    setNewTaskCommitteeId('');
     setNewTaskPriority('urgent');
     setNewTaskType('delivery');
     setNewTaskTime('09:00 ص');
-    setNewTaskAssistantName(currentUser.name);
+    setNewTaskAssigneeId(currentUser.id);
     setIsAddModalOpen(true);
   };
 
@@ -219,10 +225,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     const targetDate = dateStr || selectedDateStr;
     setDeliveryMode('ceremony');
     setCeremonyDate(targetDate);
-    const firstComm = committees[0];
+    const firstComm = committees.find((c) => AuthService.canOnCommittee('committees.finalize', c));
     if (firstComm) {
       setCeremonyCommitteeId(firstComm.id);
-      setCeremonyCommitteeNumber(firstComm.committeeNumber);
       setCeremonyHonoredCount(firstComm.ceremonyDetails?.honoredStudentsCount ?? firstComm.studentsCount ?? '');
       setCeremonySheikhs(
         firstComm.ceremonyDetails?.attendingSheikhs?.length
@@ -251,81 +256,53 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     setCeremonySheikhs(ceremonySheikhs.filter((_, i) => i !== idx));
   };
 
-  const handleCreateTaskSubmit = (e: React.FormEvent) => {
+  const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
 
     if (deliveryMode === 'ceremony') {
-      const selectedComm =
-        committees.find(
-          (c) => c.id === ceremonyCommitteeId || c.committeeNumber === Number(ceremonyCommitteeNumber)
-        ) || committees[0];
-
-      const commId = selectedComm?.id || ceremonyCommitteeId || `comm-${Date.now()}`;
-      const commNum =
-        selectedComm?.committeeNumber ||
-        (ceremonyCommitteeNumber !== '' ? Number(ceremonyCommitteeNumber) : 1);
-      const sheikhs =
-        ceremonySheikhs.length > 0
-          ? ceremonySheikhs
-          : selectedComm?.sheikhName
-          ? [selectedComm.sheikhName]
-          : [];
-      const count =
-        ceremonyHonoredCount !== '' ? Number(ceremonyHonoredCount) : selectedComm?.studentsCount || undefined;
-
-      if (onUpdateCommitteeCeremony && selectedComm) {
-        onUpdateCommitteeCeremony(selectedComm.id, {
+      // The ceremony is stored on the committee; the server creates its single calendar task (WEB-08).
+      const selectedComm = committees.find((c) => c.id === ceremonyCommitteeId);
+      if (!selectedComm || !onUpdateCommitteeCeremony) return;
+      const sheikhs = ceremonySheikhs.length > 0 ? ceremonySheikhs : selectedComm.sheikhName ? [selectedComm.sheikhName] : [];
+      const count = ceremonyHonoredCount !== '' ? Number(ceremonyHonoredCount) : selectedComm.studentsCount || undefined;
+      setSaving(true);
+      try {
+        const ok = await onUpdateCommitteeCeremony(selectedComm.id, {
           date: ceremonyDate,
           time: ceremonyTime.trim(),
           place: ceremonyPlace.trim() || selectedComm.branch || '',
           notes: ceremonyNotes.trim(),
-          completed: false,
+          completed: Boolean(selectedComm.stages.ceremony?.completed),
           honoredCount: count,
           attendingSheikhs: sheikhs,
         });
+        if (ok !== false) setIsAddModalOpen(false);
+      } finally {
+        setSaving(false);
       }
-
-      onAddTask({
-        title: `🎉 حفل تكريم وتوزيع جوائز: لجنة #${commNum} (${selectedComm?.sheikhName || selectedComm?.committeeName || 'المكرمين'})`,
-        date: ceremonyDate,
-        time: ceremonyTime.trim(),
-        deliverable: `تجهيز شهادات التكريم لعدد (${count}) طالباً مكرماً + دروع التكريم + حضور المشايخ: (${sheikhs.join('، ')})`,
-        committeeId: commId,
-        committeeNumber: commNum,
-        assignedAssistantName: newTaskAssistantName.trim() || currentUser.name,
-        type: 'ceremony',
-        priority: 'urgent',
-        completed: false,
-        notes: [ceremonyPlace.trim() ? `مكان الحفل: ${ceremonyPlace.trim()}` : '', ceremonyNotes.trim()].filter(Boolean).join('. ') || undefined,
-      });
-
-      setIsAddModalOpen(false);
       return;
     }
 
     if (!newTaskTitle.trim()) return;
-
-    let linkedCommId: string | undefined;
-    if (newTaskCommitteeNumber !== '') {
-      const found = committees.find((c) => c.committeeNumber === Number(newTaskCommitteeNumber));
-      if (found) linkedCommId = found.id;
+    setSaving(true);
+    try {
+      const ok = await onAddTask({
+        title: newTaskTitle.trim(),
+        date: newTaskDate,
+        time: newTaskTime.trim() || undefined,
+        deliverable: newTaskDeliverable.trim() || undefined,
+        committeeId: newTaskCommitteeId || undefined,
+        assignedAssistantId: newTaskAssigneeId || undefined,
+        type: newTaskType,
+        priority: newTaskPriority,
+        completed: false,
+        notes: newTaskNotes.trim() || undefined,
+      });
+      if (ok !== false) setIsAddModalOpen(false);
+    } finally {
+      setSaving(false);
     }
-
-    onAddTask({
-      title: newTaskTitle.trim(),
-      date: newTaskDate,
-      time: newTaskTime.trim() || undefined,
-      deliverable: newTaskDeliverable.trim() || undefined,
-      committeeId: linkedCommId,
-      committeeNumber: newTaskCommitteeNumber !== '' ? Number(newTaskCommitteeNumber) : undefined,
-      assignedAssistantName: newTaskAssistantName.trim() || currentUser.name,
-      type: newTaskType,
-      priority: newTaskPriority,
-      completed: false,
-      notes: newTaskNotes.trim() || undefined,
-    });
-
-    setIsAddModalOpen(false);
   };
 
   return (
@@ -350,6 +327,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => handleOpenAddModal(selectedDateStr)}
+            hidden={!canWriteTasks}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-xl text-emerald-600">add_task</span>
@@ -605,6 +583,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleOpenAddCeremonyModal(selectedDateStr)}
+                  hidden={!canScheduleCeremonies}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs active:scale-95"
                   title="إضافة ميعاد حفل تكريم وتوزيع جوائز للجنة في هذا اليوم"
                 >
@@ -615,6 +594,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal(selectedDateStr)}
+            hidden={!canWriteTasks}
                   className="px-3 py-1.5 rounded-xl bg-brand hover:bg-success text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
@@ -717,6 +697,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onToggleTaskComplete(task.id)}
+                          disabled={!(canWriteTasks || task.assignedAssistantId === currentUser.id) || currentUser.role === 'auditor'}
                           className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-colors cursor-pointer mt-0.5 shrink-0 ${
                             task.completed
                               ? 'bg-emerald-600 text-white'
@@ -795,6 +776,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onDeleteTask(task.id)}
+                        hidden={!AuthService.can('tasks.delete')}
                         className="text-red-500 hover:text-red-700 text-xs font-semibold cursor-pointer"
                       >
                         حذف
@@ -825,6 +807,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             <button
               type="button"
               onClick={() => handleOpenAddModal(selectedDateStr)}
+            hidden={!canWriteTasks}
               className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-brand/40 text-brand hover:bg-tint font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
             >
               <span className="material-symbols-outlined text-sm">add_circle</span>
@@ -906,15 +889,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       اللجنة المراد إقامة وتوثيق الحفل لها <span className="text-red-500">*</span>
                     </label>
                     <select
-                      value={ceremonyCommitteeId || ceremonyCommitteeNumber}
+                      value={ceremonyCommitteeId}
                       onChange={(e) => {
                         const val = e.target.value;
-                        const found = committees.find(
-                          (c) => c.id === val || c.committeeNumber === Number(val)
-                        );
+                        const found = committees.find((c) => c.id === val);
                         if (found) {
                           setCeremonyCommitteeId(found.id);
-                          setCeremonyCommitteeNumber(found.committeeNumber);
                           setCeremonyHonoredCount(
                             found.ceremonyDetails?.honoredStudentsCount ?? found.studentsCount ?? ''
                           );
@@ -933,12 +913,15 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
                       required
                     >
-                      {committees.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          لجنة #{c.committeeNumber} - {c.committeeName} ({c.competitionBook}) - الشيخ:{' '}
-                          {c.sheikhName || '—'}
-                        </option>
-                      ))}
+                      <option value="">اختر اللجنة</option>
+                      {committees
+                        .filter((c) => AuthService.canOnCommittee('committees.finalize', c))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            لجنة #{c.committeeNumber} - {c.committeeName}{c.courseName ? ` — ${c.courseName}` : ''} - الشيخ:{' '}
+                            {c.sheikhName || '—'}
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -1137,20 +1120,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block font-bold text-ink mb-1">اللجنة المرتبطة</label>
-                      <select
-                        value={newTaskCommitteeNumber}
-                        onChange={(e) =>
-                          setNewTaskCommitteeNumber(e.target.value ? Number(e.target.value) : '')
-                        }
+                      <CommitteeSelect
+                        committees={committees}
+                        value={newTaskCommitteeId}
+                        onChange={setNewTaskCommitteeId}
+                        emptyLabel="بدون لجنة (عام)"
                         className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
-                      >
-                        <option value="">بدون لجنة (عام)</option>
-                        {committees.map((c) => (
-                          <option key={c.id} value={c.committeeNumber}>
-                            لجنة #{c.committeeNumber} ({c.committeeName})
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div>
@@ -1168,10 +1144,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
                     <div>
                       <label className="block font-bold text-ink mb-1">المكلف / المعاون</label>
-                      <input
-                        type="text"
-                        value={newTaskAssistantName}
-                        onChange={(e) => setNewTaskAssistantName(e.target.value)}
+                      <AssigneeSelect
+                        value={newTaskAssigneeId}
+                        onChange={setNewTaskAssigneeId}
                         className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                       />
                     </div>

@@ -23,7 +23,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('login', () => {
   it('leaves no session behind when the account cannot be loaded after the password check', async () => {
     mockFetch([
-      { status: 200, body: { success: true, token: 'access-1', refreshToken: 'refresh-1', user: { id: 'u1' } } },
+      { status: 200, body: { success: true, token: 'access-1', user: { id: 'u1' } } },
       { status: 500, body: { success: false, message: 'حدث خطأ غير متوقع في الخادم' } },
     ]);
 
@@ -31,7 +31,6 @@ describe('login', () => {
 
     expect(result.success).toBe(false);
     expect(tokens.access).toBeNull();
-    expect(tokens.refresh).toBeNull();
     expect(AuthService.getCurrentUser()).toBeNull();
   });
 

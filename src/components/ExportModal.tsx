@@ -1,3 +1,4 @@
+import { csvCell } from '../utils/csv';
 import React, { useState } from 'react';
 import { Committee, STAGES_LIST } from '../types';
 import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
@@ -19,12 +20,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   useEscapeKey(onClose);
   if (!isOpen) return null;
 
-  /** One CSV cell: quotes escaped, and values that a spreadsheet would run as a formula neutralized. */
-  const csvCell = (value: unknown) => {
-    let text = String(value ?? '');
-    if (text.length > 1 && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-    return `"${text.replace(/"/g, '""')}"`;
-  };
 
   const handleExportCSV = () => {
     const headers = [

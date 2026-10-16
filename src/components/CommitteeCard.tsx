@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Committee, StageKey, STAGES_LIST, AppUser } from '../types';
 import { calculateCurrentStage } from '../utils/stageUtils';
+import { AuthService } from '../services/AuthService';
 
 interface CommitteeCardProps {
   committee: Committee;
@@ -8,8 +9,10 @@ interface CommitteeCardProps {
   onQuickToggleStage: (committeeId: string, stageKey: StageKey) => void;
   onDeleteCommittee?: (committeeId: string) => void;
   currentUser?: AppUser;
-  onReceiveCommittee?: (committeeId: string) => void;
-  onApproveExamReadiness?: (committeeId: string) => void;
+  /** Records (or with `cancel`, clears) that the assistant received the committee. */
+  onReceiveCommittee?: (committeeId: string, cancel?: boolean) => unknown;
+  /** Approves (or with `revoke`, withdraws) exam readiness. */
+  onApproveExamReadiness?: (committeeId: string, revoke?: boolean) => unknown;
 }
 
 export const CommitteeCard: React.FC<CommitteeCardProps> = ({
@@ -17,9 +20,23 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
   onViewDetails,
   onQuickToggleStage,
   onDeleteCommittee,
-  currentUser,
+  onReceiveCommittee,
+  onApproveExamReadiness,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // Shown only when the server would accept it: action allowed and committee in scope (WEB-06).
+  const canReception = AuthService.canOnCommittee('committees.reception', committee);
+  const canDelete = AuthService.canOnCommittee('committees.delete', committee);
+  const run = async (fn?: () => unknown) => {
+    if (!fn) return;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
   const currentStatus = calculateCurrentStage(committee.stages);
 
   // Count how many stages are completed
@@ -225,6 +242,44 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
         </div>
       </div>
 
+      {/* Reception and exam readiness (assistants, managers of the committee) */}
+      {(committee.receivedByAssistant || committee.examApprovedBy || canReception) && (
+        <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+          <div className={`p-2 rounded-xl border ${committee.receivedByAssistant ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+            <span className="block font-bold text-slate-700">الاستلام</span>
+            <span className="block text-slate-600 truncate">
+              {committee.receivedByAssistant ? `استلمها ${committee.receivedByAssistant.assistantName}` : 'لم تُستلم بعد'}
+            </span>
+            {canReception && onReceiveCommittee && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run(() => onReceiveCommittee(committee.id, Boolean(committee.receivedByAssistant)))}
+                className="mt-1 text-xs font-bold text-brand hover:underline cursor-pointer disabled:opacity-50"
+              >
+                {committee.receivedByAssistant ? 'إلغاء التوثيق' : 'توثيق الاستلام'}
+              </button>
+            )}
+          </div>
+          <div className={`p-2 rounded-xl border ${committee.examApprovedBy ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+            <span className="block font-bold text-slate-700">جاهزية الامتحان</span>
+            <span className="block text-slate-600 truncate">
+              {committee.examApprovedBy ? `اعتمدها ${committee.examApprovedBy.assistantName}` : 'غير معتمدة'}
+            </span>
+            {canReception && onApproveExamReadiness && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run(() => onApproveExamReadiness(committee.id, Boolean(committee.examApprovedBy)))}
+                className="mt-1 text-xs font-bold text-blue-800 hover:underline cursor-pointer disabled:opacity-50"
+              >
+                {committee.examApprovedBy ? 'إلغاء الاعتماد' : 'اعتماد الجاهزية'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Footer Actions: High Contrast & Sleek */}
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 relative">
         <button
@@ -266,7 +321,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
 
                 <div className="my-1 border-t border-slate-100" />
 
-                {onDeleteCommittee && (
+                {onDeleteCommittee && canDelete && (
                   <button
                     onClick={() => {
                       setShowMenu(false);

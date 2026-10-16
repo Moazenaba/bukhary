@@ -1,13 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { todayISO } from '../utils/stageUtils';
 import { ScheduleTask, Committee, AppUser } from '../types';
+import { AuthService } from '../services/AuthService';
+import { AssigneeSelect, CommitteeSelect } from './AssigneeSelect';
 
 interface DailyAlertsViewProps {
   tasks: ScheduleTask[];
   committees: Committee[];
   currentUser: AppUser;
   onToggleTaskComplete: (taskId: string) => void;
-  onAddTask: (task: Omit<ScheduleTask, 'id'>) => void;
+  /** Resolves to true once the server saved the task. */
+  onAddTask: (task: Omit<ScheduleTask, 'id'>) => boolean | void | Promise<boolean | void>;
   onDeleteTask: (taskId: string) => void;
   onNavigateToCalendar: () => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
@@ -23,7 +26,7 @@ interface DailyAlertsViewProps {
       honoredCount?: number;
       attendingSheikhs?: string[];
     }
-  ) => void;
+  ) => unknown;
 }
 
 export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
@@ -50,9 +53,10 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
   const [isAddCeremonyModalOpen, setIsAddCeremonyModalOpen] = useState(false);
 
   // Dedicated Ceremony Modal Form State
-  const [ceremonyCommNumber, setCeremonyCommNumber] = useState<number>(
-    committees[0]?.committeeNumber || 1
-  );
+  // Ceremonies and task links use committee ids: numbers repeat across courses (WEB-08).
+  const [ceremonyCommitteeId, setCeremonyCommitteeId] = useState<string>('');
+  const canWriteTasks = AuthService.can('tasks.write');
+  const canScheduleCeremonies = AuthService.can('committees.finalize');
   const [ceremonyDay, setCeremonyDay] = useState<string>('الاثنين');
   const [ceremonyDateInput, setCeremonyDateInput] = useState<string>(selectedDate);
   const [ceremonyTimeInput, setCeremonyTimeInput] = useState<string>('');
@@ -89,13 +93,13 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
   const [newTaskDate, setNewTaskDate] = useState(selectedDate);
   const [newTime, setNewTime] = useState('10:00 ص');
   const [newDeliverable, setNewDeliverable] = useState('');
-  const [newCommitteeNum, setNewCommitteeNum] = useState<number | ''>('');
+  const [newCommitteeId, setNewCommitteeId] = useState<string>('');
   const [newPriority, setNewPriority] = useState<'urgent' | 'high' | 'normal'>('urgent');
   const [newType, setNewType] = useState<
     'delivery' | 'custom_delivery' | 'ceremony' | 'receive' | 'exam' | 'scoring' | 'review' | 'general'
   >('delivery');
   const [customDeliveryText, setCustomDeliveryText] = useState('');
-  const [newAssistant, setNewAssistant] = useState(currentUser.name);
+  const [newAssigneeId, setNewAssigneeId] = useState<string>(currentUser.id);
   const [newNotes, setNewNotes] = useState('');
 
   // Selected Date Display String (Arabic)
@@ -115,7 +119,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
     return selectedDate;
   }, [selectedDate]);
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
@@ -124,23 +128,24 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       ? `نوع التسليم اليدوي: ${customDeliveryText.trim()} • ${newDeliverable}`.trim()
       : newDeliverable.trim();
 
-    onAddTask({
+    const ok = await onAddTask({
       title: newTitle.trim(),
       date: newTaskDate || selectedDate,
       time: newTime,
       deliverable: finalDeliverable || undefined,
-      committeeNumber: newCommitteeNum ? Number(newCommitteeNum) : undefined,
+      committeeId: newCommitteeId || undefined,
       priority: newPriority,
       type: finalType,
-      assignedAssistantName: newAssistant || currentUser.name,
+      assignedAssistantId: newAssigneeId || undefined,
       notes: newNotes.trim() || undefined,
       completed: false,
     });
+    if (ok === false) return;
 
     setNewTitle('');
     setNewDeliverable('');
     setCustomDeliveryText('');
-    setNewCommitteeNum('');
+    setNewCommitteeId('');
     setNewNotes('');
     setIsAddModalOpen(false);
   };
@@ -158,40 +163,21 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
     setCeremonySheikhs(ceremonySheikhs.filter((_, i) => i !== idx));
   };
 
-  const handleCreateCeremony = (e: React.FormEvent) => {
+  const handleCreateCeremony = async (e: React.FormEvent) => {
     e.preventDefault();
-    const comm = committees.find((c) => c.committeeNumber === Number(ceremonyCommNumber));
-    if (!comm) return;
-
-    // 1. Update committee ceremony details in database
-    if (onUpdateCommitteeCeremony) {
-      onUpdateCommitteeCeremony(comm.id, {
-        date: ceremonyDateInput,
-        time: ceremonyTimeInput,
-        place: ceremonyPlaceInput,
-        notes: ceremonyNotesInput,
-        completed: false,
-        honoredCount: ceremonyHonoredCount,
-        attendingSheikhs: ceremonySheikhs,
-      });
-    }
-
-    // 2. Add Ceremony task
-    onAddTask({
-      title: `🎉 حفل تكريم وتتويج لجنة #${comm.committeeNumber} (${comm.competitionBook}) - يوم ${ceremonyDay}`,
+    const comm = committees.find((c) => c.id === ceremonyCommitteeId);
+    if (!comm || !onUpdateCommitteeCeremony) return;
+    // The ceremony is stored on the committee; the server keeps its one calendar task (WEB-08).
+    const ok = await onUpdateCommitteeCeremony(comm.id, {
       date: ceremonyDateInput,
       time: ceremonyTimeInput,
-      deliverable: `يوم (${ceremonyDay} ${ceremonyDateInput}): تسليم شهادات التقدير لـ (${ceremonyHonoredCount}) طالب مكرم، بحضور المشايخ: ${ceremonySheikhs.join('، ')}`,
-      committeeNumber: comm.committeeNumber,
-      committeeId: comm.id,
-      priority: 'urgent',
-      type: 'ceremony',
-      assignedAssistantName: currentUser.name,
-      notes: `مكان الحفل: ${ceremonyPlaceInput} • الوقت: ${ceremonyTimeInput}. ${ceremonyNotesInput}`.trim(),
-      completed: false,
+      place: ceremonyPlaceInput,
+      notes: ceremonyNotesInput,
+      completed: Boolean(comm.stages.ceremony?.completed),
+      honoredCount: ceremonyHonoredCount,
+      attendingSheikhs: ceremonySheikhs,
     });
-
-    setIsAddCeremonyModalOpen(false);
+    if (ok !== false) setIsAddCeremonyModalOpen(false);
   };
 
   // Filter tasks based on view mode (selected day vs all schedule) and status and search
@@ -258,7 +244,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             type="button"
             onClick={() => {
               setCeremonyDateInput(selectedDate);
-              setIsAddCeremonyModalOpen(true);
+              if (canScheduleCeremonies) setIsAddCeremonyModalOpen(true);
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
           >
@@ -270,7 +256,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             type="button"
             onClick={() => {
               setNewTaskDate(selectedDate);
-              setIsAddModalOpen(true);
+              if (canWriteTasks) setIsAddModalOpen(true);
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
           >
@@ -524,7 +510,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
               type="button"
               onClick={() => {
                 setNewTaskDate(selectedDate);
-                setIsAddModalOpen(true);
+                if (canWriteTasks) setIsAddModalOpen(true);
               }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
             >
@@ -553,6 +539,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onToggleTaskComplete(task.id)}
+                    disabled={!(canWriteTasks || task.assignedAssistantId === currentUser.id) || currentUser.role === 'auditor'}
                     className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer mt-0.5 active:scale-95 ${
                       task.completed
                         ? 'bg-emerald-600 text-white shadow-2xs'
@@ -650,6 +637,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onDeleteTask(task.id)}
+                    hidden={!AuthService.can('tasks.delete')}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="حذف هذا التنبيه"
                   >
@@ -774,23 +762,21 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">رقم اللجنة (اختياري)</label>
-                  <input
-                    type="number"
-                    value={newCommitteeNum}
-                    onChange={(e) => setNewCommitteeNum(e.target.value ? parseInt(e.target.value) : '')}
-                    placeholder="رقم اللجنة..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:border-brand outline-none"
+                  <label className="block text-slate-700 font-bold mb-1">اللجنة (اختياري)</label>
+                  <CommitteeSelect
+                    committees={committees}
+                    value={newCommitteeId}
+                    onChange={setNewCommitteeId}
+                    emptyLabel="بدون لجنة"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
 
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">المعاون المكلف</label>
-                  <input
-                    type="text"
-                    value={newAssistant}
-                    onChange={(e) => setNewAssistant(e.target.value)}
-                    placeholder="اسم المعاون أو المشرف..."
+                  <AssigneeSelect
+                    value={newAssigneeId}
+                    onChange={setNewAssigneeId}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
@@ -859,11 +845,11 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   اختر اللجنة المقررة <span className="text-rose-500">*</span>
                 </label>
                 <select
-                  value={ceremonyCommNumber}
+                  value={ceremonyCommitteeId}
+                  required
                   onChange={(e) => {
-                    const num = Number(e.target.value);
-                    setCeremonyCommNumber(num);
-                    const found = committees.find((c) => c.committeeNumber === num);
+                    setCeremonyCommitteeId(e.target.value);
+                    const found = committees.find((c) => c.id === e.target.value);
                     if (found) {
                       setCeremonyHonoredCount(found.studentsCount || 0);
                       if (found.sheikhName) {
@@ -873,11 +859,14 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   }}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-brand outline-none"
                 >
-                  {committees.map((c) => (
-                    <option key={c.id} value={c.committeeNumber}>
-                      لجنة #{c.committeeNumber}: {c.committeeName} — {c.competitionBook} ({c.sheikhName || '—'})
-                    </option>
-                  ))}
+                  <option value="">اختر اللجنة</option>
+                  {committees
+                    .filter((c) => AuthService.canOnCommittee('committees.finalize', c))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        لجنة #{c.committeeNumber}: {c.committeeName}{c.courseName ? ` — ${c.courseName}` : ''} ({c.sheikhName || '—'})
+                      </option>
+                    ))}
                 </select>
               </div>
 

@@ -13,19 +13,28 @@ import {
 } from '../types';
 import {
   calculateCurrentStage,
-  getCurrentFormattedDateTime,
   createDefaultQuestions,
   getScoringProgress,
 } from '../utils/stageUtils';
+import { STAGE_ACTION } from '../utils/committeeChanges';
+import { AuthService } from '../services/AuthService';
 
 interface CommitteeDetailModalProps {
   committee: Committee | null;
   onClose: () => void;
-  onSaveCommittee: (updated: Committee) => void;
+  /** Saves the edited committee; resolves to false when the server refused (the form then rolls back). */
+  onSaveCommittee: (updated: Committee) => Promise<boolean> | boolean | void;
   currentUser?: AppUser;
   courses?: Course[];
-  onReceiveCommittee?: (committeeId: string) => void;
-  onApproveExamReadiness?: (committeeId: string) => void;
+  onReceiveCommittee?: (committeeId: string, cancel?: boolean) => unknown;
+  onApproveExamReadiness?: (committeeId: string, revoke?: boolean) => unknown;
+}
+
+/** Server times are ISO; older records may hold display text, shown as it is. */
+function formatWhen(value?: string) {
+  if (!value) return '';
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? value : new Date(ms).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 // The form keeps its own editing state, so it is remounted (key) for each committee;
@@ -37,30 +46,37 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   committee,
   onClose,
   onSaveCommittee,
-  currentUser,
   courses = [],
   onReceiveCommittee,
   onApproveExamReadiness,
 }) => {
   useEscapeKey(onClose);
 
+  // Controls follow what the server will accept: the action and this committee's scope (WEB-09).
+  const can = (action: string) => AuthService.canOnCommittee(action, committee);
+  const canEditBase = can('committees.update');
+  const canScore = can('committees.scoring');
+  const canFinalize = can('committees.finalize');
+  const canReception = can('committees.reception');
+  const canStage = (k: StageKey) => can(STAGE_ACTION[k]);
+
   // Local state for stages and notes
   const [stages, setStages] = useState(committee.stages);
   const [generalNotes, setGeneralNotes] = useState(committee.generalNotes || '');
-  const [committeeName, setCommitteeName] = useState(committee.committeeName);
-  const [branch, setBranch] = useState(committee.branch);
-  const [associationName, setAssociationName] = useState(committee.associationName || '');
-  const [competitionBook, setCompetitionBook] = useState(committee.competitionBook);
+  const [committeeName] = useState(committee.committeeName);
+  const [branch] = useState(committee.branch);
+  const [associationName] = useState(committee.associationName || '');
+  const [competitionBook] = useState(committee.competitionBook);
   const [courseId, setCourseId] = useState<string>(
     committee.courseId || courses.find((c) => c.isDefault)?.id || ''
   );
-  // البيانات الجديدة
   const [isWomenCommittee, setIsWomenCommittee] = useState<boolean>(committee.isWomenCommittee || false);
   const [sheikhName, setSheikhName] = useState<string>(committee.sheikhName || '');
   const [sheikhPhone, setSheikhPhone] = useState<string>(committee.sheikhPhone || '');
   const [sheikhCountry, setSheikhCountry] = useState<string>(committee.sheikhCountry || '');
   const [studentsCount, setStudentsCount] = useState<number | ''>(committee.studentsCount ?? '');
   const [isSavedToast, setIsSavedToast] = useState(false);
+  const [pending, setPending] = useState(false);
 
   // Scoring state
   const [scoringDetails, setScoringDetails] = useState<ScoringStageDetails>(() => {
@@ -106,32 +122,75 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     );
   });
 
+  /** The committee as currently edited in the form, with optional overrides. */
+  const buildCommittee = (overrides: Partial<Committee> = {}): Committee => {
+    const selCourse = courses.find((c) => c.id === courseId);
+    return {
+      ...committee,
+      committeeName,
+      branch,
+      associationName: associationName.trim() || undefined,
+      competitionBook,
+      generalNotes,
+      courseId,
+      courseName: selCourse?.name || committee.courseName,
+      sheikhName: sheikhName.trim() || undefined,
+      sheikhPhone: sheikhPhone.trim() || undefined,
+      sheikhCountry: sheikhCountry.trim() || undefined,
+      studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
+      isWomenCommittee,
+      stages,
+      scoringDetails,
+      aggregationDetails,
+      ceremonyDetails,
+      ...overrides,
+    };
+  };
+
+  /**
+   * Sends the change and waits for the server. "Saved" appears only after it confirmed; when it
+   * refused, `revert` puts the form back (the error is shown by the app).
+   */
+  const save = async (next: Committee, revert: () => void) => {
+    setPending(true);
+    const ok = await Promise.resolve(onSaveCommittee(next));
+    setPending(false);
+    if (ok === false) {
+      revert();
+      return;
+    }
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 2000);
+  };
+
+  const saveCeremony = (updated: CeremonyStageDetails) => {
+    if (!canFinalize) return;
+    const before = ceremonyDetails;
+    setCeremonyDetails(updated);
+    void save(buildCommittee({ ceremonyDetails: updated }), () => setCeremonyDetails(before));
+  };
+
   const handleAddSheikh = () => {
     const trimmed = newSheikhInput.trim();
     if (!trimmed) return;
     if (!ceremonyDetails.attendingSheikhs.includes(trimmed)) {
-      const updated: CeremonyStageDetails = {
-        ...ceremonyDetails,
-        attendingSheikhs: [...ceremonyDetails.attendingSheikhs, trimmed],
-      };
-      setCeremonyDetails(updated);
-      onSaveCommittee({
-        ...committee,
-        ceremonyDetails: updated,
-      });
+      saveCeremony({ ...ceremonyDetails, attendingSheikhs: [...ceremonyDetails.attendingSheikhs, trimmed] });
     }
     setNewSheikhInput('');
   };
 
   const handleRemoveSheikh = (index: number) => {
-    const updated: CeremonyStageDetails = {
-      ...ceremonyDetails,
-      attendingSheikhs: ceremonyDetails.attendingSheikhs.filter((_, i) => i !== index),
-    };
-    setCeremonyDetails(updated);
-    onSaveCommittee({
-      ...committee,
-      ceremonyDetails: updated,
+    saveCeremony({ ...ceremonyDetails, attendingSheikhs: ceremonyDetails.attendingSheikhs.filter((_, i) => i !== index) });
+  };
+
+  const saveScoring = (updatedScoring: ScoringStageDetails, nextStages = stages) => {
+    if (!canScore) return;
+    const before = { scoring: scoringDetails, stages };
+    setScoringDetails(updatedScoring);
+    setStages(nextStages);
+    void save(buildCommittee({ scoringDetails: updatedScoring, stages: nextStages }), () => {
+      setScoringDetails(before.scoring);
+      setStages(before.stages);
     });
   };
 
@@ -139,143 +198,41 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   const handleAddScorerToQuestion = (qId: string, scorerName: string) => {
     const trimmed = scorerName.trim();
     if (!trimmed) return;
-
-    const updatedQuestions = scoringDetails.questions.map((q) => {
-      if (q.id === qId) {
-        const currentScorers = q.scorers || [];
-        if (!currentScorers.includes(trimmed)) {
-          return {
-            ...q,
-            scorers: [...currentScorers, trimmed],
-          };
-        }
-      }
-      return q;
-    });
-
-    const updatedScoring: ScoringStageDetails = {
-      ...scoringDetails,
-      questions: updatedQuestions,
-    };
-    setScoringDetails(updatedScoring);
-
-    // Clear input for this question
+    const updatedQuestions = scoringDetails.questions.map((q) =>
+      q.id === qId && !(q.scorers || []).includes(trimmed) ? { ...q, scorers: [...(q.scorers || []), trimmed] } : q
+    );
     setNewScorerInputs((prev) => ({ ...prev, [qId]: '' }));
-
-    onSaveCommittee({
-      ...committee,
-      stages,
-      scoringDetails: updatedScoring,
-      aggregationDetails,
-    });
+    saveScoring({ ...scoringDetails, questions: updatedQuestions });
   };
 
   const handleRemoveScorerFromQuestion = (qId: string, scorerToRemove: string) => {
-    const updatedQuestions = scoringDetails.questions.map((q) => {
-      if (q.id === qId) {
-        return {
-          ...q,
-          scorers: (q.scorers || []).filter((s) => s !== scorerToRemove),
-        };
-      }
-      return q;
-    });
-
-    const updatedScoring: ScoringStageDetails = {
-      ...scoringDetails,
-      questions: updatedQuestions,
-    };
-    setScoringDetails(updatedScoring);
-
-    onSaveCommittee({
-      ...committee,
-      stages,
-      scoringDetails: updatedScoring,
-      aggregationDetails,
-    });
+    const updatedQuestions = scoringDetails.questions.map((q) =>
+      q.id === qId ? { ...q, scorers: (q.scorers || []).filter((s) => s !== scorerToRemove) } : q
+    );
+    saveScoring({ ...scoringDetails, questions: updatedQuestions });
   };
 
-  // Toggle standard stage handler
+  // Stages change through the server's workflow: in order, with the server's time (API-10).
   const handleToggleStage = (key: StageKey) => {
-    const isCurrentlyDone = stages[key]?.completed;
-    const nowStamp = getCurrentFormattedDateTime();
-
-    const updatedStages = {
-      ...stages,
-      [key]: {
-        completed: !isCurrentlyDone,
-        completedAt: !isCurrentlyDone ? nowStamp : undefined,
-      },
-    };
-
+    if (!canStage(key) || pending) return;
+    const isCurrentlyDone = Boolean(stages[key]?.completed);
+    const before = stages;
+    const updatedStages = { ...stages, [key]: { ...(stages[key] ?? {}), completed: !isCurrentlyDone } };
     setStages(updatedStages);
-
-    const selCourse = courses.find((c) => c.id === courseId);
-    const updatedCommittee: Committee = {
-      ...committee,
-      committeeName,
-      branch,
-      associationName: associationName.trim() || undefined,
-      competitionBook,
-      generalNotes,
-      courseId,
-      courseName: selCourse?.name || committee.courseName,
-      sheikhName: sheikhName.trim() || undefined,
-      sheikhPhone: sheikhPhone.trim() || undefined,
-      sheikhCountry: sheikhCountry.trim() || undefined,
-      studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
-      isWomenCommittee,
-      stages: updatedStages,
-      scoringDetails,
-      aggregationDetails,
-      ceremonyDetails,
-    };
-    onSaveCommittee(updatedCommittee);
-    setIsSavedToast(true);
-    setTimeout(() => setIsSavedToast(false), 2000);
+    void save(buildCommittee({ stages: updatedStages }), () => setStages(before));
   };
 
   // Toggle individual question in scoring
   const handleToggleQuestion = (qId: string) => {
-    const nowStamp = getCurrentFormattedDateTime();
-    const updatedQuestions = scoringDetails.questions.map((q) => {
-      if (q.id === qId) {
-        const nextState = !q.completed;
-        return {
-          ...q,
-          completed: nextState,
-          completedAt: nextState ? nowStamp : undefined,
-        };
-      }
-      return q;
-    });
-
+    if (pending) return;
+    const updatedQuestions = scoringDetails.questions.map((q) => (q.id === qId ? { ...q, completed: !q.completed } : q));
     const allDone = updatedQuestions.every((q) => q.completed);
-    const updatedScoring: ScoringStageDetails = {
-      ...scoringDetails,
-      questions: updatedQuestions,
-    };
-    setScoringDetails(updatedScoring);
-
-    // If all questions done, automatically mark scoring stage completed
-    const updatedStages = {
-      ...stages,
-      scoring: {
-        completed: allDone,
-        completedAt: allDone ? (stages.scoring?.completedAt || nowStamp) : undefined,
-      },
-    };
-    setStages(updatedStages);
-
-    const updatedCommittee: Committee = {
-      ...committee,
-      stages: updatedStages,
-      scoringDetails: updatedScoring,
-      aggregationDetails,
-    };
-    onSaveCommittee(updatedCommittee);
-    setIsSavedToast(true);
-    setTimeout(() => setIsSavedToast(false), 2000);
+    // When every question is scored the scoring stage is completed too (and reopened otherwise).
+    const nextStages =
+      allDone !== Boolean(stages.scoring?.completed) && canStage('scoring')
+        ? { ...stages, scoring: { ...(stages.scoring ?? {}), completed: allDone } }
+        : stages;
+    saveScoring({ ...scoringDetails, questions: updatedQuestions }, nextStages);
   };
 
   // Add new question to scoring list
@@ -283,65 +240,30 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     const nextNum = scoringDetails.questions.length + 1;
     const arabicNumbers = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر', 'الثاني عشر'];
     const newQ: QuestionScoringItem = {
-      id: `q-${Date.now()}`,
+      id: `q-${crypto.randomUUID()}`,
       questionNumber: nextNum,
       label: `السؤال ${arabicNumbers[nextNum - 1] || nextNum}`,
       completed: false,
     };
-
-    const updatedQuestions = [...scoringDetails.questions, newQ];
-    const updatedScoring = { ...scoringDetails, questions: updatedQuestions };
-    setScoringDetails(updatedScoring);
-
-    onSaveCommittee({
-      ...committee,
-      stages,
-      scoringDetails: updatedScoring,
-      aggregationDetails,
-    });
+    saveScoring({ ...scoringDetails, questions: [...scoringDetails.questions, newQ] });
   };
 
   // Delete question
   const handleDeleteQuestion = (qId: string) => {
     if (scoringDetails.questions.length <= 1) return;
-    const updatedQuestions = scoringDetails.questions.filter((q) => q.id !== qId);
-    const updatedScoring = { ...scoringDetails, questions: updatedQuestions };
-    setScoringDetails(updatedScoring);
+    saveScoring({ ...scoringDetails, questions: scoringDetails.questions.filter((q) => q.id !== qId) });
+  };
 
-    onSaveCommittee({
-      ...committee,
-      stages,
-      scoringDetails: updatedScoring,
-      aggregationDetails,
+  // Explicit save for base data, notes, scorer names and aggregation details.
+  const handleSave = () => {
+    void save(buildCommittee(), () => {
+      setGeneralNotes(committee.generalNotes || '');
+      setScoringDetails(committee.scoringDetails ?? scoringDetails);
+      setAggregationDetails(committee.aggregationDetails ?? aggregationDetails);
     });
   };
 
-  // Explicit save for notes and info
-  const handleSave = () => {
-    const selCourse = courses.find((c) => c.id === courseId);
-    const updatedCommittee: Committee = {
-      ...committee,
-      committeeName,
-      branch,
-      associationName: associationName.trim() || undefined,
-      competitionBook,
-      generalNotes,
-      courseId,
-      courseName: selCourse?.name || committee.courseName,
-      sheikhName: sheikhName.trim() || undefined,
-      sheikhPhone: sheikhPhone.trim() || undefined,
-      sheikhCountry: sheikhCountry.trim() || undefined,
-      studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
-      isWomenCommittee,
-      stages,
-      scoringDetails,
-      aggregationDetails,
-      ceremonyDetails,
-    };
-    onSaveCommittee(updatedCommittee);
-    setIsSavedToast(true);
-    setTimeout(() => setIsSavedToast(false), 2500);
-  };
+  const canSaveAnything = canEditBase || canScore || canFinalize;
 
   const currentStatus = calculateCurrentStage(stages);
   const scoringProgress = getScoringProgress(scoringDetails);
@@ -413,7 +335,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             </div>
             <div>
               <span className="text-muted block font-semibold mb-0.5">الدورة التابعة لها:</span>
-              {currentUser?.role === 'super_admin' && courses && courses.length > 0 ? (
+              {canEditBase && courses && courses.length > 0 ? (
                 <select
                   value={courseId}
                   onChange={(e) => setCourseId(e.target.value)}
@@ -488,18 +410,49 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             </div>
           </div>
 
-          {/* Exam Readiness Info (if approved) */}
-          {committee.examApprovedBy && (
-            <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 flex items-center justify-between text-xs">
-              <span className="font-bold text-blue-900 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-blue-700">verified</span>
-                <span>جاهزية وتوزيع الامتحان معتمدة بواسطة: <strong>{committee.examApprovedBy.assistantName}</strong></span>
+          {/* Reception and exam readiness (WEB-06): recorded by the server with who and when */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className={`p-3.5 rounded-xl border ${committee.receivedByAssistant ? 'bg-emerald-50/70 border-emerald-200' : 'bg-canvas border-line/40'}`}>
+              <span className="font-bold text-ink flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-emerald-700 text-base">inventory</span>
+                <span>استلام اللجنة</span>
               </span>
-              <span className="text-xs text-blue-700 font-mono">
-                {committee.examApprovedBy.approvedAt}
-              </span>
+              <p className="mt-1 text-ink-soft">
+                {committee.receivedByAssistant
+                  ? `استلمها ${committee.receivedByAssistant.assistantName} — ${formatWhen(committee.receivedByAssistant.receivedAt)}`
+                  : 'لم يُوثَّق الاستلام بعد'}
+              </p>
+              {canReception && onReceiveCommittee && (
+                <button
+                  type="button"
+                  onClick={() => onReceiveCommittee(committee.id, Boolean(committee.receivedByAssistant))}
+                  className="mt-2 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-900 font-bold cursor-pointer hover:bg-emerald-50"
+                >
+                  {committee.receivedByAssistant ? 'إلغاء توثيق الاستلام' : 'توثيق الاستلام'}
+                </button>
+              )}
             </div>
-          )}
+            <div className={`p-3.5 rounded-xl border ${committee.examApprovedBy ? 'bg-blue-50/70 border-blue-200' : 'bg-canvas border-line/40'}`}>
+              <span className="font-bold text-ink flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-blue-700 text-base">verified</span>
+                <span>جاهزية وتوزيع الامتحان</span>
+              </span>
+              <p className="mt-1 text-ink-soft">
+                {committee.examApprovedBy
+                  ? `اعتمدها ${committee.examApprovedBy.assistantName} — ${formatWhen(committee.examApprovedBy.approvedAt)}`
+                  : 'غير معتمدة بعد'}
+              </p>
+              {canReception && onApproveExamReadiness && (
+                <button
+                  type="button"
+                  onClick={() => onApproveExamReadiness(committee.id, Boolean(committee.examApprovedBy))}
+                  className="mt-2 px-3 py-1.5 rounded-lg bg-white border border-blue-300 text-blue-900 font-bold cursor-pointer hover:bg-blue-50"
+                >
+                  {committee.examApprovedBy ? 'إلغاء الاعتماد' : 'اعتماد الجاهزية'}
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Section: Stages Progression with Special Scoring & Aggregation Details */}
           <div className="space-y-3">
@@ -509,7 +462,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                 <span>مراحل عمل اللجنة (تبديل الحالة وتوثيق الوقت):</span>
               </h3>
               <span className="text-xs text-muted">
-                التأشير بـ "تم" يسجل الوقت والتاريخ تلقائياً
+                الخادم يسجل الوقت ومن قام بالإتمام، وتُتم المراحل بالترتيب
               </span>
             </div>
 
@@ -517,7 +470,6 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
               {STAGES_LIST.map((stageItem) => {
                 const stageData = stages[stageItem.key];
                 const isCompleted = stageData?.completed;
-                const isRegistration = stageItem.key === 'registration';
                 const isScoring = stageItem.key === 'scoring';
                 const isAggregation = stageItem.key === 'aggregation';
 
@@ -555,7 +507,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             {stageData?.completedAt && (
                               <div className="flex items-center gap-1 text-xs text-amber-800 mt-1">
                                 <span className="material-symbols-outlined text-xs">schedule</span>
-                                <span>تاريخ إتمام التصحيح: {stageData.completedAt}</span>
+                                <span>تاريخ إتمام التصحيح: {formatWhen(stageData.completedAt)}</span>
                               </div>
                             )}
                           </div>
@@ -566,7 +518,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           <button
                             type="button"
                             onClick={() => handleToggleStage('scoring')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            disabled={!canStage('scoring') || pending}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                               isCompleted
                                 ? 'bg-emerald-700 text-white'
                                 : 'bg-white text-amber-900 border border-amber-300 hover:bg-amber-100'
@@ -642,6 +595,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               <button
                                 type="button"
                                 onClick={handleAddQuestion}
+                                disabled={!canScore || pending}
                                 className="text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                               >
                                 <span className="material-symbols-outlined text-xs">add</span>
@@ -674,8 +628,18 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     {/* Top Row: Checkbox, Label, Timestamp, Delete */}
                                     <div className="flex items-center justify-between pb-2 border-b border-line/30">
                                       <div
-                                        onClick={() => handleToggleQuestion(q.id)}
-                                        className="flex items-center gap-2.5 cursor-pointer select-none"
+                                        role="checkbox"
+                                        aria-checked={q.completed}
+                                        aria-disabled={!canScore || pending}
+                                        tabIndex={canScore ? 0 : -1}
+                                        onClick={() => canScore && handleToggleQuestion(q.id)}
+                                        onKeyDown={(e) => {
+                                          if (canScore && (e.key === ' ' || e.key === 'Enter')) {
+                                            e.preventDefault();
+                                            handleToggleQuestion(q.id);
+                                          }
+                                        }}
+                                        className={`flex items-center gap-2.5 select-none ${canScore ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
                                       >
                                         <span
                                           className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-all ${
@@ -715,6 +679,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                           <button
                                             type="button"
                                             onClick={() => handleDeleteQuestion(q.id)}
+                                            disabled={!canScore || pending}
                                             className="text-gray-400 hover:text-red-500 p-1 rounded-md"
                                             title="حذف هذا السؤال"
                                           >
@@ -866,7 +831,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             {stageData?.completedAt && (
                               <div className="flex items-center gap-1 text-xs text-teal-800 mt-1">
                                 <span className="material-symbols-outlined text-xs">schedule</span>
-                                <span>تاريخ إتمام التجميع: {stageData.completedAt}</span>
+                                <span>تاريخ إتمام التجميع: {formatWhen(stageData.completedAt)}</span>
                               </div>
                             )}
                           </div>
@@ -877,6 +842,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             <input
                               type="checkbox"
                               checked={!!isCompleted}
+                              disabled={!canStage('aggregation') || pending}
                               onChange={() => handleToggleStage('aggregation')}
                               className="sr-only peer"
                             />
@@ -977,7 +943,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             {isCompleted && stageData?.completedAt && (
                               <div className="flex items-center gap-1 text-xs text-emerald-800 mt-1 font-mono">
                                 <span className="material-symbols-outlined text-xs">schedule</span>
-                                <span>تاريخ التمام: {stageData.completedAt}</span>
+                                <span>تاريخ التمام: {formatWhen(stageData.completedAt)}</span>
                               </div>
                             )}
                           </div>
@@ -987,7 +953,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           <button
                             type="button"
                             onClick={() => handleToggleStage('ceremony')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            disabled={!canStage('ceremony') || pending}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                               isCompleted
                                 ? 'bg-emerald-700 text-white shadow-2xs'
                                 : 'bg-brand text-white hover:bg-brand-deep shadow-2xs'
@@ -1022,18 +989,9 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 type="number"
                                 min="0"
                                 value={ceremonyDetails.honoredStudentsCount ?? ''}
-                                onChange={(e) => {
-                                  const updated = {
-                                    ...ceremonyDetails,
-                                    honoredStudentsCount:
-                                      e.target.value === '' ? undefined : Number(e.target.value),
-                                  };
-                                  setCeremonyDetails(updated);
-                                  onSaveCommittee({
-                                    ...committee,
-                                    ceremonyDetails: updated,
-                                  });
-                                }}
+                                disabled={!canFinalize}
+                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, honoredStudentsCount: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                onBlur={() => saveCeremony(ceremonyDetails)}
                                 placeholder="اكتب عدد الطلاب المكرمين..."
                                 className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
                               />
@@ -1051,17 +1009,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 <input
                                   type="date"
                                   value={ceremonyDetails.ceremonyDate || ''}
-                                  onChange={(e) => {
-                                    const updated = {
-                                      ...ceremonyDetails,
-                                      ceremonyDate: e.target.value,
-                                    };
-                                    setCeremonyDetails(updated);
-                                    onSaveCommittee({
-                                      ...committee,
-                                      ceremonyDetails: updated,
-                                    });
-                                  }}
+                                  disabled={!canFinalize}
+                                  onChange={(e) => saveCeremony({ ...ceremonyDetails, ceremonyDate: e.target.value })}
                                   className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-amber-600"
                                 />
                               </div>
@@ -1074,17 +1023,9 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                   type="text"
                                   placeholder="مثال: 4 العصر، 4 المغرب، 08:00 م بعد العشاء..."
                                   value={ceremonyDetails.ceremonyTime || ''}
-                                  onChange={(e) => {
-                                    const updated = {
-                                      ...ceremonyDetails,
-                                      ceremonyTime: e.target.value,
-                                    };
-                                    setCeremonyDetails(updated);
-                                    onSaveCommittee({
-                                      ...committee,
-                                      ceremonyDetails: updated,
-                                    });
-                                  }}
+                                  disabled={!canFinalize}
+                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, ceremonyTime: e.target.value })}
+                                onBlur={() => saveCeremony(ceremonyDetails)}
                                   className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                                 />
                               </div>
@@ -1143,6 +1084,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               <button
                                 type="button"
                                 onClick={handleAddSheikh}
+                                disabled={!canFinalize}
                                 className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                               >
                                 <span className="material-symbols-outlined text-sm">add</span>
@@ -1161,17 +1103,9 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 type="text"
                                 placeholder="مثال: القاعة الكبرى - مسجد الإمام البخاري..."
                                 value={ceremonyDetails.ceremonyPlace || ''}
-                                onChange={(e) => {
-                                  const updated = {
-                                    ...ceremonyDetails,
-                                    ceremonyPlace: e.target.value,
-                                  };
-                                  setCeremonyDetails(updated);
-                                  onSaveCommittee({
-                                    ...committee,
-                                    ceremonyDetails: updated,
-                                  });
-                                }}
+                                disabled={!canFinalize}
+                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, ceremonyPlace: e.target.value })}
+                                onBlur={() => saveCeremony(ceremonyDetails)}
                                 className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                               />
                             </div>
@@ -1184,17 +1118,9 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 type="text"
                                 placeholder="مثال: تجهيز أجهزة الصوت والدروع وشهادات التقدير..."
                                 value={ceremonyDetails.notes || ''}
-                                onChange={(e) => {
-                                  const updated = {
-                                    ...ceremonyDetails,
-                                    notes: e.target.value,
-                                  };
-                                  setCeremonyDetails(updated);
-                                  onSaveCommittee({
-                                    ...committee,
-                                    ceremonyDetails: updated,
-                                  });
-                                }}
+                                disabled={!canFinalize}
+                                onChange={(e) => setCeremonyDetails({ ...ceremonyDetails, notes: e.target.value })}
+                                onBlur={() => saveCeremony(ceremonyDetails)}
                                 className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                               />
                             </div>
@@ -1258,7 +1184,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                         {isCompleted && stageData?.completedAt && (
                           <div className="flex items-center gap-1 text-xs text-emerald-700 mt-0.5">
                             <span className="material-symbols-outlined text-xs">schedule</span>
-                            <span>تاريخ الإتمام: {stageData.completedAt}</span>
+                            <span>تاريخ الإتمام: {formatWhen(stageData.completedAt)}</span>
                           </div>
                         )}
                       </div>
@@ -1270,7 +1196,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                         <input
                           type="checkbox"
                           checked={!!isCompleted}
-                          disabled={isRegistration}
+                          disabled={!canStage(stageItem.key) || pending}
+                          aria-label={stageItem.label}
                           onChange={() => handleToggleStage(stageItem.key)}
                           className="sr-only peer"
                         />
@@ -1284,7 +1211,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
           </div>
 
           {/* Section: Sheikh, Students & Committee Type Edit */}
-          {currentUser?.role === 'super_admin' && (
+          {canEditBase && (
             <div className="bg-canvas p-4 rounded-xl border border-line/40 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-brand flex items-center gap-1.5">
@@ -1377,12 +1304,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                 الملاحظات العامة على اللجنة
               </label>
               <span className="text-xs text-muted">
-                (خانة نصية حرة خاصة بكل لجنة يتم حفظها ومزامنتها فورياً)
+                {canEditBase ? '(تُحفظ بزر الحفظ بالأسفل)' : '(للاطلاع فقط)'}
               </span>
             </div>
             <textarea
               rows={3}
               value={generalNotes}
+              readOnly={!canEditBase}
               onChange={(e) => setGeneralNotes(e.target.value)}
               placeholder=""
               className="w-full bg-white border border-line rounded-xl p-3 text-xs text-ink outline-none focus:border-brand leading-relaxed"
@@ -1396,7 +1324,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             {isSavedToast && (
               <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 animate-in fade-in">
                 <span className="material-symbols-outlined text-sm">check</span>
-                تم حفظ وتحديث بيانات اللجنة فورياً
+                تم الحفظ على الخادم
               </span>
             )}
           </div>
@@ -1410,13 +1338,16 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
               إغلاق
             </button>
 
-            <button
-              onClick={handleSave}
-              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-brand hover:bg-success shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm">save</span>
-              <span>حفظ الملاحظات والتعديلات</span>
-            </button>
+            {canSaveAnything && (
+              <button
+                onClick={handleSave}
+                disabled={pending}
+                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-brand hover:bg-success shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-sm">save</span>
+                <span>{pending ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

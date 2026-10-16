@@ -3,49 +3,57 @@ import {
   AppUser,
   AssistantPermission,
   Committee,
+  Course,
   PermissionDefinition,
   UserRole,
   PermissionProfile,
   ExamItem,
 } from '../types';
-import { AuthService } from '../services/AuthService';
+import { AuthService, type AccessChanges } from '../services/AuthService';
+import { CommitteePicker } from './CommitteePicker';
 
 interface AssistantsViewProps {
   users: AppUser[];
   committees: Committee[];
+  courses?: Course[];
   exams?: ExamItem[];
   currentUser: AppUser;
   profiles?: PermissionProfile[];
-  onSaveProfile?: (profile: PermissionProfile) => void;
-  onDeleteProfile?: (profileId: string) => void;
-  onAssignProfile?: (userId: string, profileId: string) => void;
-  onSetSuperAdmin?: (userId: string, isSuper: boolean) => Promise<{ success: boolean; message: string }>;
-  onApproveAssistant: (
-    userId: string,
-    permissions: AssistantPermission[],
-    assignedCommittees: number[],
-    role?: UserRole
-  ) => void;
-  onScheduleInterview?: (userId: string, date: string, notes?: string) => void;
-  onRejectAssistant: (userId: string, reason?: string) => void;
-  onUpdateAssistantPermissions: (
-    userId: string,
-    permissions: AssistantPermission[],
-    assignedCommittees: number[]
-  ) => void;
-  onUpdateAssistantUser: (updatedUser: AppUser) => void;
+  onSaveProfile?: (profile: PermissionProfile) => unknown;
+  onDeleteProfile?: (profileId: string) => unknown;
+  onAssignProfile?: (userId: string, profileId: string) => Promise<unknown>;
+  onSetSuperAdmin?: (userId: string, isSuper: boolean, demoteTo?: UserRole) => Promise<{ success: boolean; message: string }>;
+  /** One request: approval plus any access settings (WEB-03). Resolves to undefined on failure. */
+  onApproveAssistant: (userId: string, access?: AccessChanges) => Promise<unknown>;
+  onScheduleInterview?: (userId: string, date: string, notes?: string) => unknown;
+  onRejectAssistant: (userId: string, reason?: string) => unknown;
+  /** Profile fields plus only the access settings that changed. Resolves to undefined on failure. */
+  onUpdateAssistantUser: (updatedUser: AppUser, access?: AccessChanges) => Promise<unknown>;
   onAddAssistantDirect: (user: Omit<AppUser, 'id' | 'createdAt'> & { password: string }) => unknown;
-  onDeleteAssistant: (userId: string) => void;
+  onDeleteAssistant: (userId: string) => unknown;
+  /** Super admin: temporary password the user must replace at the next login (WEB-02). */
+  onResetPassword?: (userId: string, temporaryPassword: string) => Promise<unknown>;
   onOpenAuthModal: () => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
+  /** System permissions only: custom labels never granted anything (D-01). */
   customPermissions: PermissionDefinition[];
-  onAddCustomPermission: (label: string) => void;
-  onDeleteCustomPermission: (id: string) => void;
+}
+
+const sameSet = (a: string[] = [], b: string[] = []) => a.length === b.length && a.every((x) => b.includes(x));
+
+/** A readable temporary password that satisfies the server rule (letters and digits, 10 characters). */
+function generateTemporaryPassword() {
+  const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  const pick = (set: string) => set[crypto.getRandomValues(new Uint32Array(1))[0] % set.length];
+  const chars = [...Array(7)].map(() => pick(letters)).concat([...Array(3)].map(() => pick(digits)));
+  return chars.sort(() => (crypto.getRandomValues(new Uint8Array(1))[0] > 127 ? 1 : -1)).join('');
 }
 
 export const AssistantsView: React.FC<AssistantsViewProps> = ({
   users,
   committees,
+  courses: _courses = [],
   exams = [],
   currentUser,
   profiles = [],
@@ -56,16 +64,22 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   onApproveAssistant,
   onScheduleInterview,
   onRejectAssistant,
-  onUpdateAssistantPermissions,
   onUpdateAssistantUser,
   onAddAssistantDirect,
   onDeleteAssistant,
+  onResetPassword,
   onOpenAuthModal,
   onOpenCommitteeDetails,
   customPermissions,
-  onAddCustomPermission,
-  onDeleteCustomPermission,
 }) => {
+  // Super admins grant roles, permissions and access; other managers assign their own committees only.
+  const canGrant = AuthService.canGrant();
+  const canAssign = (c: Committee) => canGrant || AuthService.canAccessCommittee(c);
+  const committeeLabel = (ids: string[] = []) =>
+    committees
+      .filter((c) => ids.includes(c.id))
+      .map((c) => `#${c.committeeNumber}${c.courseName ? ` (${c.courseName})` : ''}`)
+      .join('، ');
   // Tabs: 'approved' (المعاونون والمستخدمون), 'profiles' (مركز بناء أنظمة الصلاحيات المخصصة), 'requests' (طلبات الانضمام والمقابلات)
   const [activeTab, setActiveTab] = useState<'approved' | 'profiles' | 'requests'>('approved');
   const [requestsSubFilter, setRequestsSubFilter] = useState<'all' | 'pending' | 'interview' | 'rejected'>('all');
@@ -79,6 +93,20 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [rejectingUser, setRejectingUser] = useState<AppUser | null>(null);
   const [approvingUser, setApprovingUser] = useState<AppUser | null>(null);
   const [assigningProfileUser, setAssigningProfileUser] = useState<AppUser | null>(null);
+  const [demotingUser, setDemotingUser] = useState<AppUser | null>(null);
+  const [demoteTo, setDemoteTo] = useState<UserRole>('committee_head');
+  const [saving, setSaving] = useState(false);
+  // Edit modal: access settings edited next to the profile fields.
+  const [editAccess, setEditAccess] = useState<{
+    role: UserRole;
+    permissions: AssistantPermission[];
+    committeeIds: string[];
+    allCommittees: boolean;
+    allExams: boolean;
+    examIds: string[];
+    profileId: string;
+  } | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
 
   // Profile Builder Modal State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -86,19 +114,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [profileName, setProfileName] = useState('');
   const [profileDescription, setProfileDescription] = useState('');
   const [profileBadgeColor, setProfileBadgeColor] = useState<'emerald' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal'>('emerald');
-  const [profileAllowedTabs, setProfileAllowedTabs] = useState<string[]>([
-    'summer_course',
-    'committees',
-    'daily_alerts',
-  ]);
   const [profileAllCommittees, setProfileAllCommittees] = useState(true);
-  const [profileAllowedCommittees, setProfileAllowedCommittees] = useState<number[]>([]);
+  const [profileAllowedCommitteeIds, setProfileAllowedCommitteeIds] = useState<string[]>([]);
   const [profileAllExams, setProfileAllExams] = useState(true);
   const [profileAllowedExamIds, setProfileAllowedExamIds] = useState<string[]>([]);
-  const [profilePermissions, setProfilePermissions] = useState<AssistantPermission[]>([
-    'database_sheets',
-    'manage_committees',
-  ]);
+  const [profilePermissions, setProfilePermissions] = useState<AssistantPermission[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [superAdminAlert, setSuperAdminAlert] = useState<string | null>(null);
@@ -110,15 +130,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   // Rejection state
   const [rejectionReason, setRejectionReason] = useState('نعتذر عن قبول الطلب حالياً لاكتمال النصاب المطلوب في لجان هذه الدورة، مع تمنياتنا بالتوفيق في الدورات القادمة.');
 
-  // Approval modal custom state
+  // Approval modal: nothing extra is pre-selected (WEB-05).
   const [approvalRole, setApprovalRole] = useState<UserRole>('assistant');
   const [approvalProfileId, setApprovalProfileId] = useState<string>('');
-  const [approvalPermissions, setApprovalPermissions] = useState<AssistantPermission[]>([
-    'database_sheets',
-    'manage_committees',
-    'calendar_schedule',
-  ]);
-  const [approvalCommittees, setApprovalCommittees] = useState<number[]>([]);
+  const [approvalPermissions, setApprovalPermissions] = useState<AssistantPermission[]>([]);
+  const [approvalCommittees, setApprovalCommittees] = useState<string[]>([]);
+  const [approvalAllCommittees, setApprovalAllCommittees] = useState(false);
 
   // Form state for adding direct assistant
   const [newName, setNewName] = useState('');
@@ -129,9 +146,9 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [newRole, setNewRole] = useState<UserRole>('assistant');
   const [newProfileId, setNewProfileId] = useState<string>('');
   const [newPermissions, setNewPermissions] = useState<AssistantPermission[]>([]);
-  const [newAssignedCommittees, setNewAssignedCommittees] = useState<number[]>([]);
+  const [newAssignedCommittees, setNewAssignedCommittees] = useState<string[]>([]);
 
-  // Available All Tabs Meta
+  // Screen names, used only to describe what a permission opens.
   const ALL_SYSTEM_TABS: Array<{ id: string; label: string; icon: string; desc: string }> = [
     { id: 'home', label: 'الرئيسية ونظرة عامة', icon: 'dashboard', desc: 'الشاشة الترحيبية والملخص الميداني' },
     { id: 'summer_course', label: 'قاعدة البيانات والكشوفات', icon: 'table_chart', desc: 'كشوفات الطلاب ورصد الحضور' },
@@ -185,12 +202,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     setProfileName('');
     setProfileDescription('');
     setProfileBadgeColor('emerald');
-    setProfileAllowedTabs(['summer_course', 'committees', 'daily_alerts']);
-    setProfileAllCommittees(true);
-    setProfileAllowedCommittees([1, 2]);
+    setProfileAllCommittees(false);
+    setProfileAllowedCommitteeIds([]);
     setProfileAllExams(true);
     setProfileAllowedExamIds([]);
-    setProfilePermissions(['database_sheets', 'manage_committees']);
+    setProfilePermissions([]);
     setIsProfileModalOpen(true);
   };
 
@@ -199,129 +215,99 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     setProfileName(profile.name);
     setProfileDescription(profile.description);
     setProfileBadgeColor(profile.badgeColor || 'emerald');
-    setProfileAllowedTabs(profile.allowedTabs || ['summer_course', 'committees']);
     setProfileAllCommittees(Boolean(profile.allCommitteesAllowed));
-    setProfileAllowedCommittees(profile.allowedCommittees || []);
+    setProfileAllowedCommitteeIds(profile.allowedCommitteeIds ?? []);
     setProfileAllExams(Boolean(profile.allExamsAllowed));
     setProfileAllowedExamIds(profile.allowedExamIds || []);
     setProfilePermissions(profile.permissions || []);
     setIsProfileModalOpen(true);
   };
 
-  const handleSaveProfileSubmit = (e: React.FormEvent) => {
+  const handleSaveProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profileName.trim()) return;
-
+    const ids = profileAllCommittees ? [] : profileAllowedCommitteeIds;
     const newProf: PermissionProfile = {
-      id: editingProfile ? editingProfile.id : `profile_${Date.now()}`,
+      id: editingProfile ? editingProfile.id : `profile_${crypto.randomUUID()}`,
       name: profileName.trim(),
       description: profileDescription.trim(),
       badgeColor: profileBadgeColor,
-      allowedTabs: profileAllowedTabs,
-      allowedCommittees: profileAllCommittees ? [] : profileAllowedCommittees,
+      allowedCommitteeIds: ids,
+      allowedCommittees: committees.filter((c) => ids.includes(c.id)).map((c) => c.committeeNumber),
       allCommitteesAllowed: profileAllCommittees,
       allowedExamIds: profileAllExams ? [] : profileAllowedExamIds,
       allExamsAllowed: profileAllExams,
       permissions: profilePermissions,
-      createdAt: editingProfile ? editingProfile.createdAt : new Date().toLocaleDateString('ar-EG'),
+      createdAt: editingProfile ? editingProfile.createdAt : new Date().toISOString(),
       createdBy: currentUser.name,
       isDefault: editingProfile ? editingProfile.isDefault : false,
     };
-
-    if (onSaveProfile) {
-      onSaveProfile(newProf);
-    } else {
-      AuthService.saveProfile(newProf);
+    setSaving(true);
+    try {
+      await (onSaveProfile ? onSaveProfile(newProf) : AuthService.saveProfile(newProf));
+      setIsProfileModalOpen(false);
+    } finally {
+      setSaving(false);
     }
-
-    setIsProfileModalOpen(false);
   };
 
-  const handleToggleSuperAdmin = async (targetUser: AppUser) => {
-    if (!isSuperAdmin) {
-      alert('عذراً، فقط المشرف العام (سوبر أدمن) يملك صلاحية تغيير رتبة السوبر أدمن.');
-      return;
-    }
-
+  const handleToggleSuperAdmin = async (targetUser: AppUser, demoteRole?: UserRole) => {
+    if (!canGrant) return;
     const willBeSuper = targetUser.role !== 'super_admin';
     const result = await (onSetSuperAdmin
-      ? onSetSuperAdmin(targetUser.id, willBeSuper)
-      : AuthService.setSuperAdmin(targetUser.id, willBeSuper));
-
-    if (!result.success) {
-      setSuperAdminAlert(result.message);
-      setTimeout(() => setSuperAdminAlert(null), 5000);
-    } else {
-      setSuperAdminAlert(result.message);
-      setTimeout(() => setSuperAdminAlert(null), 4000);
-    }
+      ? onSetSuperAdmin(targetUser.id, willBeSuper, demoteRole)
+      : AuthService.setSuperAdmin(targetUser.id, willBeSuper, demoteRole));
+    setSuperAdminAlert(result.message);
+    setTimeout(() => setSuperAdminAlert(null), result.success ? 4000 : 5000);
   };
 
-  const handleAssignProfileToUser = (targetUser: AppUser, profileId: string) => {
-    if (onAssignProfile) {
-      onAssignProfile(targetUser.id, profileId);
-    } else {
-      AuthService.assignProfileToUser(targetUser.id, profileId);
+  /** Applying a profile is one server request: the server copies its settings (WEB-03). */
+  const handleAssignProfileToUser = async (targetUser: AppUser, profileId: string) => {
+    setSaving(true);
+    try {
+      await (onAssignProfile ? onAssignProfile(targetUser.id, profileId) : AuthService.assignProfileToUser(targetUser.id, profileId));
+      setAssigningProfileUser(null);
+    } finally {
+      setSaving(false);
     }
-    const prof = effectiveProfiles.find((p) => p.id === profileId);
-    if (prof && onUpdateAssistantUser) {
-      onUpdateAssistantUser({
-        ...targetUser,
-        profileId,
-        permissions: prof.permissions,
-        assignedCommittees: prof.allCommitteesAllowed ? [] : prof.allowedCommittees,
-        allCommitteesAllowed: prof.allCommitteesAllowed,
-        allowedExamIds: prof.allowedExamIds,
-        allExamsAllowed: prof.allExamsAllowed,
-      });
-    }
-    setAssigningProfileUser(null);
   };
 
   const handleOpenApproveModal = (user: AppUser) => {
     setApprovingUser(user);
     setApprovalRole(user.role || 'assistant');
-    setApprovalProfileId(user.profileId || '');
-    setApprovalPermissions(
-      user.permissions && user.permissions.length > 0
-        ? user.permissions
-        : ['database_sheets', 'manage_committees', 'calendar_schedule']
-    );
-    setApprovalCommittees(
-      user.assignedCommittees && user.assignedCommittees.length > 0
-        ? user.assignedCommittees
-        : user.preferredCommittees && user.preferredCommittees.length > 0
-        ? user.preferredCommittees
-        : [1]
-    );
+    setApprovalProfileId('');
+    setApprovalPermissions([]);
+    setApprovalAllCommittees(false);
+    // Preferred committees are numbers chosen by the applicant; offer them only where unambiguous.
+    const preferred = committees.filter((c) => user.preferredCommittees?.includes(c.committeeNumber) && canAssign(c));
+    const numbers = new Set(preferred.map((c) => c.committeeNumber));
+    setApprovalCommittees(preferred.length === numbers.size ? preferred.map((c) => c.id) : []);
   };
 
-  const handleConfirmApproval = (e: React.FormEvent) => {
+  const handleConfirmApproval = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!approvingUser) return;
-
-    if (approvalProfileId) {
-      const prof = effectiveProfiles.find((p) => p.id === approvalProfileId);
-      if (prof) {
-        onApproveAssistant(
-          approvingUser.id,
-          prof.permissions,
-          prof.allCommitteesAllowed ? [] : prof.allowedCommittees,
-          approvalRole
-        );
-        handleAssignProfileToUser(approvingUser, approvalProfileId);
-        setApprovingUser(null);
-        return;
+    const access: AccessChanges = {};
+    if (canGrant) {
+      if (approvalRole !== approvingUser.role) access.role = approvalRole;
+      if (approvalProfileId) {
+        access.profileId = approvalProfileId;
+      } else {
+        access.permissions = approvalPermissions;
+        if (approvalAllCommittees) access.allCommitteesAllowed = true;
+        else access.assignedCommitteeIds = approvalCommittees;
       }
+    } else {
+      access.assignedCommitteeIds = approvalCommittees;
     }
-
-    onApproveAssistant(
-      approvingUser.id,
-      approvalPermissions,
-      approvalCommittees,
-      approvalRole
-    );
-    setApprovingUser(null);
+    setSaving(true);
+    try {
+      // The modal closes only after the server confirmed the approval.
+      const result = await onApproveAssistant(approvingUser.id, access);
+      if (result !== undefined) setApprovingUser(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleOpenInterviewModal = (user: AppUser) => {
@@ -356,66 +342,81 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newPhone.trim() || !newPassword) return;
-
-    let perms = newPermissions;
-    let comms = newAssignedCommittees;
-    let allComms = true;
-    let examIds: string[] = [];
-    let allExams = true;
-
-    if (newProfileId) {
-      const prof = effectiveProfiles.find((p) => p.id === newProfileId);
-      if (prof) {
-        perms = prof.permissions;
-        comms = prof.allCommitteesAllowed ? [] : prof.allowedCommittees;
-        allComms = prof.allCommitteesAllowed;
-        examIds = prof.allowedExamIds || [];
-        allExams = prof.allExamsAllowed;
-      }
-    }
-
     const created = await onAddAssistantDirect({
       password: newPassword,
       name: newName.trim(),
       phone: newPhone.trim(),
       email: newEmail.trim(),
-      role: newRole,
-      profileId: newProfileId || undefined,
+      role: canGrant ? newRole : 'assistant',
+      profileId: canGrant && newProfileId ? newProfileId : undefined,
       status: 'approved',
-      assignedCommittees: comms,
-      allCommitteesAllowed: allComms,
-      allowedExamIds: examIds,
-      allExamsAllowed: allExams,
-      permissions: perms,
+      assignedCommittees: [],
+      assignedCommitteeIds: newAssignedCommittees,
+      permissions: canGrant && !newProfileId ? newPermissions : [],
       notes: newNotes.trim() || undefined,
     });
     if (!created) return;
-
     setIsAddModalOpen(false);
     setNewName('');
     setNewPhone('');
     setNewEmail('');
     setNewPassword('');
     setNewNotes('');
+    setNewPermissions([]);
+    setNewProfileId('');
     setNewAssignedCommittees([]);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const openEditUser = (user: AppUser) => {
+    setEditingUser(user);
+    setResetPassword('');
+    setEditAccess({
+      role: user.role,
+      permissions: user.permissions ?? [],
+      committeeIds: user.assignedCommitteeIds ?? [],
+      allCommittees: Boolean(user.allCommitteesAllowed),
+      allExams: Boolean(user.allExamsAllowed),
+      examIds: user.allowedExamIds ?? [],
+      profileId: '',
+    });
+  };
+
+  /** Sends the profile fields and only the access settings that changed, in one request. */
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser) return;
-    let updated = { ...editingUser };
-    if (updated.profileId) {
-      const prof = effectiveProfiles.find((p) => p.id === updated.profileId);
-      if (prof) {
-        updated.permissions = prof.permissions;
-        updated.assignedCommittees = prof.allCommitteesAllowed ? [] : prof.allowedCommittees;
-        updated.allCommitteesAllowed = prof.allCommitteesAllowed;
-        updated.allowedExamIds = prof.allowedExamIds || [];
-        updated.allExamsAllowed = prof.allExamsAllowed;
+    if (!editingUser || !editAccess) return;
+    const original = users.find((u) => u.id === editingUser.id) ?? editingUser;
+    const access: AccessChanges = {};
+    if (editAccess.profileId) {
+      access.profileId = editAccess.profileId;
+    } else {
+      if (canGrant && editAccess.role !== original.role) access.role = editAccess.role;
+      if (canGrant && !sameSet(editAccess.permissions, original.permissions)) access.permissions = editAccess.permissions;
+      if (canGrant && editAccess.allCommittees !== Boolean(original.allCommitteesAllowed)) access.allCommitteesAllowed = editAccess.allCommittees;
+      if (!editAccess.allCommittees && !sameSet(editAccess.committeeIds, original.assignedCommitteeIds ?? [])) {
+        access.assignedCommitteeIds = editAccess.committeeIds;
       }
+      if (canGrant && editAccess.allExams !== Boolean(original.allExamsAllowed)) access.allExamsAllowed = editAccess.allExams;
+      if (canGrant && !editAccess.allExams && !sameSet(editAccess.examIds, original.allowedExamIds ?? [])) access.allowedExamIds = editAccess.examIds;
     }
-    onUpdateAssistantUser(updated);
-    setEditingUser(null);
+    setSaving(true);
+    try {
+      const result = await onUpdateAssistantUser(editingUser, access);
+      if (result !== undefined) setEditingUser(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!editingUser || !onResetPassword || resetPassword.length < 8) return;
+    setSaving(true);
+    try {
+      const result = await onResetPassword(editingUser.id, resetPassword);
+      if (result !== undefined) setSuperAdminAlert(`تمت إعادة تعيين كلمة مرور ${editingUser.name}. أبلغه بكلمة المرور المؤقتة؛ سيُطلب منه تغييرها عند الدخول.`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -437,7 +438,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          {isSuperAdmin && (
+          {canGrant && (
             <button
               onClick={handleOpenCreateProfile}
               className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-amber-950 font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer"
@@ -459,8 +460,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             onClick={onOpenAuthModal}
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-black/20 hover:bg-black/30 text-emerald-200 border border-emerald-400/30 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-lg">sync_alt</span>
-            <span>تبديل الحساب</span>
+            <span className="material-symbols-outlined text-lg">account_circle</span>
+            <span>حسابي</span>
           </button>
         </div>
       </div>
@@ -616,9 +617,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {filteredApproved.map((user) => {
               const userProfile = effectiveProfiles.find((p) => p.id === user.profileId);
-              const assignedComms = committees.filter((c) =>
-                user.assignedCommittees.includes(c.committeeNumber)
-              );
+              const assignedLabel = committeeLabel(user.assignedCommitteeIds);
+              const canEditUser = canGrant || (user.role === 'assistant' && user.id !== currentUser.id) || user.id === currentUser.id;
 
               return (
                 <div
@@ -656,14 +656,17 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setEditingUser(user)}
-                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
-                        title="تعديل البيانات والصلاحيات"
-                      >
-                        <span className="material-symbols-outlined text-base">edit</span>
-                      </button>
-                      {user.role !== 'super_admin' && (
+                      {canEditUser && (
+                        <button
+                          onClick={() => openEditUser(user)}
+                          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                          title="تعديل البيانات والصلاحيات"
+                          aria-label={`تعديل ${user.name}`}
+                        >
+                          <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                      )}
+                      {user.role !== 'super_admin' && AuthService.can('users.delete') && (
                         <button
                           onClick={() => setUserToDelete(user)}
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
@@ -680,11 +683,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     <div>
                       <span className="text-slate-500 text-xs block">نظام الصلاحية المطبق:</span>
                       <strong className="text-teal-900 font-bold">
-                        {userProfile ? userProfile.name : user.role === 'super_admin' ? 'كامل الصلاحيات (سوبر أدمن)' : 'صلاحيات مخصصة يدوياً'}
+                        {user.role === 'super_admin' ? 'كامل الصلاحيات (سوبر أدمن)' : userProfile ? `آخر بروفايل طُبّق: ${userProfile.name}` : 'صلاحيات محددة يدوياً'}
                       </strong>
                     </div>
 
-                    {isSuperAdmin && (
+                    {canGrant && user.role !== 'super_admin' && (
                       <button
                         onClick={() => setAssigningProfileUser(user)}
                         className="px-3 py-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-950 font-bold text-xs cursor-pointer flex items-center gap-1"
@@ -701,10 +704,10 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       <span className="text-xs text-slate-500 block font-bold">اللجان المسموح بها:</span>
                       <span className="text-emerald-950 font-semibold mt-0.5 block">
                         {user.role === 'super_admin' || user.allCommitteesAllowed
-                          ? 'كافة اللجان العامة ✓'
-                          : assignedComms.length > 0
-                          ? assignedComms.map((c) => `#${c.committeeNumber}`).join('، ')
-                          : 'لا توجد لجان مسندة'}
+                          ? 'كل اللجان ✓'
+                          : user.role === 'auditor'
+                          ? 'اطلاع فقط على كل اللجان'
+                          : assignedLabel || 'لا توجد لجان مسندة'}
                       </span>
                     </div>
 
@@ -712,21 +715,28 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       <span className="text-xs text-slate-500 block font-bold">الامتحانات المصرح بها:</span>
                       <span className="text-blue-950 font-semibold mt-0.5 block">
                         {user.role === 'super_admin' || user.allExamsAllowed
-                          ? 'كافة الامتحانات ✓'
+                          ? 'كل الامتحانات ✓'
                           : user.allowedExamIds && user.allowedExamIds.length > 0
                           ? `${user.allowedExamIds.length} امتحان محدد`
-                          : 'كافة الامتحانات المعتمدة'}
+                          : 'لا يفتح ملفات الامتحانات'}
                       </span>
                     </div>
                   </div>
 
                   {/* Super Admin Promotion / Demotion Action (Only Super Admin can do this) */}
-                  {isSuperAdmin && currentUser.id !== user.id && (
+                  {canGrant && currentUser.id !== user.id && (
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-xs text-slate-500">التحكم في رتبة السوبر أدمن:</span>
                       <button
                         type="button"
-                        onClick={() => handleToggleSuperAdmin(user)}
+                        onClick={() => {
+                          if (user.role === 'super_admin') {
+                            setDemoteTo('committee_head');
+                            setDemotingUser(user);
+                          } else {
+                            void handleToggleSuperAdmin(user);
+                          }
+                        }}
                         className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer transition-all flex items-center gap-1 ${
                           user.role === 'super_admin'
                             ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
@@ -758,11 +768,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   <span>أنظمة الصلاحيات المخصصة (Permission Profiles Builder)</span>
                 </h3>
                 <p className="text-xs text-teal-900 mt-1 max-w-2xl leading-relaxed">
-                  يمكن للسوبر أدمن إنشاء أي بروفايل صلاحية جديد، وتحديد التابات المفتوحة، اللجان المسموح بها، والامتحانات التي يستطيع المستخدم الدخول على تفاصيلها وتصحيحها فقط.
+                  البروفايل قالب جاهز: عند تطبيقه على مستخدم ينسخ الخادم صلاحياته ولجانه والامتحانات المسموح بها، والخادم هو من يطبقها. تعديل البروفايل لاحقاً لا يغيّر من طُبّق عليهم حتى يُطبَّق مرة أخرى.
                 </p>
               </div>
 
-              {isSuperAdmin && (
+              {canGrant && (
                 <button
                   onClick={handleOpenCreateProfile}
                   className="px-5 py-2.5 rounded-2xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs sm:text-sm cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 transition-all shrink-0"
@@ -805,24 +815,19 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
                     {/* Profile Details & Scope Matrix */}
                     <div className="py-3 space-y-2.5 text-xs">
-                      {/* Allowed Pages / Tabs */}
+                      {/* Permissions granted by the profile */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
                         <span className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-teal-700">visibility</span>
-                          <span>الصفحات والتابات المفتوحة للمستخدم:</span>
+                          <span className="material-symbols-outlined text-sm text-teal-700">key</span>
+                          <span>الصلاحيات:</span>
                         </span>
                         <div className="flex flex-wrap gap-1.5">
-                          {prof.allowedTabs.map((tId) => {
-                            const tabMeta = ALL_SYSTEM_TABS.find((t) => t.id === tId);
-                            return (
-                              <span
-                                key={tId}
-                                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-bold"
-                              >
-                                {tabMeta?.label || tId}
-                              </span>
-                            );
-                          })}
+                          {prof.permissions.length === 0 && <span className="text-xs text-slate-400">بدون صلاحيات إضافية</span>}
+                          {prof.permissions.map((pid) => (
+                            <span key={pid} className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-bold">
+                              {customPermissions.find((cp) => cp.id === pid)?.label || pid}
+                            </span>
+                          ))}
                         </div>
                       </div>
 
@@ -834,9 +839,9 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         </span>
                         <span className="text-xs font-semibold text-emerald-950">
                           {prof.allCommitteesAllowed
-                            ? '✓ مسموح بكافة اللجان العامة دون استثناء'
-                            : prof.allowedCommittees && prof.allowedCommittees.length > 0
-                            ? `مقتصر على اللجان: (${prof.allowedCommittees.map((c) => `#${c}`).join('، ')}) فقط`
+                            ? '✓ كل اللجان في كل الدورات'
+                            : (prof.allowedCommitteeIds ?? []).length > 0
+                            ? `مقتصر على: ${committeeLabel(prof.allowedCommitteeIds)}`
                             : 'لا توجد لجان محددة'}
                         </span>
                       </div>
@@ -852,7 +857,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                             ? '✓ مسموح بكافة الامتحانات والنماذج'
                             : prof.allowedExamIds && prof.allowedExamIds.length > 0
                             ? `مقتصر على (${prof.allowedExamIds.length}) امتحانات محددة فقط`
-                            : 'كافة الامتحانات المعتمدة'}
+                            : 'لا يفتح ملفات الامتحانات'}
                         </span>
                       </div>
                     </div>
@@ -1128,42 +1133,26 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </div>
               </div>
 
-              {/* Allowed View Tabs Checklist (الصفحات والتابات المفتوحة) */}
+              {/* Permissions (system permissions only) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-teal-700">visibility</span>
-                  <span>٢. الصفحات والتابات المصرح للمستخدم برؤيتها والدخول عليها:</span>
+                  <span className="material-symbols-outlined text-sm text-teal-700">key</span>
+                  <span>٢. الصلاحيات التي يمنحها البروفايل:</span>
                 </h4>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ALL_SYSTEM_TABS.map((tab) => {
-                    const isChecked = profileAllowedTabs.includes(tab.id);
-                    return (
-                      <label
-                        key={tab.id}
-                        className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2.5 transition-all ${
-                          isChecked
-                            ? 'bg-teal-50 border-teal-300 text-teal-950 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            setProfileAllowedTabs((prev) =>
-                              e.target.checked ? [...prev, tab.id] : prev.filter((id) => id !== tab.id)
-                            );
-                          }}
-                          className="rounded text-teal-600 focus:ring-teal-600"
-                        />
-                        <div>
-                          <span className="block text-xs">{tab.label}</span>
-                          <span className="text-xs text-slate-400 font-normal">{tab.desc}</span>
-                        </div>
-                      </label>
-                    );
-                  })}
+                  {customPermissions.map((perm) => (
+                    <label key={perm.id} className="flex items-center gap-2 cursor-pointer text-xs">
+                      <input
+                        type="checkbox"
+                        checked={profilePermissions.includes(perm.id)}
+                        onChange={(e) =>
+                          setProfilePermissions((prev) => (e.target.checked ? [...prev, perm.id] : prev.filter((x) => x !== perm.id)))
+                        }
+                        className="rounded text-teal-600 focus:ring-teal-600"
+                      />
+                      <span>{perm.label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -1197,30 +1186,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </div>
 
                 {!profileAllCommittees && (
-                  <div className="pt-2 flex flex-wrap gap-1.5">
-                    {committees.map((c) => {
-                      const isSelected = profileAllowedCommittees.includes(c.committeeNumber);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            setProfileAllowedCommittees((prev) =>
-                              isSelected
-                                ? prev.filter((num) => num !== c.committeeNumber)
-                                : [...prev, c.committeeNumber].sort((a, b) => a - b)
-                            );
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-teal-700 text-white border-teal-700'
-                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                          }`}
-                        >
-                          لجنة #{c.committeeNumber}
-                        </button>
-                      );
-                    })}
+                  <div className="pt-2">
+                    <CommitteePicker committees={committees} selectedIds={profileAllowedCommitteeIds} onChange={setProfileAllowedCommitteeIds} />
                   </div>
                 )}
               </div>
@@ -1305,9 +1272,10 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black shadow-md cursor-pointer"
+                  disabled={saving}
+                  className="px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black shadow-md cursor-pointer disabled:opacity-60"
                 >
-                  حفظ وتثبيت نظام الصلاحية
+                  {saving ? 'جارٍ الحفظ…' : 'حفظ نظام الصلاحية'}
                 </button>
               </div>
             </form>
@@ -1341,7 +1309,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   <button
                     key={prof.id}
                     type="button"
-                    onClick={() => handleAssignProfileToUser(assigningProfileUser, prof.id)}
+                    disabled={saving}
+                    onClick={() => void handleAssignProfileToUser(assigningProfileUser, prof.id)}
                     className={`w-full p-3 rounded-2xl border text-right cursor-pointer transition-all flex items-center justify-between ${
                       isSelected
                         ? 'bg-teal-50 border-teal-500 text-teal-950 font-bold ring-2 ring-teal-200'
@@ -1386,87 +1355,89 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             </div>
 
             <form onSubmit={handleConfirmApproval} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">المسمى والدور في المنظومة:</label>
-                <select
-                  value={approvalRole}
-                  onChange={(e) => setApprovalRole(e.target.value as UserRole)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
-                >
-                  <option value="assistant">معاون ميداني معتمد</option>
-                  <option value="teacher">معلم ومقرئ معتمد</option>
-                  <option value="committee_head">رئيس لجنة ومقرئ</option>
-                  <option value="auditor">مراجع ومدقق جودة</option>
-                </select>
-              </div>
+              {canGrant ? (
+                <>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1" htmlFor="approval-role">الدور في المنظومة:</label>
+                    <select
+                      id="approval-role"
+                      value={approvalRole}
+                      onChange={(e) => setApprovalRole(e.target.value as UserRole)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
+                    >
+                      <option value="assistant">معاون ميداني معتمد</option>
+                      <option value="teacher">معلم ومقرئ معتمد</option>
+                      <option value="committee_head">رئيس لجنة ومقرئ</option>
+                      <option value="auditor">مراجع ومدقق جودة</option>
+                    </select>
+                    {approvingUser.role !== approvalRole && (
+                      <p className="mt-1 text-slate-500">طلب المتقدم دور: {AuthService.getRoleLabel(approvingUser.role)}</p>
+                    )}
+                  </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">اختر نظام الصلاحية المخصص المطبق:</label>
-                <select
-                  value={approvalProfileId}
-                  onChange={(e) => setApprovalProfileId(e.target.value)}
-                  className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
-                >
-                  <option value="">صلاحيات مخصصة يدوياً (حسب الاختيارات أدناه)</option>
-                  {effectiveProfiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1" htmlFor="approval-profile">تطبيق بروفايل صلاحيات (اختياري):</label>
+                    <select
+                      id="approval-profile"
+                      value={approvalProfileId}
+                      onChange={(e) => setApprovalProfileId(e.target.value)}
+                      className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
+                    >
+                      <option value="">بدون بروفايل (حدد أدناه)</option>
+                      {effectiveProfiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <p className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700">
+                  يُعتمد الحساب بدور «{AuthService.getRoleLabel(approvingUser.role)}». تحديد الصلاحيات والأدوار من صلاحيات المشرف العام؛ يمكنك إسناد لجانك فقط.
+                </p>
+              )}
 
               {!approvalProfileId && (
                 <>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">إسناد اللجان الميدانية:</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {committees.map((c) => {
-                        const isSelected = approvalCommittees.includes(c.committeeNumber);
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setApprovalCommittees((prev) =>
-                                prev.includes(c.committeeNumber)
-                                  ? prev.filter((n) => n !== c.committeeNumber)
-                                  : [...prev, c.committeeNumber].sort((a, b) => a - b)
-                              );
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
-                              isSelected
-                                ? 'bg-brand text-white border-brand'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                            }`}
-                          >
-                            لجنة #{c.committeeNumber}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {canGrant && (
+                    <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                      <input type="checkbox" checked={approvalAllCommittees} onChange={(e) => setApprovalAllCommittees(e.target.checked)} />
+                      <span>كل اللجان في كل الدورات</span>
+                    </label>
+                  )}
+                  {!approvalAllCommittees && (
+                    <CommitteePicker
+                      label="إسناد اللجان:"
+                      committees={committees}
+                      selectedIds={approvalCommittees}
+                      onChange={setApprovalCommittees}
+                      canSelect={canAssign}
+                    />
+                  )}
 
-                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
-                    <span className="font-bold text-slate-900 block">الصلاحيات الممنوحة:</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {customPermissions.map((perm) => (
-                        <label key={perm.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={approvalPermissions.includes(perm.id)}
-                            onChange={(e) => {
-                              setApprovalPermissions((prev) =>
-                                e.target.checked ? [...prev, perm.id] : prev.filter((p) => p !== perm.id)
-                              );
-                            }}
-                            className="rounded text-brand focus:ring-brand"
-                          />
-                          <span>{perm.label}</span>
-                        </label>
-                      ))}
+                  {canGrant && (
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                      <span className="font-bold text-slate-900 block">صلاحيات إضافية (لا شيء محدد افتراضياً):</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {customPermissions.map((perm) => (
+                          <label key={perm.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={approvalPermissions.includes(perm.id)}
+                              onChange={(e) => {
+                                setApprovalPermissions((prev) =>
+                                  e.target.checked ? [...prev, perm.id] : prev.filter((p) => p !== perm.id)
+                                );
+                              }}
+                              className="rounded text-brand focus:ring-brand"
+                            />
+                            <span>{perm.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
 
@@ -1480,12 +1451,47 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer disabled:opacity-60"
                 >
-                  اعتماد وتفعيل الصلاحيات فوراً
+                  {saving ? 'جارٍ الاعتماد…' : 'اعتماد الحساب'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DEMOTE SUPER ADMIN: the new role is chosen, not assumed (WEB-14) */}
+      {demotingUser && (
+        <div role="dialog" aria-modal="true" aria-labelledby="demote-title" className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 text-right">
+          <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4">
+            <h3 id="demote-title" className="font-black text-base text-slate-900">تنزيل {demotingUser.name} من المشرف العام</h3>
+            <label className="block text-xs font-bold text-slate-700">
+              الدور الجديد
+              <select value={demoteTo} onChange={(e) => setDemoteTo(e.target.value as UserRole)} className="mt-1 w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs">
+                <option value="committee_head">رئيس لجنة</option>
+                <option value="teacher">معلم ومقرئ</option>
+                <option value="assistant">معاون ميداني</option>
+                <option value="auditor">مراجع ومدقق</option>
+              </select>
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setDemotingUser(null)} className="px-4 py-2 rounded-xl text-slate-600 border border-slate-300 font-bold text-xs">
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const u = demotingUser;
+                  setDemotingUser(null);
+                  await handleToggleSuperAdmin(u, demoteTo);
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs cursor-pointer"
+              >
+                تنزيل
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1734,9 +1740,10 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">الدور الوظيفي</label>
                   <select
-                    value={newRole}
+                    value={canGrant ? newRole : 'assistant'}
+                    disabled={!canGrant}
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none disabled:opacity-70"
                   >
                     <option value="assistant">معاون ميداني</option>
                     <option value="teacher">معلم ومقرئ</option>
@@ -1746,21 +1753,52 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">تطبيق نظام صلاحية مخصص (اختياري):</label>
-                <select
-                  value={newProfileId}
-                  onChange={(e) => setNewProfileId(e.target.value)}
-                  className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
-                >
-                  <option value="">صلاحيات يدوية (افتراضية)</option>
-                  {effectiveProfiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {canGrant && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">تطبيق بروفايل صلاحيات (اختياري):</label>
+                  <select
+                    value={newProfileId}
+                    onChange={(e) => setNewProfileId(e.target.value)}
+                    className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
+                  >
+                    <option value="">بدون بروفايل</option>
+                    {effectiveProfiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {canGrant && !newProfileId && (
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                  <span className="font-bold text-slate-900 block">الصلاحيات:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {customPermissions.map((perm) => (
+                      <label key={perm.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newPermissions.includes(perm.id)}
+                          onChange={(e) => setNewPermissions((prev) => (e.target.checked ? [...prev, perm.id] : prev.filter((x) => x !== perm.id)))}
+                          className="rounded text-brand focus:ring-brand"
+                        />
+                        <span>{perm.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!newProfileId && (
+                <CommitteePicker
+                  label="اللجان المسندة:"
+                  committees={committees}
+                  selectedIds={newAssignedCommittees}
+                  onChange={setNewAssignedCommittees}
+                  canSelect={canAssign}
+                />
+              )}
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
@@ -1821,36 +1859,151 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">الدور في المنظومة</label>
-                <select
-                  value={editingUser.role}
-                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
-                >
-                  <option value="super_admin">المشرف العام (سوبر أدمن)</option>
-                  <option value="assistant">معاون ميداني</option>
-                  <option value="teacher">معلم ومقرئ</option>
-                  <option value="committee_head">رئيس لجنة</option>
-                  <option value="auditor">مراجع ومدقق</option>
-                </select>
-              </div>
+              {editAccess && editingUser.id !== currentUser.id && editingUser.role !== 'super_admin' && (
+                <>
+                  {canGrant && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1" htmlFor="edit-role">الدور في المنظومة</label>
+                        <select
+                          id="edit-role"
+                          value={editAccess.role}
+                          disabled={Boolean(editAccess.profileId)}
+                          onChange={(e) => setEditAccess({ ...editAccess, role: e.target.value as UserRole })}
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
+                        >
+                          <option value="assistant">معاون ميداني</option>
+                          <option value="teacher">معلم ومقرئ</option>
+                          <option value="committee_head">رئيس لجنة</option>
+                          <option value="auditor">مراجع ومدقق</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1" htmlFor="edit-profile">تطبيق بروفايل</label>
+                        <select
+                          id="edit-profile"
+                          value={editAccess.profileId}
+                          onChange={(e) => setEditAccess({ ...editAccess, profileId: e.target.value })}
+                          className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
+                        >
+                          <option value="">بدون (تعديل يدوي أدناه)</option>
+                          {effectiveProfiles.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">نظام الصلاحية المخصص المطبق:</label>
-                <select
-                  value={editingUser.profileId || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, profileId: e.target.value || undefined })}
-                  className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
-                >
-                  <option value="">صلاحيات مخصصة يدوياً</option>
-                  {effectiveProfiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  {!editAccess.profileId && (
+                    <>
+                      {canGrant && (
+                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                          <span className="font-bold text-slate-900 block">الصلاحيات:</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {customPermissions.map((perm) => (
+                              <label key={perm.id} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={editAccess.permissions.includes(perm.id)}
+                                  onChange={(e) =>
+                                    setEditAccess({
+                                      ...editAccess,
+                                      permissions: e.target.checked
+                                        ? [...editAccess.permissions, perm.id]
+                                        : editAccess.permissions.filter((x) => x !== perm.id),
+                                    })
+                                  }
+                                  className="rounded text-brand focus:ring-brand"
+                                />
+                                <span>{perm.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {canGrant && (
+                        <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                          <input type="checkbox" checked={editAccess.allCommittees} onChange={(e) => setEditAccess({ ...editAccess, allCommittees: e.target.checked })} />
+                          <span>كل اللجان في كل الدورات</span>
+                        </label>
+                      )}
+                      {!editAccess.allCommittees && editAccess.role !== 'auditor' && (
+                        <CommitteePicker
+                          label="اللجان المسندة:"
+                          committees={committees}
+                          selectedIds={editAccess.committeeIds}
+                          onChange={(ids) => setEditAccess({ ...editAccess, committeeIds: ids })}
+                          canSelect={canAssign}
+                        />
+                      )}
+
+                      {canGrant && ['committee_head'].includes(editAccess.role) && (
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
+                            <input type="checkbox" checked={editAccess.allExams} onChange={(e) => setEditAccess({ ...editAccess, allExams: e.target.checked })} />
+                            <span>يفتح كل ملفات الامتحانات</span>
+                          </label>
+                          {!editAccess.allExams && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
+                              {effectiveExams.map((ex) => (
+                                <label key={ex.id} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={editAccess.examIds.includes(ex.id)}
+                                    onChange={(e) =>
+                                      setEditAccess({
+                                        ...editAccess,
+                                        examIds: e.target.checked ? [...editAccess.examIds, ex.id] : editAccess.examIds.filter((x) => x !== ex.id),
+                                      })
+                                    }
+                                  />
+                                  <span>{ex.title}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {canGrant && onResetPassword && editingUser.id !== currentUser.id && (
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                  <span className="font-bold text-amber-950 block">إعادة تعيين كلمة المرور</span>
+                  <p className="text-amber-900">
+                    كلمة مؤقتة يستخدمها مرة واحدة؛ يُطلب منه اختيار كلمة جديدة عند الدخول، وتُنهى جلساته الحالية.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      dir="ltr"
+                      aria-label="كلمة المرور المؤقتة"
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                      minLength={8}
+                      placeholder="8 أحرف على الأقل، حروف وأرقام"
+                      className="flex-1 bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-mono"
+                    />
+                    <button type="button" onClick={() => setResetPassword(generateTemporaryPassword())} className="px-3 py-2 rounded-xl border border-amber-300 bg-white font-bold cursor-pointer">
+                      توليد
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving || resetPassword.length < 8}
+                      onClick={() => void handleResetPassword()}
+                      className="px-3 py-2 rounded-xl bg-amber-600 text-white font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      إعادة التعيين
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
@@ -1862,9 +2015,10 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer disabled:opacity-60"
                 >
-                  حفظ التعديلات
+                  {saving ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}
                 </button>
               </div>
             </form>

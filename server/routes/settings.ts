@@ -5,6 +5,7 @@ import { audit } from '../audit.ts';
 import type { Pool } from '../db.ts';
 import { notFound, route } from '../http.ts';
 import { id, optionalText } from '../schemas.ts';
+import { cleanPermissions } from './users.ts';
 
 // Shared settings that used to be stored per browser: competition books,
 // permission profiles and custom permission labels.
@@ -41,8 +42,11 @@ const profileInput = z.object({
   name: z.string().trim().min(1, 'اسم البروفايل مطلوب').max(200),
   description: z.string().max(2000).default(''),
   badgeColor: z.enum(['emerald', 'blue', 'amber', 'purple', 'rose', 'teal']).nullish(),
+  /** Unused by the server and the clients (screens follow permissions); kept for older profiles. */
   allowedTabs: z.array(z.string().max(50)).max(50).default([]),
   allowedCommittees: z.array(z.coerce.number().int().min(0)).max(1000).default([]),
+  /** Committees by id: what is applied to users (numbers repeat across courses). */
+  allowedCommitteeIds: z.array(z.string().max(255)).max(1000).default([]),
   allCommitteesAllowed: z.boolean().default(false),
   allowedExamIds: z.array(z.string().max(255)).max(1000).default([]),
   allExamsAllowed: z.boolean().default(false),
@@ -58,6 +62,7 @@ function profileFromRow(p: any) {
     badgeColor: p.badge_color ?? undefined,
     allowedTabs: p.allowed_tabs,
     allowedCommittees: p.allowed_committees,
+    allowedCommitteeIds: p.allowed_committee_ids ?? [],
     allCommitteesAllowed: p.all_committees_allowed,
     allowedExamIds: p.allowed_exam_ids,
     allExamsAllowed: p.all_exams_allowed,
@@ -78,17 +83,18 @@ export function profilesRouter(pool: Pool) {
     const p = profileInput.parse(req.body);
     const { rows } = await pool.query(
       `INSERT INTO permission_profiles (id, name, description, badge_color, allowed_tabs, allowed_committees,
-         all_committees_allowed, allowed_exam_ids, all_exams_allowed, permissions, is_default, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         all_committees_allowed, allowed_exam_ids, all_exams_allowed, permissions, is_default, created_by, allowed_committee_ids)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name, description = EXCLUDED.description, badge_color = EXCLUDED.badge_color,
          allowed_tabs = EXCLUDED.allowed_tabs, allowed_committees = EXCLUDED.allowed_committees,
+         allowed_committee_ids = EXCLUDED.allowed_committee_ids,
          all_committees_allowed = EXCLUDED.all_committees_allowed, allowed_exam_ids = EXCLUDED.allowed_exam_ids,
          all_exams_allowed = EXCLUDED.all_exams_allowed, permissions = EXCLUDED.permissions, is_default = EXCLUDED.is_default
        RETURNING *;`,
       [p.id, p.name, p.description, p.badgeColor ?? null, JSON.stringify(p.allowedTabs), JSON.stringify(p.allowedCommittees),
-        p.allCommitteesAllowed, JSON.stringify(p.allowedExamIds), p.allExamsAllowed, JSON.stringify(p.permissions),
-        p.isDefault, req.user!.name]
+        p.allCommitteesAllowed, JSON.stringify(p.allowedExamIds), p.allExamsAllowed,
+        JSON.stringify(cleanPermissions(p.permissions, false)), p.isDefault, req.user!.name, JSON.stringify(p.allowedCommitteeIds)]
     );
     await audit(pool, req, 'profile.save', 'permission_profile', p.id, null, p);
     res.json({ success: true, profile: profileFromRow(rows[0]) });

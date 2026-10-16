@@ -25,7 +25,6 @@ export function useServerData(userId: string | undefined) {
       tasks: [...DATA_ROOT_KEY, 'tasks', userId] as const,
       notifications: [...DATA_ROOT_KEY, 'notifications', userId] as const,
       books: [...DATA_ROOT_KEY, 'books', userId] as const,
-      customPermissions: [...DATA_ROOT_KEY, 'customPermissions', userId] as const,
     }),
     [userId]
   );
@@ -36,14 +35,7 @@ export function useServerData(userId: string | undefined) {
   const tasks = useQuery({ queryKey: keys.tasks, queryFn: () => DataService.getTasks(), enabled, retry: retryPolicy });
   const notifications = useQuery({ queryKey: keys.notifications, queryFn: () => DataService.getNotifications(), enabled, retry: retryPolicy });
   const books = useQuery({ queryKey: keys.books, queryFn: () => DataService.getBooks(), enabled, retry: retryPolicy });
-  const customPermissions = useQuery({
-    queryKey: keys.customPermissions,
-    queryFn: () => DataService.getCustomPermissions(),
-    enabled,
-    retry: retryPolicy,
-  });
-
-  const queries = { committees, courses, exams, tasks, notifications, books, customPermissions };
+  const queries = { committees, courses, exams, tasks, notifications, books };
   const refetchAll = () => Promise.all(Object.values(queries).map((q) => q.refetch()));
 
   return { keys, queries, refetchAll };

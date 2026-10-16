@@ -1,7 +1,9 @@
+import { csvCell } from './csv';
+import { todayISO } from './stageUtils';
 import * as XLSX from 'xlsx';
 import { SummerCourseRow } from '../types/summerCourse';
 
-export function exportCourseRowsToExcel(rows: SummerCourseRow[], filename = 'متابعة_الدورة_العلمية_الصيفية_1448') {
+export function exportCourseRowsToExcel(rows: SummerCourseRow[], filename = `متابعة_كشف_الدورة_${todayISO()}`) {
   const data = rows.map((r) => ({
     'م': r.number,
     'اسم الشيخ': r.sheikh_name || '',
@@ -46,7 +48,7 @@ export function exportCourseRowsToExcel(rows: SummerCourseRow[], filename = 'م�
   XLSX.writeFile(workbook, `${filename}.xlsx`);
 }
 
-export function exportCourseRowsToCSV(rows: SummerCourseRow[], filename = 'متابعة_الدورة_العلمية_الصيفية_1448') {
+export function exportCourseRowsToCSV(rows: SummerCourseRow[], filename = `متابعة_كشف_الدورة_${todayISO()}`) {
   const headers = [
     'م',
     'اسم الشيخ',
@@ -63,11 +65,7 @@ export function exportCourseRowsToCSV(rows: SummerCourseRow[], filename = 'مت�
     'ملاحظات',
   ];
 
-  const escapeCSV = (val: any) => {
-    if (val === null || val === undefined) return '""';
-    const str = String(val).replace(/"/g, '""');
-    return `"${str}"`;
-  };
+  const escapeCSV = csvCell;
 
   const csvRows = [
     headers.map(escapeCSV).join(','),

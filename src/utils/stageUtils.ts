@@ -107,20 +107,6 @@ export const calculateCurrentStage = (
 export const todayISO = (d: Date = new Date()): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export const getCurrentFormattedDateTime = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  
-  let hours = now.getHours();
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'م' : 'ص';
-  hours = hours % 12 || 12;
-
-  return `${year}/${month}/${day} - ${hours}:${minutes} ${ampm}`;
-};
-
 export const createDefaultQuestions = (count = 5): import('../types').QuestionScoringItem[] => {
   const arabicNumbers = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
   return Array.from({ length: count }, (_, i) => ({

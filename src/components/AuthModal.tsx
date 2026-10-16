@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
-import { api, errorMessage, tokens } from '../services/api';
+import { ChangePasswordForm } from './ChangePasswordForm';
 import { toast } from './Toasts';
 
 interface AuthModalProps {
@@ -13,42 +13,7 @@ interface AuthModalProps {
 
 /** The logged-in user's account: details, password change and logout. */
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUser, onLogout }) => {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
   if (!isOpen) return null;
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (newPassword !== confirmPassword) {
-      setError('كلمتا المرور الجديدتان غير متطابقتين');
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const res = await api<{ token: string; refreshToken: string }>('/auth/change-password', {
-        method: 'POST',
-        body: { currentPassword, newPassword },
-      });
-      // Other sessions are signed out by the server; this one continues with the new tokens.
-      tokens.set(res.token, res.refreshToken);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      toast.success('تم تغيير كلمة المرور');
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const input =
-    'w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left';
 
   return (
     <div
@@ -72,29 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUs
             <div className="font-mono text-muted">{currentUser.phone}{currentUser.email ? ` • ${currentUser.email}` : ''}</div>
           </div>
 
-          <form onSubmit={handleChangePassword} className="space-y-3">
-            <h4 className="font-bold text-xs text-ink">تغيير كلمة المرور</h4>
-            <label className="block text-xs text-ink-soft">
-              كلمة المرور الحالية
-              <input type="password" required autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={input} />
-            </label>
-            <label className="block text-xs text-ink-soft">
-              كلمة المرور الجديدة (8 أحرف على الأقل، حروف وأرقام)
-              <input type="password" required minLength={8} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={input} />
-            </label>
-            <label className="block text-xs text-ink-soft">
-              تأكيد كلمة المرور الجديدة
-              <input type="password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={input} />
-            </label>
-            {error && (
-              <div role="alert" className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-                {error}
-              </div>
-            )}
-            <button type="submit" disabled={isSaving} className="w-full py-2.5 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer disabled:opacity-60">
-              {isSaving ? 'جاري الحفظ...' : 'حفظ كلمة المرور الجديدة'}
-            </button>
-          </form>
+          <ChangePasswordForm onChanged={() => toast.success('تم تغيير كلمة المرور')} />
 
           <button
             type="button"

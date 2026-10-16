@@ -125,6 +125,7 @@ export interface AggregationStageDetails {
   aggregatorName?: string;         // مجمع الدرجات في التجميع
   scoringReviewerName?: string;    // مراجع الدرجات في التصحيح
   aggregationReviewerName?: string;// مراجع الدرجات في التجميع
+  date?: string;                   // تاريخ التجميع (YYYY-MM-DD)
   reviewConfirmed?: boolean;       // تم التأكيد والمطابقة
   notes?: string;
 }
@@ -140,7 +141,11 @@ export interface CeremonyStageDetails {
 
 export interface CommitteeStageRecord {
   completed: boolean;
-  completedAt?: string; // Exact date & time formatted
+  /** ISO time set by the server when the stage was completed. */
+  completedAt?: string;
+  /** Who completed it (set by the server). */
+  completedBy?: string;
+  notes?: string;
 }
 
 export interface CommitteeReceiptInfo {
@@ -362,8 +367,11 @@ export interface PermissionProfile {
   name: string;
   description: string;
   badgeColor?: 'emerald' | 'blue' | 'amber' | 'purple' | 'rose' | 'teal';
-  allowedTabs: string[]; // e.g. ['summer_course', 'committees', 'exams', 'calendar', 'stats', 'ceremonies', 'daily_alerts', 'courses', 'assistants']
+  /** Unused: screens follow the server's permissions; kept so older stored profiles still load. */
+  allowedTabs?: string[];
+  /** Committee numbers (older profiles); `allowedCommitteeIds` is what gets applied. */
   allowedCommittees: number[];
+  allowedCommitteeIds?: string[];
   allCommitteesAllowed: boolean;
   allowedExamIds: string[];
   allExamsAllowed: boolean;
@@ -386,18 +394,23 @@ export interface AppUser {
   password?: string;
   role: UserRole;
   status: AssistantStatus;
-  assignedCommittees: number[];  // أرقام اللجان المسندة للمعاون
+  /** Committee numbers of the assigned committees (read-only; derived by the server from the ids). */
+  assignedCommittees: number[];
+  /** Assigned committees by id: what the server checks. Numbers repeat across courses, ids do not. */
+  assignedCommitteeIds?: string[];
   permissions: AssistantPermission[]; // الصلاحيات الممنوحة
+  /** Set after an admin password reset: the user must choose a new password first. */
+  mustChangePassword?: boolean;
   createdAt: string;
   approvedAt?: string;
   approvedBy?: string;
   notes?: string;
   
-  // Custom Role & Scope Profiles (نظام بروفايل الصلاحيات المخصصة)
-  profileId?: string;               // معرّف بروفايل الصلاحية المخصص
-  allowedExamIds?: string[];        // معرّفات الامتحانات المسموح بالدخول عليها فقط
-  allExamsAllowed?: boolean;        // السماح بالدخول على كافة الامتحانات
-  allCommitteesAllowed?: boolean;   // السماح بالدخول على كافة اللجان
+  // Access settings: enforced by the server and changed only by a super admin.
+  profileId?: string | null;        // آخر بروفايل صلاحيات طُبّق على المستخدم
+  allowedExamIds?: string[];        // الامتحانات المسموح بفتح ملفاتها ومحتواها
+  allExamsAllowed?: boolean;        // كل الامتحانات
+  allCommitteesAllowed?: boolean;   // كل اللجان في كل الدورات
   
   // Join Request & Dossier Fields (تفاصيل طلب الانضمام)
   requestCode?: string;             // كود تتبع الطلب (مثل REQ-2026-104)
@@ -442,7 +455,10 @@ export interface ExamItem {
   pdfFileSize?: string;          // حجم الملف
   hasFile?: boolean;             // يوجد ملف مرفوع (يُنزَّل من /api/exams/:id/file للأدوار المسموح لها)
   sampleQuestions?: string[];
-  uploadedAt: string;            // تاريخ وتوقيت الرفع
+  uploadedAt: string;            // تاريخ الرفع (يحدده الخادم)
   notes?: string;                // تعليمات وملاحظات
   questionsCount?: number;       // عدد الأسئلة
+  /** Whether the current user may open the file and see the content (server-evaluated). */
+  canOpen?: boolean;
+  updatedAt?: string;
 }

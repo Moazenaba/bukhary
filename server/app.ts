@@ -33,8 +33,9 @@ export function createApp(config: AppConfig, pool: Pool) {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", ...(config.isProduction ? [] : ["'unsafe-inline'", "'unsafe-eval'"])],
-          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          // Fonts and icons are bundled with the app; nothing is loaded from third parties.
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          fontSrc: ["'self'", 'data:'],
           imgSrc: ["'self'", 'data:', 'blob:'],
           connectSrc: ["'self'", ...(config.isProduction ? [] : ['ws:', 'wss:'])],
           frameSrc: ["'self'", 'blob:'],

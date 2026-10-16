@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Committee, StageKey, Course } from '../types';
-import { getCurrentFormattedDateTime, todayISO } from '../utils/stageUtils';
+import { todayISO } from '../utils/stageUtils';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface AddCommitteeModalProps {
@@ -99,7 +99,8 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
     const finalMembers = members.map((m) => m.trim()).filter(Boolean);
 
-    const currentFormattedTime = getCurrentFormattedDateTime();
+    // The server stamps completed stages with its own time; this value is only a placeholder.
+    const currentFormattedTime = new Date().toISOString();
 
     // Setup initial stages status based on initialStage selection
     const isInitialExam = initialStage === 'exam';

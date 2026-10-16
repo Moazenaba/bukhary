@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DATA_ROOT_KEY, useCacheSetter, useServerData } from './data/queries';
@@ -13,13 +8,14 @@ import {
   ExamItem,
   STAGES_LIST,
   AppUser,
-  AssistantPermission,
-  PermissionDefinition,
   Course,
   ScheduleTask,
   SYSTEM_PERMISSIONS,
 } from './types';
-import { calculateCurrentStage, getCurrentFormattedDateTime, todayISO } from './utils/stageUtils';
+import { calculateCurrentStage, todayISO } from './utils/stageUtils';
+import { CommitteeStep, planCommitteeSave } from './utils/committeeChanges';
+import { createKeyedQueue } from './utils/keyedQueue';
+import { readTabFromHash, writeTabToHash } from './utils/hashRoute';
 import { SummerCourseRow } from './types/summerCourse';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { TopNavBar } from './components/TopNavBar';
@@ -34,7 +30,9 @@ const ExamsView = lazy(() => import('./components/ExamsView').then((m) => ({ def
 const CoursesView = lazy(() => import('./components/CoursesView').then((m) => ({ default: m.CoursesView })));
 const CalendarScheduleView = lazy(() => import('./components/CalendarScheduleView').then((m) => ({ default: m.CalendarScheduleView })));
 const AssistantsView = lazy(() => import('./components/AssistantsView').then((m) => ({ default: m.AssistantsView })));
+const AuditLogView = lazy(() => import('./components/AuditLogView').then((m) => ({ default: m.AuditLogView })));
 import { AuthModal } from './components/AuthModal';
+import { ForcedPasswordChange } from './components/ForcedPasswordChange';
 import { ExportModal } from './components/ExportModal';
 import { HomeOverviewView } from './components/HomeOverviewView';
 const StatisticsView = lazy(() => import('./components/StatisticsView').then((m) => ({ default: m.StatisticsView })));
@@ -46,16 +44,9 @@ import { Footer } from './components/Footer';
 import { CentralLoginPortal } from './components/CentralLoginPortal';
 import { SupabaseDatabaseModal } from './components/SupabaseDatabaseModal';
 import { Toasts, toast } from './components/Toasts';
-import { useAuth, AuthService } from './services/AuthService';
-import { Book, CommitteePatch, DataService } from './services/DataService';
-import { errorMessage } from './services/api';
-
-const BASE_COMMITTEE_FIELDS = [
-  'committeeNumber', 'committeeName', 'associationName', 'members', 'branch', 'competitionBook', 'generalNotes',
-  'courseId', 'sheikhName', 'sheikhPhone', 'sheikhCountry', 'studentsCount', 'isWomenCommittee',
-] as const;
-
-const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+import { useAuth, AuthService, type AccessChanges } from './services/AuthService';
+import { Book, CommitteeAction, DataService } from './services/DataService';
+import { ApiError, errorMessage } from './services/api';
 
 /** Runs a server call; on failure shows the server's message and returns undefined. */
 async function attempt<T>(fn: () => Promise<T>, success?: string): Promise<T | undefined> {
@@ -77,10 +68,22 @@ const NO_BOOKS: Book[] = [];
 const NO_COURSES: Course[] = [];
 const NO_TASKS: ScheduleTask[] = [];
 const NO_NOTIFICATIONS: NotificationItem[] = [];
-const NO_PERMISSIONS: PermissionDefinition[] = [];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('home');
+  // The open screen is kept in the URL hash, so reloads, Back and shared links work (WEB-17).
+  const [activeTab, setActiveTabState] = useState<NavTab>(() => readTabFromHash() ?? 'home');
+  const setActiveTab = useCallback((tab: NavTab) => {
+    setActiveTabState(tab);
+    writeTabToHash(tab);
+  }, []);
+  useEffect(() => {
+    const onHash = () => {
+      const tab = readTabFromHash();
+      if (tab) setActiveTabState(tab);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
     try {
@@ -127,6 +130,7 @@ export default function App() {
     deleteProfile,
     assignProfileToUser,
     setSuperAdmin,
+    resetPassword,
   } = useAuth();
 
   // Server data lives in the query cache, keyed by the logged-in user. The setters below keep
@@ -139,10 +143,8 @@ export default function App() {
   const courses = server.queries.courses.data ?? NO_COURSES;
   const scheduleTasks = server.queries.tasks.data ?? NO_TASKS;
   const notifications = server.queries.notifications.data ?? NO_NOTIFICATIONS;
-  const customPermissions = useMemo(
-    () => [...SYSTEM_PERMISSIONS, ...(server.queries.customPermissions.data ?? [])],
-    [server.queries.customPermissions.data]
-  );
+  // Only system permissions grant anything (D-01); custom labels are no longer offered.
+  const customPermissions = SYSTEM_PERMISSIONS;
   const savedBooks = useMemo(() => books.map((b) => b.name), [books]);
   const setCommittees = useCacheSetter(server.keys.committees, NO_COMMITTEES);
   const setExams = useCacheSetter(server.keys.exams, NO_EXAMS);
@@ -150,8 +152,6 @@ export default function App() {
   const setCourses = useCacheSetter(server.keys.courses, NO_COURSES);
   const setScheduleTasks = useCacheSetter(server.keys.tasks, NO_TASKS);
   const setNotifications = useCacheSetter(server.keys.notifications, NO_NOTIFICATIONS);
-  // The cache holds custom permissions only; the system ones are added above.
-  const setCustomPermissions = useCacheSetter(server.keys.customPermissions, NO_PERMISSIONS);
   const isLoadingDatabase = Object.values(server.queries).some((q) => q.isLoading);
   const failedQuery = Object.values(server.queries).find((q) => q.error);
   const loadError = failedQuery?.error ? errorMessage(failedQuery.error) : null;
@@ -182,14 +182,11 @@ export default function App() {
   const [needsScoringFilter, setNeedsScoringFilter] = useState(false);
   const [genderFilter, setGenderFilter] = useState<'all' | 'men' | 'women'>('all');
 
-  // Non-admin users only see tabs they are allowed to open.
+  // Users only see screens the server's permissions make useful to them.
   useEffect(() => {
     if (!currentUser || currentUser.role === 'super_admin') return;
-    if (!AuthService.canAccessTab(activeTab, currentUser)) {
-      const allTabs: NavTab[] = ['home', 'summer_course', 'committees', 'exams', 'ceremonies', 'calendar', 'courses', 'assistants', 'stats', 'daily_alerts'];
-      setActiveTab(allTabs.find((t) => AuthService.canAccessTab(t, currentUser)) || 'home');
-    }
-  }, [currentUser, activeTab]);
+    if (!AuthService.canAccessTab(activeTab, currentUser)) setActiveTab('home');
+  }, [currentUser, activeTab, setActiveTab]);
 
   const ITEMS_PER_PAGE = 6;
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,81 +204,73 @@ export default function App() {
 
   // ---------------- Committees ----------------
 
-  const patchCommittee = async (committeeId: string, patch: CommitteePatch, success?: string) => {
-    const saved = await attempt(() => DataService.patchCommittee(committeeId, patch), success);
-    if (saved) replaceCommittee(saved);
-    return saved;
+  // Saves of one committee run one at a time, each with the version the previous one returned (WEB-10).
+  const committeeQueue = useMemo(() => createKeyedQueue(), []);
+  const latestCommittee = (id: string) =>
+    queryClient.getQueryData<Committee[]>(server.keys.committees)?.find((c) => c.id === id);
+
+  const runStep = async (step: CommitteeStep, current: Committee): Promise<Committee> => {
+    if (step.kind === 'action') return DataService.committeeAction(current.id, step.action, current.updatedAt);
+    if (step.kind === 'patchScoring') {
+      return DataService.patchCommittee(current.id, { scoringDetails: step.scoringDetails, expectedUpdatedAt: current.updatedAt });
+    }
+    return DataService.saveCommittee({ ...step.committee, updatedAt: current.updatedAt });
   };
+
+  /**
+   * Applies the steps in order. Success is reported only after the server confirmed every step
+   * (WEB-09); on failure the server's message is shown and the committee is reloaded, so screens
+   * fall back to what is really stored. Returns whether everything was saved.
+   */
+  const runCommitteeSteps = (committeeId: string, steps: CommitteeStep[], success?: string): Promise<boolean> =>
+    committeeQueue.run(committeeId, async () => {
+      if (steps.length === 0) return true;
+      let current = latestCommittee(committeeId);
+      if (!current) return false;
+      try {
+        for (const step of steps) {
+          current = await runStep(step, current);
+          replaceCommittee(current);
+        }
+        if (steps.some((st) => st.kind === 'action' && st.action.type === 'scheduleCeremony')) {
+          void queryClient.invalidateQueries({ queryKey: server.keys.tasks });
+        }
+        if (success) toast.success(success);
+        return true;
+      } catch (err) {
+        toast.error(errorMessage(err));
+        void server.queries.committees.refetch();
+        return false;
+      }
+    });
+
+  const runCommitteeAction = (committeeId: string, action: CommitteeAction, success?: string) =>
+    runCommitteeSteps(committeeId, [{ kind: 'action', action }], success);
 
   const handleQuickToggleStage = (committeeId: string, stageKey: StageKey) => {
     const c = committees.find((x) => x.id === committeeId);
     if (!c) return;
-    const isDone = Boolean(c.stages[stageKey]?.completed);
-    patchCommittee(committeeId, {
-      stages: { [stageKey]: { completed: !isDone, completedAt: !isDone ? getCurrentFormattedDateTime() : undefined } },
-    });
+    const done = Boolean(c.stages[stageKey]?.completed);
+    void runCommitteeAction(committeeId, done ? { type: 'reopenStage', stage: stageKey } : { type: 'completeStage', stage: stageKey });
   };
 
   const handleSetStage = (committeeId: string, stageKey: StageKey, completed: boolean) =>
-    patchCommittee(committeeId, {
-      stages: { [stageKey]: { completed, completedAt: completed ? getCurrentFormattedDateTime() : undefined } },
-    });
+    runCommitteeAction(committeeId, completed ? { type: 'completeStage', stage: stageKey } : { type: 'reopenStage', stage: stageKey });
 
-  /** Ceremony schedule task linked to the committee, built only from what the user entered. */
-  const syncCeremonyTask = async (committee: Committee) => {
-    const d = committee.ceremonyDetails;
-    if (!d?.ceremonyDate || !can('tasks.write')) return;
-    const existing = scheduleTasks.find((t) => t.type === 'ceremony' && t.committeeId === committee.id);
-    const sheikhs = d.attendingSheikhs?.filter(Boolean) ?? [];
-    const task: ScheduleTask = {
-      id: existing?.id ?? `task-ceremony-${committee.id}`,
-      title: `حفل تكريم لجنة #${committee.committeeNumber} (${committee.sheikhName || committee.committeeName})`,
-      date: d.ceremonyDate,
-      time: d.ceremonyTime || undefined,
-      type: 'ceremony',
-      priority: 'urgent',
-      committeeId: committee.id,
-      committeeNumber: committee.committeeNumber,
-      deliverable: [
-        d.honoredStudentsCount ? `تكريم ${d.honoredStudentsCount} طالباً` : '',
-        sheikhs.length ? `حضور: ${sheikhs.join('، ')}` : '',
-      ].filter(Boolean).join(' • ') || undefined,
-      notes: [d.ceremonyPlace ? `مكان الحفل: ${d.ceremonyPlace}` : '', d.notes || ''].filter(Boolean).join('. ') || undefined,
-      completed: committee.stages?.ceremony?.completed || false,
-    };
-    const saved = await attempt(() => DataService.saveTask(task));
-    if (saved) replaceTask(saved);
-  };
-
-  /**
-   * Saves edits from the detail modal. Users who may edit the whole committee get one
-   * transactional save; others (assistants, teachers) send only the stage/detail changes
-   * they are allowed to make.
-   */
-  const handleSaveCommittee = async (updated: Committee) => {
-    const existing = committees.find((c) => c.id === updated.id);
-    let saved: Committee | undefined;
-    if (!existing || can('committees.update')) {
-      saved = await attempt(() => DataService.saveCommittee(updated), 'تم حفظ بيانات اللجنة');
-    } else {
-      if (BASE_COMMITTEE_FIELDS.some((f) => !same((updated as any)[f], (existing as any)[f]))) {
-        toast.error('ليس لديك صلاحية تعديل البيانات الأساسية للجنة');
-        return;
-      }
-      const patch: CommitteePatch = { expectedUpdatedAt: (existing as any).updatedAt };
-      const changedStages = Object.fromEntries(
-        Object.entries(updated.stages).filter(([k, v]) => !same(v, existing.stages[k as StageKey]))
-      );
-      if (Object.keys(changedStages).length) patch.stages = changedStages;
-      if (!same(updated.scoringDetails, existing.scoringDetails)) patch.scoringDetails = updated.scoringDetails;
-      if (!same(updated.aggregationDetails, existing.aggregationDetails)) patch.aggregationDetails = updated.aggregationDetails;
-      if (!same(updated.ceremonyDetails, existing.ceremonyDetails)) patch.ceremonyDetails = updated.ceremonyDetails;
-      if (Object.keys(patch).length === 1) return;
-      saved = await attempt(() => DataService.patchCommittee(updated.id, patch), 'تم حفظ التعديلات');
+  /** Saves edits from the detail modal as the smallest set of server calls; resolves to success. */
+  const handleSaveCommittee = async (updated: Committee): Promise<boolean> => {
+    const existing = latestCommittee(updated.id);
+    if (!existing) {
+      const saved = await attempt(() => DataService.saveCommittee(updated), 'تم حفظ بيانات اللجنة');
+      if (saved) replaceCommittee(saved);
+      return Boolean(saved);
     }
-    if (!saved) return;
-    replaceCommittee(saved);
-    if (!same(saved.ceremonyDetails, existing?.ceremonyDetails)) await syncCeremonyTask(saved);
+    const steps = planCommitteeSave(existing, updated);
+    if (steps.some((st) => st.kind === 'saveBase') && !AuthService.canOnCommittee('committees.update', existing)) {
+      toast.error('ليس لديك صلاحية تعديل البيانات الأساسية للجنة');
+      return false;
+    }
+    return runCommitteeSteps(updated.id, steps, steps.length ? 'تم الحفظ' : undefined);
   };
 
   const handleAddCommittee = async (newComm: Committee, newBookName?: string) => {
@@ -292,7 +281,8 @@ export default function App() {
     return saved;
   };
 
-  // Opens the committee linked to a course-sheet row, creating it from the row's own data if needed.
+  // Opens the committee linked to a course-sheet row. Creating a committee from a row needs the
+  // user's explicit confirmation (WEB-15) and the right to create committees.
   const handleOpenRowDetails = async (row: SummerCourseRow) => {
     const matched =
       committees.find((c) => row.committeeId && c.id === row.committeeId) ||
@@ -301,12 +291,16 @@ export default function App() {
       setSelectedCommitteeForDetails(matched);
       return;
     }
+    if (!can('committees.create')) {
+      toast.error('لا توجد لجنة مسجلة لهذا الصف، وإنشاء اللجان غير متاح لك');
+      return;
+    }
     const courseId = row.courseId || courses.find((c) => c.isDefault)?.id;
     if (!courseId) {
       toast.error('حدد الدورة التي يتبعها هذا الصف قبل فتح تفاصيل اللجنة');
       return;
     }
-    const now = getCurrentFormattedDateTime();
+    if (!window.confirm(`لا توجد لجنة رقم ${row.number} في هذه الدورة. هل تريد إنشاءها من بيانات هذا الصف؟`)) return;
     const created = await handleAddCommittee({
       id: row.committeeId || `comm-${crypto.randomUUID()}`,
       committeeNumber: row.number,
@@ -318,19 +312,10 @@ export default function App() {
       courseId,
       members: [],
       generalNotes: row.notes || '',
-      stages: {
-        registration: { completed: true, completedAt: now },
-        exam: { completed: row.delivered },
-        scoring: { completed: row.corrected },
-        aggregation: { completed: false },
-        review: { completed: row.reviewed },
-        sheet: { completed: false },
-        accreditation: { completed: false },
-        announcement: { completed: row.announced },
-        ceremony: { completed: row.ceremony },
-      },
-      createdDate: now.split(' - ')[0],
-      createdAtTime: now.split(' - ')[1] || '',
+      // Stages are completed through the workflow afterwards; a new committee starts empty.
+      stages: Object.fromEntries(STAGES_LIST.map((st) => [st.key, { completed: false }])) as Committee['stages'],
+      createdDate: todayISO(),
+      createdAtTime: '',
     });
     if (created) setSelectedCommitteeForDetails(created);
   };
@@ -340,58 +325,82 @@ export default function App() {
     if (ok) setCommittees((prev) => prev.filter((c) => c.id !== committeeId));
   };
 
-  const handleReceiveCommittee = (committeeId: string) =>
-    patchCommittee(committeeId, { receivedByAssistant: { status: 'received' } }, 'تم توثيق استلام اللجنة');
+  const handleReceiveCommittee = (committeeId: string, cancel = false) =>
+    runCommitteeAction(
+      committeeId,
+      cancel ? { type: 'cancelReception' } : { type: 'receive', status: 'received' },
+      cancel ? 'تم إلغاء توثيق الاستلام' : 'تم توثيق استلام اللجنة'
+    );
 
-  const handleApproveExamReadiness = (committeeId: string) =>
-    patchCommittee(committeeId, { examApprovedBy: {} }, 'تم اعتماد جاهزية الامتحان');
+  const handleApproveExamReadiness = (committeeId: string, revoke = false) =>
+    runCommitteeAction(
+      committeeId,
+      revoke ? { type: 'revokeReadiness' } : { type: 'approveReadiness' },
+      revoke ? 'تم إلغاء اعتماد الجاهزية' : 'تم اعتماد جاهزية الامتحان'
+    );
 
+  /** The server stores the ceremony and keeps its single calendar task in step (WEB-08). */
   const handleUpdateCommitteeCeremony = async (
     committeeId: string,
     info: { date: string; time: string; place: string; notes?: string; completed: boolean; honoredCount?: number; attendingSheikhs?: string[] }
   ) => {
     const c = committees.find((x) => x.id === committeeId);
-    if (!c) return;
-    const saved = await patchCommittee(
-      committeeId,
+    if (!c) {
+      toast.error('اللجنة غير موجودة');
+      return false;
+    }
+    const steps: CommitteeStep[] = [
       {
-        ceremonyDetails: {
-          honoredStudentsCount: info.honoredCount ?? c.ceremonyDetails?.honoredStudentsCount,
+        kind: 'action',
+        action: {
+          type: 'scheduleCeremony',
+          ceremonyDate: info.date || null,
+          ceremonyTime: info.time || null,
+          ceremonyPlace: info.place || null,
+          notes: info.notes || null,
+          honoredStudentsCount: info.honoredCount ?? c.ceremonyDetails?.honoredStudentsCount ?? null,
           attendingSheikhs: info.attendingSheikhs ?? c.ceremonyDetails?.attendingSheikhs ?? [],
-          ceremonyDate: info.date,
-          ceremonyTime: info.time,
-          ceremonyPlace: info.place,
-          notes: info.notes,
-        },
-        stages: {
-          ceremony: {
-            completed: info.completed,
-            completedAt: info.completed ? `${info.date} ${info.time}`.trim() : undefined,
-          },
         },
       },
-      'تم حفظ موعد الحفل'
-    );
-    if (saved) await syncCeremonyTask(saved);
+    ];
+    const done = Boolean(c.stages.ceremony?.completed);
+    if (info.completed !== done) {
+      steps.push({ kind: 'action', action: info.completed ? { type: 'completeStage', stage: 'ceremony' } : { type: 'reopenStage', stage: 'ceremony' } });
+    }
+    return runCommitteeSteps(committeeId, steps, 'تم حفظ موعد الحفل');
   };
 
   // ---------------- Exams & books ----------------
 
+  /** One outcome message per action (WEB-24): either everything was saved, or what failed is said. */
   const handleAddExam = async (newExam: ExamItem, file?: File) => {
-    const saved = await attempt(() => DataService.saveExam(newExam));
-    if (!saved) return;
+    let saved: ExamItem;
+    try {
+      saved = await DataService.saveExam(newExam);
+    } catch (err) {
+      toast.error(errorMessage(err));
+      return false;
+    }
     let final = saved;
     if (file) {
-      const uploaded = await attempt(() => DataService.uploadExamFile(saved.id, file, file.name));
-      if (!uploaded) {
-        toast.error('تم حفظ بيانات الامتحان لكن تعذر رفع ملف PDF، أعد رفعه من بطاقة الامتحان');
-      } else {
+      try {
+        await DataService.uploadExamFile(saved.id, file, file.name);
         final = { ...saved, hasFile: true, pdfFileName: file.name };
+      } catch (err) {
+        setExams((prev) => [saved, ...prev.filter((e) => e.id !== saved.id)]);
+        toast.error(`تم حفظ بيانات الامتحان، لكن تعذر رفع ملف PDF: ${errorMessage(err)}. ارفعه من بطاقة الامتحان.`);
+        return true;
       }
     }
     setExams((prev) => [final, ...prev.filter((e) => e.id !== final.id)]);
-    toast.success('تم حفظ الامتحان');
+    toast.success(file ? 'تم حفظ الامتحان ورفع الملف' : 'تم حفظ الامتحان');
     if (newExam.book && !savedBooks.includes(newExam.book) && can('books.write')) await handleAddBook(newExam.book);
+    return true;
+  };
+
+  const handleUploadExamFile = async (examId: string, file: File) => {
+    const ok = await attempt(() => DataService.uploadExamFile(examId, file, file.name), 'تم رفع ملف الامتحان');
+    if (ok) setExams((prev) => prev.map((e) => (e.id === examId ? { ...e, hasFile: true, pdfFileName: file.name } : e)));
   };
 
   const handleDeleteExam = async (examId: string) => {
@@ -415,8 +424,8 @@ export default function App() {
 
   // ---------------- Users ----------------
 
-  const handleApproveAssistant = (userId: string, permissions: AssistantPermission[], assignedCommittees: number[], role: any = 'assistant') =>
-    attempt(() => approveUser(userId, permissions, assignedCommittees, role), 'تم اعتماد الحساب');
+  const handleApproveAssistant = (userId: string, access: AccessChanges = {}) =>
+    attempt(() => approveUser(userId, access), 'تم اعتماد الحساب');
 
   const handleScheduleInterview = (userId: string, interviewDate: string, interviewNotes?: string) =>
     attempt(() => scheduleInterview(userId, interviewDate, interviewNotes), 'تم تحديد موعد المقابلة');
@@ -424,27 +433,16 @@ export default function App() {
   const handleRejectAssistant = (userId: string, reason?: string) =>
     attempt(() => rejectUser(userId, reason), 'تم تسجيل الاعتذار عن الطلب');
 
-  const handleUpdateAssistantPermissions = (userId: string, permissions: AssistantPermission[], assignedCommittees: number[]) => {
-    const target = users.find((u) => u.id === userId);
-    if (target) attempt(() => updateUser({ ...target, permissions, assignedCommittees }), 'تم تحديث الصلاحيات');
-  };
-
-  const handleUpdateAssistantUser = (updatedUser: AppUser) => attempt(() => updateUser(updatedUser), 'تم حفظ بيانات المستخدم');
+  const handleUpdateAssistantUser = (updatedUser: AppUser, access?: AccessChanges) =>
+    attempt(() => updateUser(updatedUser, access), 'تم حفظ بيانات المستخدم');
 
   const handleAddAssistantDirect = (newUserData: Omit<AppUser, 'id' | 'createdAt'> & { password: string }) =>
-    attempt(() => createUser(newUserData), 'تم إنشاء الحساب');
+    attempt(() => createUser(newUserData), 'تم إنشاء الحساب، وسيُطلب منه تغيير كلمة المرور عند أول دخول');
 
   const handleDeleteAssistant = (userId: string) => attempt(() => deleteUser(userId), 'تم حذف المستخدم');
 
-  const handleAddCustomPermission = async (label: string) => {
-    const saved = await attempt(() => DataService.saveCustomPermission({ id: `perm_${crypto.randomUUID()}`, label }), 'تمت إضافة الصلاحية');
-    if (saved) setCustomPermissions((prev) => [...prev, saved]);
-  };
-
-  const handleDeleteCustomPermission = async (id: string) => {
-    const ok = await attempt(() => DataService.deleteCustomPermission(id), 'تم حذف الصلاحية');
-    if (ok) setCustomPermissions((prev) => prev.filter((p) => p.id !== id));
-  };
+  const handleResetPassword = (userId: string, temporaryPassword: string) =>
+    attempt(() => resetPassword(userId, temporaryPassword), 'تمت إعادة تعيين كلمة المرور، وسيُطلب منه اختيار كلمة جديدة');
 
   // ---------------- Courses ----------------
 
@@ -466,9 +464,21 @@ export default function App() {
     setCommittees((prev) => prev.map((c) => (c.courseId === saved.id ? { ...c, courseName: saved.name } : c)));
   };
 
+  /** A course with sheet rows is deleted only after the user confirms the rows go too (API-27). */
   const handleDeleteCourse = async (courseId: string) => {
-    const ok = await attempt(() => DataService.deleteCourse(courseId), 'تم حذف الدورة');
-    if (ok) setCourses((prev) => prev.filter((c) => c.id !== courseId));
+    try {
+      await DataService.deleteCourse(courseId);
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 409 && err.message.includes('كشف'))) {
+        toast.error(errorMessage(err));
+        return;
+      }
+      if (!window.confirm(err.message)) return;
+      const ok = await attempt(() => DataService.deleteCourse(courseId, true));
+      if (!ok) return;
+    }
+    toast.success('تم حذف الدورة');
+    setCourses((prev) => prev.filter((c) => c.id !== courseId));
   };
 
   const handleSetDefaultCourse = (courseId: string) => {
@@ -478,9 +488,11 @@ export default function App() {
 
   // ---------------- Tasks ----------------
 
+  /** Tasks reference the committee and the assignee by id; the server fills in number and name (WEB-07). */
   const handleAddScheduleTask = async (newTaskData: Omit<ScheduleTask, 'id'>) => {
     const saved = await attempt(() => DataService.saveTask({ ...newTaskData, id: `task-${crypto.randomUUID()}` }), 'تمت جدولة المهمة');
     if (saved) replaceTask(saved);
+    return Boolean(saved);
   };
 
   const handleToggleTaskComplete = async (taskId: string) => {
@@ -549,7 +561,7 @@ export default function App() {
     else if (genderFilter === 'men') list = list.filter((c) => !c.isWomenCommittee);
     if (selectedCourseFilter !== 'all') list = list.filter((c) => c.courseId === selectedCourseFilter);
     if (currentUser?.role === 'assistant' && assistantOnlyFilter) {
-      list = list.filter((c) => currentUser.assignedCommittees.includes(c.committeeNumber));
+      list = list.filter((c) => AuthService.canAccessCommittee(c));
     }
     if (needsScoringFilter) list = list.filter((c) => c.scoringDetails?.questions?.some((q) => !q.completed));
     if (sortBy === 'newest') list.sort((a, b) => b.committeeNumber - a.committeeNumber);
@@ -596,6 +608,16 @@ export default function App() {
     );
   }
 
+  // After an admin reset the password, nothing else opens until a new one is chosen (WEB-02).
+  if (currentUser.mustChangePassword) {
+    return (
+      <>
+        <ForcedPasswordChange currentUser={currentUser} onLogout={handleLogout} />
+        <Toasts />
+      </>
+    );
+  }
+
   return (
     <div className="bg-canvas text-ink min-h-screen flex font-['IBM_Plex_Sans_Arabic'] text-right selection:bg-brand-light selection:text-[#00201d]">
       {/* 1. Sidebar Navigation (التابات في الجنب) */}
@@ -626,6 +648,9 @@ export default function App() {
           onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
           onOpenExport={() => setIsExportOpen(true)}
           onOpenDatabaseModal={can('database.admin') ? () => setIsSupabaseModalOpen(true) : undefined}
+          canSendNotifications={can('notifications.create')}
+          committees={committees}
+          onNotificationSent={() => void server.queries.notifications.refetch()}
           onSignOut={handleLogout}
           notifications={notifications}
           onOpenNotificationCommittee={(commId) => {
@@ -703,6 +728,7 @@ export default function App() {
               onOpenAddBook={() => setIsAddBookOpen(true)}
               onDeleteExam={handleDeleteExam}
               onDeleteBook={handleDeleteBook}
+              onUploadFile={handleUploadExamFile}
             />
           )}
 
@@ -715,20 +741,19 @@ export default function App() {
               profiles={profiles}
               onSaveProfile={saveProfile}
               onDeleteProfile={deleteProfile}
-              onAssignProfile={assignProfileToUser}
+              courses={courses}
+              onAssignProfile={(uId, pId) => attempt(() => assignProfileToUser(uId, pId), 'تم تطبيق البروفايل')}
               onSetSuperAdmin={setSuperAdmin}
               onApproveAssistant={handleApproveAssistant}
               onScheduleInterview={handleScheduleInterview}
               onRejectAssistant={handleRejectAssistant}
-              onUpdateAssistantPermissions={handleUpdateAssistantPermissions}
               onUpdateAssistantUser={handleUpdateAssistantUser}
               onAddAssistantDirect={handleAddAssistantDirect}
               onDeleteAssistant={handleDeleteAssistant}
+              onResetPassword={handleResetPassword}
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
               onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
               customPermissions={customPermissions}
-              onAddCustomPermission={handleAddCustomPermission}
-              onDeleteCustomPermission={handleDeleteCustomPermission}
             />
           )}
 
@@ -763,6 +788,8 @@ export default function App() {
           )}
 
           {activeTab === 'stats' && <StatisticsView committees={committees} />}
+
+          {activeTab === 'audit' && <AuditLogView />}
 
           {activeTab === 'ceremonies' && (
             <CeremoniesView
@@ -806,7 +833,12 @@ export default function App() {
                       <span>مرحباً بك: {currentUser.name} (معاون ميداني)</span>
                     </span>
                     <span className="text-ink-soft block leading-relaxed">
-                      الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'متابعة اللجان الميدانية'}</strong> • اللجان المسندة: <strong>{currentUser.assignedCommittees.map(c => `#${c}`).join('، ') || 'كافة اللجان'}</strong>
+                      اللجان المسندة إليك:{' '}
+                      <strong>
+                        {currentUser.allCommitteesAllowed
+                          ? 'كل اللجان'
+                          : currentUser.assignedCommittees.map((c) => `#${c}`).join('، ') || 'لم تُسند إليك لجان بعد'}
+                      </strong>
                     </span>
                   </div>
 
@@ -825,7 +857,7 @@ export default function App() {
                       }`}
                     >
                       <span className="material-symbols-outlined text-sm">filter_alt</span>
-                      <span>لجاني المسندة فقط ({currentUser.assignedCommittees.length})</span>
+                      <span>لجاني المسندة فقط ({currentUser.allCommitteesAllowed ? 'الكل' : (currentUser.assignedCommitteeIds ?? []).length})</span>
                     </button>
 
                     <button

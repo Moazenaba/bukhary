@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
-import { NotificationItem, AppUser } from '../types';
-import { NavTab } from './Sidebar';
+import { NotificationItem, AppUser, Committee } from '../types';
+import { AuthService } from '../services/AuthService';
+import { NotificationComposer } from './NotificationComposer';
+
+/** Server times are ISO; show them in the user's locale. Older free-text values are shown as they are. */
+function formatTime(value: string): string {
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return value;
+  return new Date(ms).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' });
+}
 
 interface TopNavBarProps {
   onOpenNewCommittee: () => void;
@@ -18,6 +26,9 @@ interface TopNavBarProps {
   onSignOut?: () => void;
   todaysTasksCount?: number;
   onNavigateToDailyAlerts?: () => void;
+  canSendNotifications?: boolean;
+  committees?: Committee[];
+  onNotificationSent?: () => void;
 }
 
 export const TopNavBar: React.FC<TopNavBarProps> = ({
@@ -36,8 +47,12 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onSignOut,
   todaysTasksCount = 0,
   onNavigateToDailyAlerts,
+  canSendNotifications = false,
+  committees = [],
+  onNotificationSent,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showComposer, setShowComposer] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
@@ -140,7 +155,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           )}
 
           {/* New Committee Button (Visible to super_admin or user with add_new_committee permission) */}
-          {(currentUser.role === 'super_admin' || currentUser.permissions.includes('add_new_committee')) && (
+          {AuthService.can('committees.create') && (
             <button
               onClick={onOpenNewCommittee}
               className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer"
@@ -202,7 +217,22 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                     {notifications.length} إشعار
                   </span>
                 </div>
+                {canSendNotifications && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setShowComposer(true);
+                    }}
+                    className="w-full mb-2 py-1.5 rounded-xl border border-brand/40 text-brand text-xs font-bold hover:bg-brand/5 cursor-pointer"
+                  >
+                    إرسال تنبيه جديد
+                  </button>
+                )}
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1 text-xs">
+                  {notifications.length === 0 && (
+                    <p className="py-6 text-center text-muted">لا توجد إشعارات حتى الآن</p>
+                  )}
                   {notifications.map((notif) => (
                     <div
                       key={notif.id}
@@ -216,7 +246,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                     >
                       <div className="flex items-center justify-between font-bold text-ink mb-1">
                         <span>{notif.title}</span>
-                        <span className="text-xs text-gray-400 font-normal">{notif.time}</span>
+                        <span className="text-xs text-gray-400 font-normal">{formatTime(notif.time)}</span>
                       </div>
                       <p className="text-muted text-xs">{notif.description}</p>
                     </div>
@@ -227,6 +257,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </div>
         </div>
       </div>
+      {showComposer && (
+        <NotificationComposer committees={committees} onClose={() => setShowComposer(false)} onSent={() => onNotificationSent?.()} />
+      )}
     </header>
   );
 };

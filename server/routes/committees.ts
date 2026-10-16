@@ -128,7 +128,12 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
   }
 
   const name = await courseName(db, c.courseId);
-  const stages = { ...emptyStages(), ...(existing?.stages ?? {}), ...(c.stages ?? {}) };
+  // Stage flags from a full save get server timestamps, as with PATCH (WEB-18, MOB-15).
+  const stages = {
+    ...emptyStages(),
+    ...(existing?.stages ?? {}),
+    ...mergeLegacyStages(existing?.stages ?? {}, c.stages ?? {}, user, new Date().toISOString()),
+  };
   const { rows } = await db.query(
     `INSERT INTO committees (
        id, committee_number, committee_name, association_name, members, branch, competition_book,
@@ -340,6 +345,14 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
           JSON.stringify(next.ceremonyDetails ?? {}),
         ]
       );
+      if ((action.type === 'completeStage' || action.type === 'reopenStage') && action.stage === 'ceremony') {
+        // The ceremony's calendar task follows the stage.
+        await db.query(
+          `UPDATE schedule_tasks SET completed = $2, completed_at = CASE WHEN $2 THEN NOW() ELSE NULL END, updated_at = NOW()
+           WHERE id = $1;`,
+          [`task-ceremony-${existing.id}`, action.type === 'completeStage']
+        );
+      }
       if (action.type === 'scheduleCeremony') {
         await syncCeremonyTask(db, updated[0]);
         if (action.ceremonyDate) {

@@ -13,6 +13,15 @@ interface ExamsViewProps {
   onOpenAddBook: () => void;
   onDeleteExam: (examId: string) => void;
   onDeleteBook?: (bookName: string) => void;
+  /** Upload or replace an exam's PDF (WEB-01: there was no way to attach a file after creation). */
+  onUploadFile?: (examId: string, file: File) => void | Promise<void>;
+}
+
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+
+function shortDate(value: string) {
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? value : new Date(ms).toLocaleDateString('ar', { dateStyle: 'medium' });
 }
 
 export const ExamsView: React.FC<ExamsViewProps> = ({
@@ -23,22 +32,42 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   onOpenAddBook,
   onDeleteExam,
   onDeleteBook,
+  onUploadFile,
 }) => {
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const pickFile = (examId: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !onUploadFile) return;
+      if (file.type !== 'application/pdf' || file.size > MAX_PDF_BYTES) {
+        toast.error('اختر ملف PDF لا يزيد حجمه عن 20 ميجابايت');
+        return;
+      }
+      setUploadingId(examId);
+      try {
+        await onUploadFile(examId, file);
+      } finally {
+        setUploadingId(null);
+      }
+    };
+    input.click();
+  };
   const [activeSubTab, setActiveSubTab] = useState<'exams' | 'books'>('exams');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<string>('all');
   const [viewingExam, setViewingExam] = useState<ExamItem | null>(null);
 
-  const isRestrictedScope =
-    currentUser &&
-    currentUser.role !== 'super_admin' &&
-    !currentUser.allExamsAllowed &&
-    currentUser.allowedExamIds &&
-    currentUser.allowedExamIds.length > 0;
+  // The server limits each user's exam files and content to their allow-list (API-06).
+  const examScope = AuthService.getPermissions()?.exams;
+  const isRestrictedScope = Array.isArray(examScope);
+  const canWriteExams = AuthService.can('exams.write');
 
-  // Filtered exams with Permission enforcement
   const filteredExams = exams.filter((e) => {
-    if (currentUser && !AuthService.canAccessExam(e.id, currentUser)) return false;
+    // Editors see every exam; others see the ones they may open.
+    if (!canWriteExams && e.canOpen === false) return false;
     if (selectedBook !== 'all' && e.book !== selectedBook) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -66,7 +95,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   // The PDF is fetched with the session token and opened as a blob URL
   // (browsers block opening data: URLs in new tabs).
   const handleOpenPdf = async (exam: ExamItem) => {
-    if (!exam.hasFile || !canDownload) {
+    if (!exam.hasFile || !canDownload || exam.canOpen === false) {
       setViewingExam(exam);
       return;
     }
@@ -225,7 +254,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             <div className="bg-white p-4 rounded-xl border border-line/40 shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-xs text-muted block font-semibold">ملفات PDF المرفوعة</span>
-                <span className="text-2xl font-mono font-bold text-blue-700">{exams.length} ملفات</span>
+                <span className="text-2xl font-mono font-bold text-blue-700">{exams.filter((e) => e.hasFile).length} ملفات</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
                 <span className="material-symbols-outlined">file_present</span>
@@ -319,11 +348,20 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                           {exam.hasFile ? exam.pdfFileName : 'لم يُرفع ملف أسئلة بعد'}
                         </span>
                         <span className="text-xs text-emerald-700">
-                          {exam.hasFile && exam.pdfFileSize ? `${exam.pdfFileSize} • ` : ''}أضيف في: {exam.uploadedAt}
+                          {exam.hasFile && exam.pdfFileSize ? `${exam.pdfFileSize} • ` : ''}أضيف في: {shortDate(exam.uploadedAt)}
                         </span>
                       </div>
                     </div>
-
+                    {canWrite && onUploadFile && (
+                      <button
+                        type="button"
+                        onClick={() => pickFile(exam.id)}
+                        disabled={uploadingId === exam.id}
+                        className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-white text-emerald-800 text-xs font-bold hover:bg-emerald-50 cursor-pointer disabled:opacity-60 shrink-0"
+                      >
+                        {uploadingId === exam.id ? 'جارٍ الرفع…' : exam.hasFile ? 'استبدال الملف' : 'رفع ملف PDF'}
+                      </button>
+                    )}
                   </div>
 
                   {/* Notes */}
@@ -342,7 +380,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-success transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-sm">visibility</span>
-                    <span>{exam.hasFile && canDownload ? 'فتح ورقة الامتحان (PDF)' : 'تفاصيل الامتحان'}</span>
+                    <span>{exam.hasFile && canDownload && exam.canOpen !== false ? 'فتح ورقة الامتحان (PDF)' : 'تفاصيل الامتحان'}</span>
                   </button>
 
 

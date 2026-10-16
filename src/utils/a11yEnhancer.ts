@@ -63,19 +63,40 @@ function pruneStack() {
 
 export function installA11yEnhancer() {
   if (typeof document === 'undefined') return;
+  // Only nodes added since the last frame are examined (WEB-19): a full scan of every button on
+  // each DOM change was the main cost of this layer on large lists.
   let scheduled = false;
+  let pending: Element[] = [];
+  let removed = false;
   const run = () => {
     scheduled = false;
-    document.querySelectorAll<HTMLElement>('[role="dialog"]').forEach(enhanceDialog);
-    enhanceButtons(document);
-    pruneStack();
+    const roots = pending;
+    pending = [];
+    for (const root of roots) {
+      if (!root.isConnected) continue;
+      if (root.matches('[role="dialog"]')) enhanceDialog(root as HTMLElement);
+      root.querySelectorAll<HTMLElement>('[role="dialog"]').forEach(enhanceDialog);
+      enhanceButtons(root);
+      if (root.matches('button')) enhanceButtons(root.parentElement ?? root);
+    }
+    if (removed) {
+      removed = false;
+      pruneStack();
+    }
   };
-  new MutationObserver(() => {
-    if (!scheduled) {
+  new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      m.addedNodes.forEach((n) => {
+        if (n instanceof Element) pending.push(n);
+      });
+      if (m.removedNodes.length) removed = true;
+    }
+    if (!scheduled && (pending.length || removed)) {
       scheduled = true;
       requestAnimationFrame(run);
     }
   }).observe(document.body, { childList: true, subtree: true });
+  pending.push(document.body);
 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab' || focusStack.length === 0) return;

@@ -98,6 +98,8 @@ export const ACTIONS = {
   },
   'notifications.create': { roles: ['super_admin'], description: 'إرسال تنبيه عام' },
   'audit.read': { roles: ['super_admin', 'auditor'], readOnly: true, description: 'عرض سجلات التدقيق' },
+  // Statistics are computed in the clients from data everyone may read; this action decides who sees the screen.
+  'stats.read': { readOnly: true, anyPermission: ['progress_stats'], grantedToRoles: ['auditor', 'committee_head'], description: 'الإحصائيات' },
   'database.admin': { roles: ['super_admin'], description: 'حالة قاعدة البيانات' },
   'ocr.use': { roles: MANAGERS, anyPermission: ['database_sheets'], description: 'استخراج جدول من صورة' },
 } satisfies Record<string, ActionRule>;

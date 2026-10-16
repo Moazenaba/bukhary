@@ -13,7 +13,7 @@ export const Footer: React.FC = () => {
           </div>
 
           <p className="text-[12px] sm:text-[13px] text-ink-soft">
-            نظام إدارة لجان الاختبار والتصحيح لمتون العقيدة والكتب الشرعية © 1445هـ — جميع الحقوق محفوظة
+            نظام إدارة لجان الاختبار والتصحيح لمتون العقيدة والكتب الشرعية © {new Intl.DateTimeFormat('ar-SA-u-ca-islamic', { year: 'numeric' }).format(new Date())} — جميع الحقوق محفوظة
           </p>
 
           <div className="flex items-center gap-3 sm:gap-4 text-ink-soft text-xs sm:text-[12px] font-medium">

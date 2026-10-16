@@ -319,7 +319,10 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
        updated_at = NOW()
      RETURNING *;`,
     [
-      input.id, input.name, input.phone, input.email, passwordHash,
+      input.id, input.name, input.phone,
+      // A client that leaves the email out keeps the stored one (partial saves).
+      Object.prototype.hasOwnProperty.call(req.body ?? {}, 'email') ? input.email : existing?.email ?? null,
+      passwordHash,
       // Only people who can see the passport number may change it; managers receive the list
       // without it, so a value they send back (usually empty) must not wipe it (MOB-09).
       input.passportNumber !== undefined && (canGrant || isSelf) ? input.passportNumber : existing?.passport_number ?? null,
