@@ -17,6 +17,8 @@ export interface SummerCourseRow {
   committeeId?: string; // معرف اللجنة المرتبطة في نظام اللجان
   courseId?: string; // معرف الدورة المرتبطة (مثال: الدورة الصيفية)
   courseName?: string; // اسم الدورة المرتبطة
+  /** Client-only: a committee shown in the sheet that has no saved row yet. */
+  virtual?: boolean;
 }
 
 export type CourseFilterStatus =

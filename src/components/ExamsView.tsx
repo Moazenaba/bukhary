@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { ExamItem, AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
+import { DataService } from '../services/DataService';
+import { errorMessage } from '../services/api';
+import { toast } from './Toasts';
 
 interface ExamsViewProps {
   exams: ExamItem[];
@@ -55,40 +58,31 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     return true;
   });
 
-  const handleOpenPdf = (exam: ExamItem) => {
-    if (exam.pdfDataUrl) {
-      const win = window.open();
-      if (win) {
-        win.document.write(
-          `<iframe src="${exam.pdfDataUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
-        );
-      }
-    } else {
+  const canDownload = AuthService.can('exams.file');
+  const canWrite = AuthService.can('exams.write');
+  const canDelete = AuthService.can('exams.delete');
+  const canEditBooks = AuthService.can('books.write');
+
+  // The PDF is fetched with the session token and opened as a blob URL
+  // (browsers block opening data: URLs in new tabs).
+  const handleOpenPdf = async (exam: ExamItem) => {
+    if (!exam.hasFile || !canDownload) {
       setViewingExam(exam);
+      return;
+    }
+    const win = window.open('', '_blank');
+    try {
+      const url = await DataService.examFileUrl(exam.id);
+      if (win) win.location.href = url;
+      else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      win?.close();
+      toast.error(errorMessage(err));
     }
   };
 
-  const handleDownloadMockPdf = (exam: ExamItem) => {
-    const textContent = `مسابقات مسجد البخاري العلمية في متون العقيدة
-اسم الامتحان: ${exam.title}
-الكتاب المقرر: ${exam.book}
-الفرع: ${exam.branch}
-الدرجة الكلية: ${exam.totalMarks} درجة | المدة: ${exam.durationMinutes} دقيقة
-عدد الأسئلة: ${exam.questionsCount || 5} أسئلة
-تاريخ الاعتماد: ${exam.uploadedAt}
 
-تعليمات الامتحان:
-${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من الكتاب والسنة وأقوال أهل العلم.'}
-`;
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = exam.pdfFileName || `${exam.title}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
 
   return (
     <div className="space-y-6 text-right">
@@ -97,7 +91,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">menu_book</span>
+              <span className="material-symbols-outlined text-2xl">menu_book</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-bold">
               الامتحانات والكتب المقررة (PDF)
@@ -113,18 +107,20 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           {/* 1. Add Book Button (Golden/Amber theme) */}
           <button
             onClick={onOpenAddBook}
+            hidden={!canEditBooks}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer shrink-0 border border-amber-400/50"
           >
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">library_add</span>
+            <span className="material-symbols-outlined text-xl">library_add</span>
             <span>+ إضافة كتاب مقرر</span>
           </button>
 
           {/* 2. Add Exam & Upload PDF Button */}
           <button
             onClick={onOpenAddExam}
+            hidden={!canWrite}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600" aria-hidden="true">upload_file</span>
+            <span className="material-symbols-outlined text-xl text-emerald-600">upload_file</span>
             <span>+ إضافة امتحان ورفع PDF</span>
           </button>
         </div>
@@ -141,7 +137,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-[#eff4ff]'
             }`}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">picture_as_pdf</span>
+            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
             <span>نماذج الامتحانات وPDF</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
               {exams.length}
@@ -156,7 +152,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-amber-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">auto_stories</span>
+            <span className="material-symbols-outlined text-sm">auto_stories</span>
             <span>الكتب والمتون المقررة</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-mono">
               {savedBooks.length}
@@ -168,17 +164,19 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
         {activeSubTab === 'books' ? (
           <button
             onClick={onOpenAddBook}
+            hidden={!canEditBooks}
             className="text-xs text-amber-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">add_circle</span>
+            <span className="material-symbols-outlined text-sm">add_circle</span>
             <span>إضافة متن جديد</span>
           </button>
         ) : (
           <button
             onClick={onOpenAddExam}
+            hidden={!canWrite}
             className="text-xs text-[#005c55] font-bold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">upload_file</span>
+            <span className="material-symbols-outlined text-sm">upload_file</span>
             <span>رفع نموذج امتحان</span>
           </button>
         )}
@@ -191,7 +189,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           {isRestrictedScope && (
             <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-300 text-purple-950 text-xs flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-purple-700 text-lg" aria-hidden="true">lock_person</span>
+                <span className="material-symbols-outlined text-purple-700 text-lg">lock_person</span>
                 <span>
                   <strong>نطاق الصلاحية المخصص:</strong> يظهر لك فقط الامتحانات المصرح لك بالدخول على تفاصيلها وتصحيحها ({filteredExams.length} من أصل {exams.length}).
                 </span>
@@ -210,7 +208,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 <span className="text-2xl font-mono font-bold text-[#005c55]">{exams.length}</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#005c55] flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined" aria-hidden="true">description</span>
+                <span className="material-symbols-outlined">description</span>
               </span>
             </div>
 
@@ -220,7 +218,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 <span className="text-2xl font-mono font-bold text-amber-600">{savedBooks.length}</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined" aria-hidden="true">auto_stories</span>
+                <span className="material-symbols-outlined">auto_stories</span>
               </span>
             </div>
 
@@ -230,7 +228,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                 <span className="text-2xl font-mono font-bold text-blue-700">{exams.length} ملفات</span>
               </div>
               <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined" aria-hidden="true">file_present</span>
+                <span className="material-symbols-outlined">file_present</span>
               </span>
             </div>
           </div>
@@ -239,7 +237,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           <div className="bg-white p-4 rounded-2xl border border-[#bdc9c6]/50 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="relative w-full md:flex-1">
               <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[#6e7977]">
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">search</span>
+                <span className="material-symbols-outlined text-lg">search</span>
               </span>
               <input
                 type="text"
@@ -284,7 +282,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                         {exam.title}
                       </h3>
                       <span className="inline-flex items-center gap-1 text-[11px] text-[#005c55] font-semibold mt-1">
-                        <span className="material-symbols-outlined text-xs" aria-hidden="true">auto_stories</span>
+                        <span className="material-symbols-outlined text-xs">auto_stories</span>
                         <span>{exam.book}</span>
                       </span>
                     </div>
@@ -314,21 +312,18 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                   <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 mb-4">
                     <div className="flex items-center gap-2.5">
                       <span className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
-                        <span className="material-symbols-outlined text-xl" aria-hidden="true">picture_as_pdf</span>
+                        <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
                       </span>
                       <div className="text-right">
                         <span className="font-bold text-xs text-emerald-950 block truncate max-w-[200px]">
-                          {exam.pdfFileName || 'ورقة_الامتحان.pdf'}
+                          {exam.hasFile ? exam.pdfFileName : 'لم يُرفع ملف أسئلة بعد'}
                         </span>
                         <span className="text-[11px] text-emerald-700">
-                          {exam.pdfFileSize || '1.4 MB'} • رُفع في: {exam.uploadedAt}
+                          {exam.hasFile && exam.pdfFileSize ? `${exam.pdfFileSize} • ` : ''}أضيف في: {exam.uploadedAt}
                         </span>
                       </div>
                     </div>
 
-                    <span className="text-[10px] bg-emerald-200/60 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
-                      معتمد
-                    </span>
                   </div>
 
                   {/* Notes */}
@@ -346,29 +341,24 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                     onClick={() => handleOpenPdf(exam)}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#005c55] text-white text-xs font-bold hover:bg-[#1b6b51] transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">visibility</span>
-                    <span>معاينة ورقة الامتحان (PDF)</span>
+                    <span className="material-symbols-outlined text-sm">visibility</span>
+                    <span>{exam.hasFile && canDownload ? 'فتح ورقة الامتحان (PDF)' : 'تفاصيل الامتحان'}</span>
                   </button>
 
-                  <button
-                    onClick={() => handleDownloadMockPdf(exam)}
-                    title="تنزيل الملف"
-                    className="p-2 rounded-xl border border-[#bdc9c6] text-[#3e4947] hover:bg-[#eff4ff] transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">download</span>
-                  </button>
 
-                  <button
+
+                  {canDelete && <button
                     onClick={() => {
                       if (window.confirm(`هل أنت متأكد من حذف "${exam.title}"؟`)) {
                         onDeleteExam(exam.id);
                       }
                     }}
                     title="حذف الامتحان"
+                    aria-label="حذف الامتحان"
                     className="p-2 rounded-xl border border-[#bdc9c6] text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
-                  </button>
+                    <span className="material-symbols-outlined text-base">delete</span>
+                  </button>}
                 </div>
               </div>
             ))}
@@ -376,7 +366,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
 
           {filteredExams.length === 0 && (
             <div className="bg-white rounded-2xl p-12 text-center border border-[#bdc9c6]/40 shadow-xs">
-              <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block" aria-hidden="true">
+              <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block">
                 find_in_page
               </span>
               <h3 className="font-bold text-base text-[#0d1c2e] mb-1">لا توجد امتحانات مطابقة للبحث</h3>
@@ -385,6 +375,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
               </p>
               <button
                 onClick={onOpenAddExam}
+            hidden={!canWrite}
                 className="px-4 py-2 rounded-xl bg-[#005c55] text-white text-xs font-bold hover:bg-[#1b6b51] cursor-pointer"
               >
                 + إضافة امتحان الآن
@@ -400,7 +391,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
           <div className="bg-white p-4 rounded-2xl border border-[#bdc9c6]/50 shadow-xs flex items-center justify-between">
             <div className="relative flex-1">
               <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[#6e7977]">
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">search</span>
+                <span className="material-symbols-outlined text-lg">search</span>
               </span>
               <input
                 type="text"
@@ -412,9 +403,10 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
             </div>
             <button
               onClick={onOpenAddBook}
+            hidden={!canEditBooks}
               className="mr-3 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">library_add</span>
+              <span className="material-symbols-outlined text-sm">library_add</span>
               <span>+ إضافة كتاب جديد</span>
             </button>
           </div>
@@ -448,7 +440,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                       </div>
                       <div className="flex justify-between">
                         <span>التصنيف:</span>
-                        <strong className="text-amber-800">متون العقيدة والتوحيد</strong>
+                        <strong className="text-amber-800">متون علمية معتمدة</strong>
                       </div>
                     </div>
                   </div>
@@ -464,7 +456,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                       عرض امتحانات الكتاب &larr;
                     </button>
 
-                    {onDeleteBook && idx > 3 && (
+                    {onDeleteBook && canEditBooks && (
                       <button
                         onClick={() => {
                           if (window.confirm(`هل أنت متأكد من حذف "${bookName}"؟`)) {
@@ -474,7 +466,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
                         className="text-gray-400 hover:text-red-600 p-1"
                         title="حذف هذا الكتاب"
                       >
-                        <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
+                        <span className="material-symbols-outlined text-sm">delete</span>
                       </button>
                     )}
                   </div>
@@ -487,18 +479,18 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
 
       {/* PDF View Modal */}
       {viewingExam && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-[#bdc9c6]/50 text-right animate-in fade-in">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#bdc9c6]/30">
               <div className="flex items-center gap-2 text-[#005c55]">
-                <span className="material-symbols-outlined text-2xl" aria-hidden="true">picture_as_pdf</span>
+                <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>
                 <h3 className="font-bold text-base text-[#0d1c2e]">{viewingExam.title}</h3>
               </div>
               <button
                 onClick={() => setViewingExam(null)}
                 className="p-1 rounded-lg text-gray-400 hover:text-gray-700"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
@@ -520,11 +512,13 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
 
               <div className="p-4 bg-white rounded-xl border border-[#bdc9c6]/30 space-y-2">
                 <span className="font-bold text-xs text-[#005c55] block">
-                  📄 مستند الامتحان المرفوع ({viewingExam.pdfFileName})
+                  📄 {viewingExam.hasFile ? `ملف الأسئلة: ${viewingExam.pdfFileName}` : 'لم يُرفع ملف أسئلة لهذا الامتحان'}
                 </span>
-                <p className="text-[12px] text-[#3e4947] leading-relaxed">
-                  تم اعتماد نموذج الأسئلة الرسمي وتوثيق ورقة الاختبار بنجاح في أرشيف لجان مسجد البخاري.
-                </p>
+                {viewingExam.hasFile && !canDownload && (
+                  <p className="text-[12px] text-[#3e4947] leading-relaxed">
+                    تنزيل ملف الأسئلة متاح للمشرف العام ورؤساء اللجان فقط.
+                  </p>
+                )}
                 {viewingExam.notes && (
                   <p className="text-[11px] text-[#6e7977] border-t border-gray-100 pt-2">
                     <strong>التعليمات:</strong> {viewingExam.notes}
@@ -534,13 +528,7 @@ ${exam.notes || 'الإجابة بوضوح واستحضار الأدلة من ا
             </div>
 
             <div className="mt-5 pt-3 border-t border-[#bdc9c6]/30 flex justify-between items-center">
-              <button
-                onClick={() => handleDownloadMockPdf(viewingExam)}
-                className="px-4 py-2 bg-emerald-700 text-white rounded-xl font-bold text-xs hover:bg-emerald-800 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">download</span>
-                <span>تنزيل ورقة الامتحان</span>
-              </button>
+
 
               <button
                 onClick={() => setViewingExam(null)}

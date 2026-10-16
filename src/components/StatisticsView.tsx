@@ -21,20 +21,19 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
     ? Math.round((completedCeremonyCount / total) * 100)
     : 0;
 
-  // Calculations for Periodic Rates (حركة حلوة: أسبوعي - شهري - سنوي)
-  // Weekly calculations
-  const weeklyTarget = Math.max(1, Math.ceil(total * 0.4)); // e.g. 40% of committees expected this week
+  // Progress milestones measured from the committees' real stages (no assumed targets).
+  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  const weeklyTarget = total;
   const weeklyCompleted = committees.filter(
     (c) => c.stages.ceremony?.completed || c.stages.announcement?.completed || c.stages.review?.completed
   ).length;
-  const weeklyRate = Math.min(100, Math.round((weeklyCompleted / weeklyTarget) * 100));
+  const weeklyRate = pct(weeklyCompleted);
 
-  // Monthly calculations
-  const monthlyTarget = Math.max(1, Math.ceil(total * 0.8)); // 80% monthly expected target
+  const monthlyTarget = total;
   const monthlyCompleted = committees.filter(
     (c) => c.stages.ceremony?.completed || c.stages.announcement?.completed
   ).length;
-  const monthlyRate = Math.min(100, Math.round((monthlyCompleted / monthlyTarget) * 100));
+  const monthlyRate = pct(monthlyCompleted);
 
   // Annual calculations
   const annualTarget = total;
@@ -65,24 +64,33 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
   // Group by books
   const booksCount: Record<string, number> = {};
   committees.forEach((c) => {
-    booksCount[c.competitionBook] = (booksCount[c.competitionBook] || 0) + 1;
+    const book = c.competitionBook?.trim() || 'متون غير مصنفة';
+    booksCount[book] = (booksCount[book] || 0) + 1;
   });
+
+  const getProgressLabel = (rate: number) => {
+    if (rate >= 90) return 'مستوى التقدم: استثنائي - تجاوز التوقعات';
+    if (rate >= 75) return 'مستوى التقدم: ممتاز - وفق الخطة المقررة';
+    if (rate >= 50) return 'مستوى التقدم: جيد - يتطلب متابعة دورية';
+    if (rate >= 25) return 'مستوى التقدم: مقبول - يتطلب تسريع الوتيرة';
+    return 'مستوى التقدم: في البداية - بانتظار الاعتماد الميداني';
+  };
 
   return (
     <div className="space-y-6 text-right">
-      {/* Top Banner: Periodic Toggle (الحركة الحلوة لنسب الإنجاز: أسبوعي - شهري - سنوي) */}
+      {/* Top Banner: Periodic Toggle */}
       <div className="bg-white rounded-2xl p-5 border border-[#bdc9c6]/50 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-emerald-50 text-emerald-800">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">analytics</span>
+              <span className="material-symbols-outlined text-2xl">analytics</span>
             </span>
             <h2 className="text-lg sm:text-xl font-bold text-[#0d1c2e]">
-              لوحة حساب نسبة الإنجاز الدورية (أسبوعية • شهرية • سنوية)
+              لوحة الإحصائيات ونسب الإنجاز الحية
             </h2>
           </div>
           <p className="text-xs text-[#6e7977] mt-1">
-            متابعة دقيقة لمعدلات إنجاز وتصحيح لجان مسابقات مسجد البخاري وتطورها الزمني.
+            متابعة حية لمعدلات إنجاز وتصحيح لجان مسابقات مسجد البخاري المستخرجة من قاعدة البيانات.
           </p>
         </div>
 
@@ -96,8 +104,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                 : 'text-[#3e4947] hover:bg-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_view_week</span>
-            <span>نسبة هذا الأسبوع</span>
+            <span className="material-symbols-outlined text-sm">calendar_view_week</span>
+            <span>بلغت مرحلة المراجعة</span>
           </button>
 
           <button
@@ -108,8 +116,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                 : 'text-[#3e4947] hover:bg-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_month</span>
-            <span>نسبة هذا الشهر</span>
+            <span className="material-symbols-outlined text-sm">calendar_month</span>
+            <span>أُعلنت نتيجتها</span>
           </button>
 
           <button
@@ -120,13 +128,13 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                 : 'text-[#3e4947] hover:bg-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">event_repeat</span>
-            <span>النسبة السنوية (الموسم)</span>
+            <span className="material-symbols-outlined text-sm">event_repeat</span>
+            <span>النسبة الإجمالية للموسم</span>
           </button>
         </div>
       </div>
 
-      {/* 3 Interactive Periodic Cards (هذا الأسبوع | هذا الشهر | السنوي) */}
+      {/* 3 Interactive Periodic Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* 1. WEEKLY RATE CARD */}
         <div
@@ -139,21 +147,21 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         >
           <div className="flex items-center justify-between mb-3">
             <span className="p-2.5 rounded-xl bg-teal-100 text-teal-800">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">date_range</span>
+              <span className="material-symbols-outlined text-2xl">date_range</span>
             </span>
             <div className="text-left">
               <span className="text-3xl font-mono font-bold text-teal-800">
                 {weeklyRate}%
               </span>
               <span className="block text-[10px] text-teal-700 font-semibold mt-0.5">
-                +14% مقارنة بالأسبوع الماضي
+                من إجمالي اللجان
               </span>
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#0d1c2e]">نسبة الإنجاز هذا الأسبوع</h3>
+          <h3 className="font-bold text-sm text-[#0d1c2e]">اللجان التي بلغت مرحلة المراجعة أو ما بعدها</h3>
           <p className="text-xs text-[#6e7977] mt-1">
-            أنجزت <strong>{weeklyCompleted}</strong> لجان من مستهدف <strong>{weeklyTarget}</strong> لجان هذا الأسبوع
+            <strong>{weeklyCompleted}</strong> لجنة من إجمالي <strong>{weeklyTarget}</strong> لجنة مسجلة
           </p>
 
           <div className="w-full h-2.5 bg-gray-100 rounded-full mt-3 overflow-hidden">
@@ -163,7 +171,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
             />
           </div>
           <span className="block text-[11px] text-teal-700 font-semibold mt-2">
-            مستوى التقدم: ممتاز وفق الخطة الأسبوعية
+            {getProgressLabel(weeklyRate)}
           </span>
         </div>
 
@@ -178,21 +186,21 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         >
           <div className="flex items-center justify-between mb-3">
             <span className="p-2.5 rounded-xl bg-blue-100 text-blue-800">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">calendar_month</span>
+              <span className="material-symbols-outlined text-2xl">calendar_month</span>
             </span>
             <div className="text-left">
               <span className="text-3xl font-mono font-bold text-blue-700">
                 {monthlyRate}%
               </span>
               <span className="block text-[10px] text-blue-700 font-semibold mt-0.5">
-                مستهدف ربيع الأول
+                من إجمالي اللجان
               </span>
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#0d1c2e]">نسبة الإنجاز الشهرية</h3>
+          <h3 className="font-bold text-sm text-[#0d1c2e]">اللجان التي أُعلنت نتيجتها</h3>
           <p className="text-xs text-[#6e7977] mt-1">
-            أنجزت <strong>{monthlyCompleted}</strong> لجان معتمدة من إجمالي مستهدف <strong>{monthlyTarget}</strong> لجنة للشهر
+            <strong>{monthlyCompleted}</strong> لجنة من إجمالي <strong>{monthlyTarget}</strong> لجنة مسجلة
           </p>
 
           <div className="w-full h-2.5 bg-gray-100 rounded-full mt-3 overflow-hidden">
@@ -202,7 +210,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
             />
           </div>
           <span className="block text-[11px] text-blue-700 font-semibold mt-2">
-            إتمام تسليم كشوف الدرجات والمراجعة
+            {getProgressLabel(monthlyRate)}
           </span>
         </div>
 
@@ -217,21 +225,21 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         >
           <div className="flex items-center justify-between mb-3">
             <span className="p-2.5 rounded-xl bg-emerald-100 text-emerald-800">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">celebration</span>
+              <span className="material-symbols-outlined text-2xl">celebration</span>
             </span>
             <div className="text-left">
               <span className="text-3xl font-mono font-bold text-emerald-700">
                 {annualRate}%
               </span>
               <span className="block text-[10px] text-emerald-700 font-semibold mt-0.5">
-                الموسم السنوي الكامل
+                الموسم الكامل
               </span>
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#0d1c2e]">نسبة الإنجاز السنوية (الموسم)</h3>
+          <h3 className="font-bold text-sm text-[#0d1c2e]">النسبة الإجمالية (الموسم)</h3>
           <p className="text-xs text-[#6e7977] mt-1">
-            <strong>{annualCompleted}</strong> لجان أتمت الحفل بالكامل من إجمالي <strong>{annualTarget}</strong> لجنة سنوية
+            <strong>{annualCompleted}</strong> لجان أتمت الحفل بالكامل من إجمالي <strong>{annualTarget}</strong> لجنة مسجلة
           </p>
 
           <div className="w-full h-2.5 bg-gray-100 rounded-full mt-3 overflow-hidden">
@@ -241,7 +249,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
             />
           </div>
           <span className="block text-[11px] text-emerald-700 font-semibold mt-2">
-            {annualCompleted} لجان كُرّمت رسميًا في الحفل
+            تم تكريم {annualCompleted} لجان رسمياً حتى الآن
           </span>
         </div>
       </div>
@@ -250,22 +258,22 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
       <div className="p-4 rounded-2xl bg-gradient-to-l from-[#005c55] to-emerald-800 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
           <span className="p-2.5 rounded-xl bg-white/20 text-white">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">speed</span>
+            <span className="material-symbols-outlined text-2xl">speed</span>
           </span>
           <div>
             <h4 className="font-bold text-sm">
               {activePeriod === 'week'
-                ? 'تقرير وتيرة الإنجاز هذا الأسبوع: نشاط مكثف في التصحيح والتجميع'
+                ? 'اللجان التي بلغت المراجعة'
                 : activePeriod === 'month'
-                ? 'تقرير الإنجاز الشهري: اعتماد وتدقيق كشوف اللجان والنتائج'
-                : 'التقرير السنوي لمسابقات مسجد البخاري: حصاد موسم المتون العلمية'}
+                ? 'اللجان التي أُعلنت نتيجتها'
+                : 'التقرير الختامي لمسابقات مسجد البخاري'}
             </h4>
             <p className="text-xs text-teal-100 mt-0.5">
               {activePeriod === 'week'
-                ? `بلغ معدل إنجاز اللجان هذا الأسبوع ${weeklyRate}% بمتوسط تصحيح سريع للأسئلة.`
+                ? `${weeklyCompleted} من ${total} لجنة (${weeklyRate}%) بلغت مرحلة المراجعة أو ما بعدها.`
                 : activePeriod === 'month'
-                ? `تم إنجاز ${monthlyCompleted} لجنة خلال الشهر الحالي بنجاح تام وتوثيق زمني.`
-                : `إجمالي اللجان المسجلة بالدورة ${total} لجنة في متون العقيدة والتوحيد.`}
+                ? `${monthlyCompleted} من ${total} لجنة (${monthlyRate}%) أُعلنت نتيجتها.`
+                : `إجمالي اللجان المسجلة بالدورة ${total} لجنة في مختلف المتون الشرعية.`}
             </p>
           </div>
         </div>
@@ -289,7 +297,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
           </h3>
 
           <div className="space-y-3.5">
-            {STAGES_LIST.slice(1).map((stg) => {
+            {STAGES_LIST.map((stg) => {
               const count = currentStageBreakdown[stg.key] || 0;
               const pct = total > 0 ? Math.round((count / total) * 100) : 0;
 
@@ -327,11 +335,11 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               const pct = total > 0 ? Math.round((count / total) * 100) : 0;
               return (
                 <div
-                  key={idx}
+                  key={`${book}-${idx}`}
                   className="p-3 rounded-xl bg-[#f8f9ff] border border-[#bdc9c6]/40 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#005c55] text-lg" aria-hidden="true">
+                    <span className="material-symbols-outlined text-[#005c55] text-lg">
                       auto_stories
                     </span>
                     <span className="font-bold text-xs text-[#0d1c2e]">{book}</span>

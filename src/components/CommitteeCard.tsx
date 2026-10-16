@@ -80,12 +80,12 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
         {/* Competition Book & Student Count Badges */}
         <div className="flex items-center justify-between gap-2 mb-3.5 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50/80 text-[#005c55] border border-emerald-200/80 max-w-full truncate shadow-2xs">
-            <span className="material-symbols-outlined text-sm text-emerald-700" aria-hidden="true">menu_book</span>
+            <span className="material-symbols-outlined text-sm text-emerald-700">menu_book</span>
             <span className="truncate">{committee.competitionBook}</span>
           </span>
 
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold bg-blue-50 text-blue-900 border border-blue-200/80 font-mono text-xs shadow-2xs">
-            <span className="material-symbols-outlined text-sm text-blue-700" aria-hidden="true">groups</span>
+            <span className="material-symbols-outlined text-sm text-blue-700">groups</span>
             <span>{committee.studentsCount || 0} {committee.isWomenCommittee ? 'طالبة' : 'طالباً'}</span>
           </span>
         </div>
@@ -95,7 +95,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           {/* Members */}
           <div className="flex items-start justify-between gap-2">
             <span className="text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
-              <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">group</span>
+              <span className="material-symbols-outlined text-sm text-slate-400">group</span>
               <span>الأعضاء:</span>
             </span>
             <span className="font-semibold text-slate-800 text-left line-clamp-1">
@@ -106,7 +106,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           {/* Branch */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
-              <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">alt_route</span>
+              <span className="material-symbols-outlined text-sm text-slate-400">alt_route</span>
               <span>الفرع:</span>
             </span>
             <span className="font-bold text-slate-800">{committee.branch}</span>
@@ -116,7 +116,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           {committee.associationName && (
             <div className="flex items-center justify-between gap-2">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
-                <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">apartment</span>
+                <span className="material-symbols-outlined text-sm text-slate-400">apartment</span>
                 <span>الجمعية:</span>
               </span>
               <span className="font-bold text-[#005c55]">{committee.associationName}</span>
@@ -127,7 +127,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           {committee.sheikhName && (
             <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/50">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
-                <span className="material-symbols-outlined text-sm text-emerald-600" aria-hidden="true">person_pin</span>
+                <span className="material-symbols-outlined text-sm text-emerald-600">person_pin</span>
                 <span>الشيخ الميداني:</span>
               </span>
               <div className="flex items-center gap-1.5 text-left truncate max-w-[210px]">
@@ -166,7 +166,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
         <div className="mb-4">
           <div className="flex justify-between items-center text-xs mb-1.5">
             <span className="text-slate-600 font-semibold flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm text-emerald-700" aria-hidden="true">timeline</span>
+              <span className="material-symbols-outlined text-sm text-emerald-700">timeline</span>
               <span>سير المراحل:</span>
             </span>
             <span className="font-mono font-extrabold text-[#005c55]">
@@ -197,7 +197,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                 : 'bg-emerald-50/70 border-emerald-200 text-emerald-900 font-bold'
             }`}>
               <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base text-amber-700" aria-hidden="true">
+                <span className="material-symbols-outlined text-base text-amber-700">
                   {hasUnscoredQuestions ? 'edit_note' : 'task_alt'}
                 </span>
                 <span>
@@ -231,7 +231,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           onClick={() => onViewDetails(committee)}
           className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-l from-[#005c55] to-emerald-700 hover:from-[#004742] hover:to-emerald-800 text-white text-xs font-extrabold transition-all shadow-xs hover:shadow-md active:scale-[0.98] cursor-pointer"
         >
-          <span className="material-symbols-outlined text-base" aria-hidden="true">visibility</span>
+          <span className="material-symbols-outlined text-base">visibility</span>
           <span>عرض التفاصيل وسجل المراحل</span>
         </button>
 
@@ -242,7 +242,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
             aria-label="خيارات إضافية"
             className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">more_vert</span>
+            <span className="material-symbols-outlined text-lg">more_vert</span>
           </button>
 
           {/* Dropdown Menu */}
@@ -260,7 +260,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                   }}
                   className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 font-bold flex items-center gap-2 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-sm text-emerald-700" aria-hidden="true">edit_square</span>
+                  <span className="material-symbols-outlined text-sm text-emerald-700">edit_square</span>
                   <span>تعديل بيانات اللجنة</span>
                 </button>
 
@@ -276,7 +276,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                     }}
                     className="w-full px-3.5 py-2 text-xs text-red-600 hover:bg-red-50 font-bold flex items-center gap-2 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
+                    <span className="material-symbols-outlined text-sm">delete</span>
                     <span>حذف اللجنة</span>
                   </button>
                 )}

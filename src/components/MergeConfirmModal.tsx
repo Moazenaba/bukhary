@@ -1,5 +1,6 @@
 import React from 'react';
 import { Layers, Replace, AlertCircle, X } from 'lucide-react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface MergeConfirmModalProps {
   isOpen: boolean;
@@ -18,10 +19,11 @@ export const MergeConfirmModal: React.FC<MergeConfirmModalProps> = ({
   onMerge,
   onReplace,
 }) => {
+  useEscapeKey(onClose);
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+    <div role="dialog" aria-modal="true" aria-label="تأكيد الدمج" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-3">
@@ -38,8 +40,8 @@ export const MergeConfirmModal: React.FC<MergeConfirmModalProps> = ({
             </div>
           </div>
           <button
+            aria-label="إغلاق"
             onClick={onClose}
-            aria-label="إغلاق النافذة"
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50"
           >
             <X className="w-5 h-5" />

@@ -19,7 +19,7 @@ interface AssistantsViewProps {
   onSaveProfile?: (profile: PermissionProfile) => void;
   onDeleteProfile?: (profileId: string) => void;
   onAssignProfile?: (userId: string, profileId: string) => void;
-  onSetSuperAdmin?: (userId: string, isSuper: boolean) => { success: boolean; message: string };
+  onSetSuperAdmin?: (userId: string, isSuper: boolean) => Promise<{ success: boolean; message: string }>;
   onApproveAssistant: (
     userId: string,
     permissions: AssistantPermission[],
@@ -34,7 +34,7 @@ interface AssistantsViewProps {
     assignedCommittees: number[]
   ) => void;
   onUpdateAssistantUser: (updatedUser: AppUser) => void;
-  onAddAssistantDirect: (user: Omit<AppUser, 'id' | 'createdAt'>) => void;
+  onAddAssistantDirect: (user: Omit<AppUser, 'id' | 'createdAt'> & { password: string }) => unknown;
   onDeleteAssistant: (userId: string) => void;
   onOpenAuthModal: () => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
@@ -92,7 +92,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     'daily_alerts',
   ]);
   const [profileAllCommittees, setProfileAllCommittees] = useState(true);
-  const [profileAllowedCommittees, setProfileAllowedCommittees] = useState<number[]>([1, 2]);
+  const [profileAllowedCommittees, setProfileAllowedCommittees] = useState<number[]>([]);
   const [profileAllExams, setProfileAllExams] = useState(true);
   const [profileAllowedExamIds, setProfileAllowedExamIds] = useState<string[]>([]);
   const [profilePermissions, setProfilePermissions] = useState<AssistantPermission[]>([
@@ -104,7 +104,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [superAdminAlert, setSuperAdminAlert] = useState<string | null>(null);
 
   // Interview state
-  const [interviewDate, setInterviewDate] = useState('2026-10-06 17:00');
+  const [interviewDate, setInterviewDate] = useState('');
   const [interviewNotes, setInterviewNotes] = useState('يرجى الحضور لمقر إدارة لجان المسابقة لإجراء اختبار حفظ القرآن والمقابلة الشخصية.');
 
   // Rejection state
@@ -118,21 +118,18 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     'manage_committees',
     'calendar_schedule',
   ]);
-  const [approvalCommittees, setApprovalCommittees] = useState<number[]>([1]);
+  const [approvalCommittees, setApprovalCommittees] = useState<number[]>([]);
 
   // Form state for adding direct assistant
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('assistant');
   const [newProfileId, setNewProfileId] = useState<string>('');
-  const [newPermissions, setNewPermissions] = useState<AssistantPermission[]>([
-    'database_sheets',
-    'manage_committees',
-    'calendar_schedule',
-  ]);
-  const [newAssignedCommittees, setNewAssignedCommittees] = useState<number[]>([1]);
+  const [newPermissions, setNewPermissions] = useState<AssistantPermission[]>([]);
+  const [newAssignedCommittees, setNewAssignedCommittees] = useState<number[]>([]);
 
   // Available All Tabs Meta
   const ALL_SYSTEM_TABS: Array<{ id: string; label: string; icon: string; desc: string }> = [
@@ -151,17 +148,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   // Fallback to AuthService & LocalStorage if props are syncing
   const effectiveProfiles: PermissionProfile[] =
     profiles && profiles.length > 0 ? profiles : AuthService.getProfiles();
-  const effectiveExams: ExamItem[] =
-    exams && exams.length > 0
-      ? exams
-      : (() => {
-          try {
-            const stored = localStorage.getItem('bukhari_exams_v4');
-            return stored ? JSON.parse(stored) : [];
-          } catch {
-            return [];
-          }
-        })();
+  const effectiveExams: ExamItem[] = exams ?? [];
 
   // Filtering
   const isSuperAdmin = currentUser.role === 'super_admin';
@@ -172,21 +159,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const interviewRequests = users.filter((u) => u.status === 'interview');
   const rejectedRequests = users.filter((u) => u.status === 'rejected');
 
-  const [approvedPage, setApprovedPage] = useState(1);
-  const approvedPageSize = 8;
-
   const filteredApproved = approvedUsers.filter((u) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return u.name.toLowerCase().includes(q) || u.phone.includes(q) || u.email.toLowerCase().includes(q);
   });
-
-  const totalApprovedPages = Math.max(1, Math.ceil(filteredApproved.length / approvedPageSize));
-  const safeApprovedPage = Math.min(approvedPage, totalApprovedPages);
-  const paginatedApproved = filteredApproved.slice(
-    (safeApprovedPage - 1) * approvedPageSize,
-    safeApprovedPage * approvedPageSize
-  );
 
   const filteredRequests = joinRequests.filter((u) => {
     if (requestsSubFilter === 'pending' && u.status !== 'pending') return false;
@@ -238,7 +215,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     const newProf: PermissionProfile = {
       id: editingProfile ? editingProfile.id : `profile_${Date.now()}`,
       name: profileName.trim(),
-      description: profileDescription.trim() || 'نظام صلاحيات مخصص ومعتمد',
+      description: profileDescription.trim(),
       badgeColor: profileBadgeColor,
       allowedTabs: profileAllowedTabs,
       allowedCommittees: profileAllCommittees ? [] : profileAllowedCommittees,
@@ -260,16 +237,16 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     setIsProfileModalOpen(false);
   };
 
-  const handleToggleSuperAdmin = (targetUser: AppUser) => {
+  const handleToggleSuperAdmin = async (targetUser: AppUser) => {
     if (!isSuperAdmin) {
       alert('عذراً، فقط المشرف العام (سوبر أدمن) يملك صلاحية تغيير رتبة السوبر أدمن.');
       return;
     }
 
     const willBeSuper = targetUser.role !== 'super_admin';
-    const result = onSetSuperAdmin
+    const result = await (onSetSuperAdmin
       ? onSetSuperAdmin(targetUser.id, willBeSuper)
-      : AuthService.setSuperAdmin(targetUser.id, willBeSuper);
+      : AuthService.setSuperAdmin(targetUser.id, willBeSuper));
 
     if (!result.success) {
       setSuperAdminAlert(result.message);
@@ -349,7 +326,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
   const handleOpenInterviewModal = (user: AppUser) => {
     setInterviewingUser(user);
-    setInterviewDate('2026-10-06 17:00');
+    setInterviewDate('');
     setInterviewNotes('يرجى الحضور لمقر إدارة لجان المسجد لإجراء اختبار حفظ القرآن والمقابلة.');
   };
 
@@ -376,9 +353,9 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     setRejectingUser(null);
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!newName.trim() || !newPhone.trim() || !newPassword) return;
 
     let perms = newPermissions;
     let comms = newAssignedCommittees;
@@ -397,10 +374,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       }
     }
 
-    onAddAssistantDirect({
+    const created = await onAddAssistantDirect({
+      password: newPassword,
       name: newName.trim(),
-      phone: newPhone.trim() || '0500000000',
-      email: newEmail.trim() || `${Date.now()}@bukhari.org`,
+      phone: newPhone.trim(),
+      email: newEmail.trim(),
       role: newRole,
       profileId: newProfileId || undefined,
       status: 'approved',
@@ -409,17 +387,17 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       allowedExamIds: examIds,
       allExamsAllowed: allExams,
       permissions: perms,
-      approvedAt: new Date().toLocaleDateString('ar-EG'),
-      approvedBy: currentUser.name,
-      notes: newNotes.trim() || 'معاون مضاف ومفعل مباشرة من المشرف العام',
+      notes: newNotes.trim() || undefined,
     });
+    if (!created) return;
 
     setIsAddModalOpen(false);
     setNewName('');
     setNewPhone('');
     setNewEmail('');
+    setNewPassword('');
     setNewNotes('');
-    setNewAssignedCommittees([1]);
+    setNewAssignedCommittees([]);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -447,7 +425,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         <div>
           <div className="flex items-center gap-2.5 mb-1.5">
             <span className="p-2 rounded-2xl bg-white/20 text-white shadow-inner">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">admin_panel_settings</span>
+              <span className="material-symbols-outlined text-2xl">admin_panel_settings</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-black tracking-wide">
               نظام الصلاحيات والأدوار وإدارة الكوادر
@@ -464,7 +442,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               onClick={handleOpenCreateProfile}
               className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-amber-950 font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">add_moderator</span>
+              <span className="material-symbols-outlined text-lg">add_moderator</span>
               <span>+ إنشاء نظام صلاحية جديد</span>
             </button>
           )}
@@ -473,7 +451,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             onClick={() => setIsAddModalOpen(true)}
             className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/30 transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">person_add</span>
+            <span className="material-symbols-outlined text-lg">person_add</span>
             <span>+ إضافة مستخدم</span>
           </button>
 
@@ -481,7 +459,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             onClick={onOpenAuthModal}
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-black/20 hover:bg-black/30 text-emerald-200 border border-emerald-400/30 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">sync_alt</span>
+            <span className="material-symbols-outlined text-lg">sync_alt</span>
             <span>تبديل الحساب</span>
           </button>
         </div>
@@ -491,7 +469,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {superAdminAlert && (
         <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-400 text-amber-950 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 animate-in fade-in shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-600 text-xl" aria-hidden="true">info</span>
+            <span className="material-symbols-outlined text-amber-600 text-xl">info</span>
             <span>{superAdminAlert}</span>
           </div>
           <button onClick={() => setSuperAdminAlert(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
@@ -513,7 +491,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <span className="text-2xl font-black text-emerald-800 font-mono">{approvedUsers.length}</span>
           </div>
           <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">group</span>
+            <span className="material-symbols-outlined text-2xl">group</span>
           </span>
         </div>
 
@@ -528,7 +506,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <span className="text-2xl font-black text-purple-700 font-mono">{effectiveProfiles.length}</span>
           </div>
           <span className="w-11 h-11 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">tune</span>
+            <span className="material-symbols-outlined text-2xl">tune</span>
           </span>
         </div>
 
@@ -546,7 +524,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <span className="text-2xl font-black text-amber-600 font-mono">{pendingRequests.length}</span>
           </div>
           <span className="w-11 h-11 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">pending_actions</span>
+            <span className="material-symbols-outlined text-2xl">pending_actions</span>
           </span>
         </div>
 
@@ -561,7 +539,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             </div>
           </div>
           <span className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">military_tech</span>
+            <span className="material-symbols-outlined text-2xl">military_tech</span>
           </span>
         </div>
       </div>
@@ -577,7 +555,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">manage_accounts</span>
+            <span className="material-symbols-outlined text-base">manage_accounts</span>
             <span>المستخدمون وتعيين الأدوار</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
               {approvedUsers.length}
@@ -592,7 +570,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-purple-50'
             }`}
           >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">tune</span>
+            <span className="material-symbols-outlined text-base">tune</span>
             <span>مركز بناء وتصميم أنظمة الصلاحيات</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-200 text-purple-950 font-mono font-bold">
               {effectiveProfiles.length} نظام
@@ -607,7 +585,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-amber-50'
             }`}
           >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">how_to_reg</span>
+            <span className="material-symbols-outlined text-base">how_to_reg</span>
             <span>طلبات الانضمام والمقابلات</span>
             {pendingRequests.length > 0 && (
               <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200 text-amber-950 font-mono font-black animate-pulse">
@@ -620,7 +598,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         {/* Search */}
         <div className="relative w-full sm:w-64">
           <span className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-            <span className="material-symbols-outlined text-base" aria-hidden="true">search</span>
+            <span className="material-symbols-outlined text-base">search</span>
           </span>
           <input
             type="text"
@@ -636,7 +614,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {activeTab === 'approved' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {paginatedApproved.map((user) => {
+            {filteredApproved.map((user) => {
               const userProfile = effectiveProfiles.find((p) => p.id === user.profileId);
               const assignedComms = committees.filter((c) =>
                 user.assignedCommittees.includes(c.committeeNumber)
@@ -656,7 +634,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                             : 'bg-emerald-100 text-[#005c55]'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+                        <span className="material-symbols-outlined text-2xl">
                           {user.role === 'super_admin' ? 'military_tech' : 'person'}
                         </span>
                       </span>
@@ -683,7 +661,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
                         title="تعديل البيانات والصلاحيات"
                       >
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">edit</span>
+                        <span className="material-symbols-outlined text-base">edit</span>
                       </button>
                       {user.role !== 'super_admin' && (
                         <button
@@ -691,7 +669,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
                           title="حذف الحساب"
                         >
-                          <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
+                          <span className="material-symbols-outlined text-base">delete</span>
                         </button>
                       )}
                     </div>
@@ -711,7 +689,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         onClick={() => setAssigningProfileUser(user)}
                         className="px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-950 font-bold text-xs cursor-pointer flex items-center gap-1"
                       >
-                        <span className="material-symbols-outlined text-sm" aria-hidden="true">swap_horiz</span>
+                        <span className="material-symbols-outlined text-sm">swap_horiz</span>
                         <span>تغيير نظام الصلاحية</span>
                       </button>
                     )}
@@ -755,7 +733,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                             : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                        <span className="material-symbols-outlined text-sm">
                           {user.role === 'super_admin' ? 'remove_moderator' : 'military_tech'}
                         </span>
                         <span>{user.role === 'super_admin' ? 'تنزيل من سوبر أدمن' : 'ترقية إلى سوبر أدمن'}</span>
@@ -766,58 +744,6 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               );
             })}
           </div>
-
-          {/* Pagination Controls for Approved Users */}
-          {totalApprovedPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs mt-4">
-              <div className="text-xs text-slate-600 font-medium">
-                عرض <span className="font-bold font-mono">{(safeApprovedPage - 1) * approvedPageSize + 1}</span> إلى{' '}
-                <span className="font-bold font-mono">{Math.min(safeApprovedPage * approvedPageSize, filteredApproved.length)}</span> من إجمالي{' '}
-                <span className="font-bold font-mono">{filteredApproved.length}</span> مستخدم
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={safeApprovedPage <= 1}
-                  onClick={() => setApprovedPage((prev) => Math.max(1, prev - 1))}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                    arrow_forward
-                  </span>
-                  <span>السابق</span>
-                </button>
-
-                {Array.from({ length: totalApprovedPages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setApprovedPage(p)}
-                    className={`w-8 h-8 rounded-xl text-xs font-bold font-mono transition-all ${
-                      p === safeApprovedPage
-                        ? 'bg-[#005c55] text-white shadow-xs'
-                        : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  disabled={safeApprovedPage >= totalApprovedPages}
-                  onClick={() => setApprovedPage((prev) => Math.min(totalApprovedPages, prev + 1))}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                >
-                  <span>التالي</span>
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                    arrow_back
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -828,7 +754,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-black text-base text-purple-950 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-purple-700" aria-hidden="true">tune</span>
+                  <span className="material-symbols-outlined text-purple-700">tune</span>
                   <span>أنظمة الصلاحيات المخصصة (Permission Profiles Builder)</span>
                 </h3>
                 <p className="text-xs text-purple-900 mt-1 max-w-2xl leading-relaxed">
@@ -841,7 +767,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   onClick={handleOpenCreateProfile}
                   className="px-5 py-2.5 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs sm:text-sm cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 transition-all shrink-0"
                 >
-                  <span className="material-symbols-outlined text-base" aria-hidden="true">add_circle</span>
+                  <span className="material-symbols-outlined text-base">add_circle</span>
                   <span>+ إنشاء نظام صلاحية جديد</span>
                 </button>
               )}
@@ -882,7 +808,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       {/* Allowed Pages / Tabs */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
                         <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">visibility</span>
+                          <span className="material-symbols-outlined text-sm text-purple-700">visibility</span>
                           <span>الصفحات والتابات المفتوحة للمستخدم:</span>
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -903,7 +829,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       {/* Allowed Committees Scope */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
                         <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-emerald-700" aria-hidden="true">groups</span>
+                          <span className="material-symbols-outlined text-sm text-emerald-700">groups</span>
                           <span>نطاق اللجان الميدانية:</span>
                         </span>
                         <span className="text-xs font-semibold text-emerald-950">
@@ -918,7 +844,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       {/* Allowed Exams Scope */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
                         <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-blue-700" aria-hidden="true">description</span>
+                          <span className="material-symbols-outlined text-sm text-blue-700">description</span>
                           <span>نطاق الامتحانات وبنك الأسئلة:</span>
                         </span>
                         <span className="text-xs font-semibold text-blue-950">
@@ -938,7 +864,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       onClick={() => handleOpenEditProfile(prof)}
                       className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-purple-100 text-slate-800 hover:text-purple-950 font-bold text-xs cursor-pointer flex items-center gap-1 transition-all"
                     >
-                      <span className="material-symbols-outlined text-sm" aria-hidden="true">edit_note</span>
+                      <span className="material-symbols-outlined text-sm">edit_note</span>
                       <span>تعديل هذا النظام</span>
                     </button>
 
@@ -953,7 +879,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 cursor-pointer"
                         title="حذف هذا النظام"
                       >
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
+                        <span className="material-symbols-outlined text-base">delete</span>
                       </button>
                     )}
                   </div>
@@ -1037,7 +963,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                             : 'bg-rose-100 text-rose-900'
                         }`}
                       >
-                        <span className="material-symbols-outlined" aria-hidden="true">
+                        <span className="material-symbols-outlined">
                           {user.status === 'interview' ? 'mic' : user.status === 'rejected' ? 'person_cancel' : 'person_pin'}
                         </span>
                       </span>
@@ -1090,7 +1016,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     onClick={() => handleOpenApproveModal(user)}
                     className="flex-1 py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">how_to_reg</span>
+                    <span className="material-symbols-outlined text-sm">how_to_reg</span>
                     <span>✓ قبول واعتماد</span>
                   </button>
 
@@ -1098,7 +1024,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     onClick={() => handleOpenInterviewModal(user)}
                     className="py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">mic</span>
+                    <span className="material-symbols-outlined text-sm">mic</span>
                     <span>مقابلة</span>
                   </button>
 
@@ -1106,7 +1032,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     onClick={() => setDossierUser(user)}
                     className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">visibility</span>
+                    <span className="material-symbols-outlined text-sm">visibility</span>
                     <span>الملف</span>
                   </button>
 
@@ -1114,7 +1040,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     onClick={() => handleOpenRejectModal(user)}
                     className="py-2 px-2.5 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
+                    <span className="material-symbols-outlined text-sm">close</span>
                     <span>اعتذار</span>
                   </button>
                 </div>
@@ -1126,12 +1052,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* CREATE / EDIT PERMISSION PROFILE MODAL (بناء وتصميم الصلاحية المخصصة) */}
       {isProfileModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl border border-purple-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-purple-700 to-indigo-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold">
-                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">tune</span>
+                  <span className="material-symbols-outlined text-2xl">tune</span>
                 </span>
                 <div>
                   <h3 className="font-black text-base sm:text-lg">
@@ -1154,7 +1080,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Profile Name & Description */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">badge</span>
+                  <span className="material-symbols-outlined text-sm text-purple-700">badge</span>
                   <span>١. اسم نظام الصلاحية ووصفه:</span>
                 </h4>
 
@@ -1205,7 +1131,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Allowed View Tabs Checklist (الصفحات والتابات المفتوحة) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">visibility</span>
+                  <span className="material-symbols-outlined text-sm text-purple-700">visibility</span>
                   <span>٢. الصفحات والتابات المصرح للمستخدم برؤيتها والدخول عليها:</span>
                 </h4>
 
@@ -1244,7 +1170,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Allowed Committees Scope (نطاق اللجان الميدانية) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">groups</span>
+                  <span className="material-symbols-outlined text-sm text-purple-700">groups</span>
                   <span>٣. نطاق اللجان الميدانية المصرح بها:</span>
                 </h4>
 
@@ -1302,7 +1228,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Allowed Exams Scope (نطاق الامتحانات المصرح بها) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700" aria-hidden="true">description</span>
+                  <span className="material-symbols-outlined text-sm text-purple-700">description</span>
                   <span>٤. نطاق الامتحانات وبنك الأسئلة المصرح بالدخول عليها وتصحيحها:</span>
                 </h4>
 
@@ -1391,7 +1317,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* ASSIGN PROFILE QUICK MODAL */}
       {assigningProfileUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
           <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-purple-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
@@ -1437,12 +1363,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* APPROVE APPLICANT MODAL */}
       {approvingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl" aria-hidden="true">how_to_reg</span>
+                  <span className="material-symbols-outlined text-xl">how_to_reg</span>
                 </span>
                 <div>
                   <h3 className="font-black text-sm sm:text-base text-slate-900">
@@ -1566,11 +1492,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* SCHEDULE INTERVIEW MODAL */}
       {interviewingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
           <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-blue-600" aria-hidden="true">event</span>
+                <span className="material-symbols-outlined text-blue-600">event</span>
                 <span>جدولة مقابلة شخصية واختبار: {interviewingUser.name}</span>
               </h3>
               <button
@@ -1587,7 +1513,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="مثال: غداً الثلاثاء 2026-10-06 الساعة 5:00 مساءً"
+                  placeholder="مثال: الثلاثاء 6 أكتوبر الساعة 5 مساءً"
                   value={interviewDate}
                   onChange={(e) => setInterviewDate(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-600"
@@ -1626,11 +1552,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* REJECTION MODAL */}
       {rejectingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
           <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-black text-sm sm:text-base text-rose-950 flex items-center gap-2">
-                <span className="material-symbols-outlined text-rose-600" aria-hidden="true">person_cancel</span>
+                <span className="material-symbols-outlined text-rose-600">person_cancel</span>
                 <span>الاعتذار عن طلب المتقدم: {rejectingUser.name}</span>
               </h3>
               <button
@@ -1674,13 +1600,13 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* FULL APPLICANT DOSSIER MODAL */}
       {dossierUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-slate-900 to-slate-800 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-black text-base">ملف وسيرة المتقدم: {dossierUser.name}</h3>
                 <span className="text-xs text-slate-300 font-mono">
-                  كود الطلب: {dossierUser.requestCode || 'REQ-2026-N/A'} • تاريخ التقديم: {dossierUser.createdAt}
+                  كود الطلب: {dossierUser.requestCode || '—'} • تاريخ التقديم: {dossierUser.createdAt}
                 </span>
               </div>
               <button
@@ -1721,7 +1647,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   onClick={() => window.print()}
                   className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">print</span>
+                  <span className="material-symbols-outlined text-sm">print</span>
                   <span>طباعة الملف</span>
                 </button>
 
@@ -1743,12 +1669,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* DIRECT ADD USER MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl" aria-hidden="true">person_add</span>
+                  <span className="material-symbols-outlined text-xl">person_add</span>
                 </span>
                 <div>
                   <h3 className="font-black text-sm sm:text-base text-slate-900">إضافة وتفعيل مستخدم مباشر</h3>
@@ -1773,6 +1699,22 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  كلمة المرور الأولية <span className="text-rose-500">*</span>
+                  <span className="font-normal text-slate-500"> (8 أحرف على الأقل، حروف وأرقام؛ أبلغها للمستخدم ليغيرها بعد الدخول)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
                 />
               </div>
 
@@ -1842,7 +1784,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* EDIT USER MODAL */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-slate-100 to-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-black text-base text-slate-900">تعديل بيانات وصلاحيات: {editingUser.name}</h3>
@@ -1932,11 +1874,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
       {/* DELETE CONFIRMATION MODAL */}
       {userToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
           <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center gap-3 border-b border-rose-100 pb-3">
               <span className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined" aria-hidden="true">delete_forever</span>
+                <span className="material-symbols-outlined">delete_forever</span>
               </span>
               <div>
                 <h3 className="font-black text-base text-rose-950">تأكيد حذف الحساب</h3>

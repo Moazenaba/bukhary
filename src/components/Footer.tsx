@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
       <footer className="mt-12 bg-white border-t border-[#bdc9c6]/30 py-6 text-center text-right">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-[#005c55] text-[16px] font-bold">
-            <span className="material-symbols-outlined" aria-hidden="true">mosque</span>
+            <span className="material-symbols-outlined">mosque</span>
             <span>مسابقات مسجد البخاري العلمية</span>
           </div>
 
@@ -35,7 +35,7 @@ export const Footer: React.FC = () => {
               onClick={() => setModalContent('sheets')}
               className="hover:text-[#005c55] transition-colors cursor-pointer"
             >
-              قاعدة بيانات Google Sheets
+              التصدير إلى Excel و Google Sheets
             </button>
           </div>
         </div>
@@ -43,7 +43,7 @@ export const Footer: React.FC = () => {
 
       {/* Info Modals */}
       {modalContent && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-[#bdc9c6]/40 text-right animate-in fade-in">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#bdc9c6]/30">
               <h3 className="font-bold text-base text-[#005c55]">
@@ -57,7 +57,7 @@ export const Footer: React.FC = () => {
                 onClick={() => setModalContent(null)}
                 className="p-1 rounded-lg text-gray-400 hover:text-gray-700"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
@@ -93,13 +93,9 @@ export const Footer: React.FC = () => {
               {modalContent === 'sheets' && (
                 <>
                   <p>
-                    ترتبط المنصة مباشرة بجدول Google Sheets، وكل إضافة لجنة أو تغيير لمرحلة أو كتابة ملاحظة يتم تحديثها فورياً في خلايا وصفوف الملف.
+                    تُحفظ كل البيانات في قاعدة بيانات المنظومة على الخادم. لنقلها إلى Excel أو Google Sheets استخدم زر «تصدير الكشوف»
+                    لتنزيل ملف CSV، ثم افتحه أو استورده في البرنامج الذي تريده.
                   </p>
-                  <div className="bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/40 space-y-1">
-                    <p>• البيانات تحفظ لحظياً في متصفحك (LocalStorage)</p>
-                    <p>• يمكنك استخراج ملف CSV متوافق تماماً مع Google Sheets و Excel</p>
-                    <p>• إمكانية ربط Webhook آلي لإرسال الصفوف مباشرة إلى Google Sheets</p>
-                  </div>
                 </>
               )}
             </div>

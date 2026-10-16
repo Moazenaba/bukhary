@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { DATA_ROOT_KEY, useCacheSetter, useServerData } from './data/queries';
 import {
   Committee,
   StageKey,
   NotificationItem,
-  GoogleSheetsConfig,
   ExamItem,
   STAGES_LIST,
   AppUser,
@@ -16,19 +17,9 @@ import {
   PermissionDefinition,
   Course,
   ScheduleTask,
+  SYSTEM_PERMISSIONS,
 } from './types';
-export const DEFAULT_COMPETITION_BOOKS: string[] = [
-  'مسابقة كتاب الأصول الثلاثة',
-  'كتاب التوحيد الذي هو حق الله على العبيد',
-  'مسابقة كتاب القواعد الأربع',
-  'مسابقة العقيدة الواسطية',
-  'مسابقة لمعة الاعتقاد الهادي إلى سبيل الرشاد',
-  'مسابقة كتاب كشف الشبهات',
-  'مسابقة الأربعين النووية',
-  'مسابقة متن الآجرومية',
-  'مسابقة كتاب نخبة الفكر في مصطلح أهل الأثر',
-];
-import { calculateCurrentStage, getCurrentFormattedDateTime } from './utils/stageUtils';
+import { calculateCurrentStage, getCurrentFormattedDateTime, todayISO } from './utils/stageUtils';
 import { SummerCourseRow } from './types/summerCourse';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { TopNavBar } from './components/TopNavBar';
@@ -53,31 +44,50 @@ import { DailyAlertsView } from './components/DailyAlertsView';
 import { CeremoniesView } from './components/CeremoniesView';
 import { Footer } from './components/Footer';
 import { CentralLoginPortal } from './components/CentralLoginPortal';
-import { useAuth, AuthService } from './services/AuthService';
-import { SupabaseService } from './services/SupabaseService';
 import { SupabaseDatabaseModal } from './components/SupabaseDatabaseModal';
-import { SYSTEM_PERMISSIONS } from './types';
+import { Toasts, toast } from './components/Toasts';
+import { useAuth, AuthService } from './services/AuthService';
+import { Book, CommitteePatch, DataService } from './services/DataService';
+import { errorMessage } from './services/api';
 
-const STORAGE_KEY_COMMITTEES = 'bukhari_competition_committees_v2';
-const STORAGE_KEY_BOOKS = 'bukhari_saved_books_v2';
-const STORAGE_KEY_SHEETS = 'bukhari_sheets_config_v2';
-const STORAGE_KEY_EXAMS = 'bukhari_exams_v2';
-const STORAGE_KEY_CUSTOM_PERMS = 'bukhari_custom_permissions_v4';
-const STORAGE_KEY_COURSES = 'bukhari_competition_courses_v2';
-const STORAGE_KEY_SCHEDULE_TASKS = 'bukhari_schedule_tasks_v2';
+const BASE_COMMITTEE_FIELDS = [
+  'committeeNumber', 'committeeName', 'associationName', 'members', 'branch', 'competitionBook', 'generalNotes',
+  'courseId', 'sheikhName', 'sheikhPhone', 'sheikhCountry', 'studentsCount', 'isWomenCommittee',
+] as const;
 
-const DEFAULT_SYSTEM_PERMISSIONS: PermissionDefinition[] = SYSTEM_PERMISSIONS;
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** Runs a server call; on failure shows the server's message and returns undefined. */
+async function attempt<T>(fn: () => Promise<T>, success?: string): Promise<T | undefined> {
+  try {
+    const result = await fn();
+    if (success) toast.success(success);
+    return result;
+  } catch (err) {
+    toast.error(errorMessage(err));
+    return undefined;
+  }
+}
+
+
+// Stable empty values, so a missing query result does not create a new array on every render.
+const NO_COMMITTEES: Committee[] = [];
+const NO_EXAMS: ExamItem[] = [];
+const NO_BOOKS: Book[] = [];
+const NO_COURSES: Course[] = [];
+const NO_TASKS: ScheduleTask[] = [];
+const NO_NOTIFICATIONS: NotificationItem[] = [];
+const NO_PERMISSIONS: PermissionDefinition[] = [];
 
 export default function App() {
-  // Main view tab (Sidebar tabs) - default is home overview screen
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('bukhari_sidebar_desktop_open');
       if (saved !== null) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // ignore
     }
     return true;
   });
@@ -90,289 +100,78 @@ export default function App() {
         const next = !prev;
         try {
           localStorage.setItem('bukhari_sidebar_desktop_open', JSON.stringify(next));
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
         return next;
       });
     }
   };
 
-  // Committees state with persistent LocalStorage
-  const [committees, setCommittees] = useState<Committee[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_COMMITTEES);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load committees from localStorage', e);
-    }
-    return [];
-  });
+  // ---- Server data (never cached in localStorage) ----
 
-  // Exams state with persistent LocalStorage
-  const [exams, setExams] = useState<ExamItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_EXAMS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load exams from localStorage', e);
-    }
-    return [];
-  });
-
-  // Saved competition books with persistent LocalStorage
-  const [savedBooks, setSavedBooks] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_BOOKS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load books from localStorage', e);
-    }
-    return DEFAULT_COMPETITION_BOOKS;
-  });
-
-  // Google Sheets configuration state
-  const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SHEETS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load sheets config from localStorage', e);
-    }
-    return {
-      sheetId: '',
-      sheetName: 'لجان مسابقات مسجد البخاري',
-      webhookUrl: '',
-      autoSync: true,
-      lastSyncedAt: '2026/09/25 - 10:00 ص',
-    };
-  });
-
-  // Centralized Authentication & RBAC Layer via AuthService
   const {
+    ready,
     currentUser,
     users,
     profiles,
-    isAuthenticated,
-    quickLogin,
+    can,
     logout,
-    registerUser,
     updateUser,
     approveUser,
     scheduleInterview,
     rejectUser,
     deleteUser,
-    addDirectUser,
+    createUser,
     saveProfile,
     deleteProfile,
     assignProfileToUser,
     setSuperAdmin,
-    isSuperAdmin,
   } = useAuth();
+
+  // Server data lives in the query cache, keyed by the logged-in user. The setters below keep
+  // their old names and call sites, but they write to the cache, so every screen reads one copy.
+  const queryClient = useQueryClient();
+  const server = useServerData(currentUser?.id);
+  const committees = server.queries.committees.data ?? NO_COMMITTEES;
+  const exams = server.queries.exams.data ?? NO_EXAMS;
+  const books = server.queries.books.data ?? NO_BOOKS;
+  const courses = server.queries.courses.data ?? NO_COURSES;
+  const scheduleTasks = server.queries.tasks.data ?? NO_TASKS;
+  const notifications = server.queries.notifications.data ?? NO_NOTIFICATIONS;
+  const customPermissions = useMemo(
+    () => [...SYSTEM_PERMISSIONS, ...(server.queries.customPermissions.data ?? [])],
+    [server.queries.customPermissions.data]
+  );
+  const savedBooks = useMemo(() => books.map((b) => b.name), [books]);
+  const setCommittees = useCacheSetter(server.keys.committees, NO_COMMITTEES);
+  const setExams = useCacheSetter(server.keys.exams, NO_EXAMS);
+  const setBooks = useCacheSetter(server.keys.books, NO_BOOKS);
+  const setCourses = useCacheSetter(server.keys.courses, NO_COURSES);
+  const setScheduleTasks = useCacheSetter(server.keys.tasks, NO_TASKS);
+  const setNotifications = useCacheSetter(server.keys.notifications, NO_NOTIFICATIONS);
+  // The cache holds custom permissions only; the system ones are added above.
+  const setCustomPermissions = useCacheSetter(server.keys.customPermissions, NO_PERMISSIONS);
+  const isLoadingDatabase = Object.values(server.queries).some((q) => q.isLoading);
+  const failedQuery = Object.values(server.queries).find((q) => q.error);
+  const loadError = failedQuery?.error ? errorMessage(failedQuery.error) : null;
+  const loadAll = () => {
+    void server.refetchAll();
+  };
+
+  // On logout, drop all cached server data so the next user never sees it.
+  useEffect(() => {
+    if (!currentUser?.id) queryClient.removeQueries({ queryKey: DATA_ROOT_KEY });
+  }, [currentUser?.id, queryClient]);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
-  // Custom permissions state with persistent LocalStorage
-  const [customPermissions, setCustomPermissions] = useState<PermissionDefinition[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CUSTOM_PERMS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load custom permissions', e);
-    }
-    return DEFAULT_SYSTEM_PERMISSIONS;
-  });
 
-  // Persist custom permissions
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_CUSTOM_PERMS, JSON.stringify(customPermissions));
-    } catch (e) {
-      console.error('Failed to save custom permissions', e);
-    }
-  }, [customPermissions]);
-
-  // Persist committees
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_COMMITTEES, JSON.stringify(committees));
-    } catch (e) {
-      console.error('Failed to save committees', e);
-    }
-  }, [committees]);
-
-  // Persist exams
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(exams));
-    } catch (e) {
-      console.error('Failed to save exams', e);
-    }
-  }, [exams]);
-
-  // Persist books
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_BOOKS, JSON.stringify(savedBooks));
-    } catch (e) {
-      console.error('Failed to save books', e);
-    }
-  }, [savedBooks]);
-
-  // Persist sheets config
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_SHEETS, JSON.stringify(sheetsConfig));
-    } catch (e) {
-      console.error('Failed to save sheets config', e);
-    }
-  }, [sheetsConfig]);
-
-  // Courses state with persistent LocalStorage
-  const [courses, setCourses] = useState<Course[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_COURSES);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load courses from localStorage', e);
-    }
-    return [];
-  });
-
-  // Schedule / Calendar Tasks state with persistent LocalStorage
-  const [scheduleTasks, setScheduleTasks] = useState<ScheduleTask[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SCHEDULE_TASKS);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Failed to load schedule tasks from localStorage', e);
-    }
-    return [];
-  });
-
-  // Persist courses
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_COURSES, JSON.stringify(courses));
-    } catch (e) {
-      console.error('Failed to save courses', e);
-    }
-  }, [courses]);
-
-  // Loading state while retrieving database records from Supabase
-  const [isLoadingDatabase, setIsLoadingDatabase] = useState(true);
-
-  // Retrieve all live database records directly from Supabase PostgreSQL on startup
-  useEffect(() => {
-    let isMounted = true;
-    async function loadAllFromSupabase() {
-      setIsLoadingDatabase(true);
-      try {
-        const [dbCommittees, dbCourses, dbExams, dbTasks, dbNotifs] = await Promise.all([
-          SupabaseService.getCommittees(),
-          SupabaseService.getCourses(),
-          SupabaseService.getExams(),
-          SupabaseService.getTasks(),
-          SupabaseService.getNotifications(),
-        ]);
-
-        if (isMounted) {
-          if (Array.isArray(dbCommittees) && dbCommittees.length > 0) {
-            setCommittees(dbCommittees);
-          }
-          if (Array.isArray(dbCourses) && dbCourses.length > 0) {
-            setCourses(dbCourses);
-          }
-          if (Array.isArray(dbExams) && dbExams.length > 0) {
-            setExams(dbExams);
-          }
-          if (Array.isArray(dbTasks) && dbTasks.length > 0) {
-            setScheduleTasks(dbTasks);
-          }
-          if (Array.isArray(dbNotifs) && dbNotifs.length > 0) {
-            setNotifications(dbNotifs);
-          }
-        }
-      } catch (err) {
-        console.error('فشل جلب البيانات من سوبابيز:', err);
-      } finally {
-        if (isMounted) {
-          setIsLoadingDatabase(false);
-        }
-      }
-    }
-
-    loadAllFromSupabase();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Persist schedule tasks
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_SCHEDULE_TASKS, JSON.stringify(scheduleTasks));
-    } catch (e) {
-      console.error('Failed to save schedule tasks', e);
-    }
-  }, [scheduleTasks]);
-
-  // Auto-complete ceremonies in the database if the ceremony day has passed (< 2026-10-05)
-  useEffect(() => {
-    const todayISO = '2026-10-05';
-
-    // 1. Check if any committee has an uncompleted ceremony whose scheduled date has passed
-    const needsCommitteeUpdate = committees.some((c) => {
-      const task = scheduleTasks.find(
-        (t) => t.type === 'ceremony' && t.committeeNumber === c.committeeNumber
-      );
-      return task && task.date && task.date < todayISO && !c.stages.ceremony?.completed;
-    });
-
-    if (needsCommitteeUpdate) {
-      setCommittees((prev) =>
-        prev.map((c) => {
-          const task = scheduleTasks.find(
-            (t) => t.type === 'ceremony' && t.committeeNumber === c.committeeNumber
-          );
-          if (task && task.date && task.date < todayISO && !c.stages.ceremony?.completed) {
-            return {
-              ...c,
-              stages: {
-                ...c.stages,
-                ceremony: {
-                  completed: true,
-                  completedAt: `${task.date} (تم الحفل تلقائياً لانقضاء موعد الحفل)`,
-                },
-              },
-            };
-          }
-          return c;
-        })
-      );
-    }
-
-    // 2. Check if any ceremony schedule task has passed and is not yet marked completed
-    const needsTaskUpdate = scheduleTasks.some((t) => {
-      return t.type === 'ceremony' && t.date && t.date < todayISO && !t.completed;
-    });
-
-    if (needsTaskUpdate) {
-      setScheduleTasks((prev) =>
-        prev.map((t) => {
-          if (t.type === 'ceremony' && t.date && t.date < todayISO && !t.completed) {
-            return {
-              ...t,
-              completed: true,
-              completedAt: `${t.date} (انقضى موعد الحفل)`,
-            };
-          }
-          return t;
-        })
-      );
-    }
-  }, [committees, scheduleTasks]);
+  const replaceCommittee = (saved: Committee) =>
+    setCommittees((prev) => (prev.some((c) => c.id === saved.id) ? prev.map((c) => (c.id === saved.id ? saved : c)) : [saved, ...prev]));
+  const replaceTask = (saved: ScheduleTask) =>
+    setScheduleTasks((prev) => (prev.some((t) => t.id === saved.id) ? prev.map((t) => (t.id === saved.id ? saved : t)) : [saved, ...prev]));
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -383,902 +182,417 @@ export default function App() {
   const [needsScoringFilter, setNeedsScoringFilter] = useState(false);
   const [genderFilter, setGenderFilter] = useState<'all' | 'men' | 'women'>('all');
 
-  // Enforce granular permissions restriction so non-admin users only access allowed tabs
+  // Non-admin users only see tabs they are allowed to open.
   useEffect(() => {
-    if (!currentUser) return;
-    if (currentUser.role === 'super_admin') return;
-
+    if (!currentUser || currentUser.role === 'super_admin') return;
     if (!AuthService.canAccessTab(activeTab, currentUser)) {
-      const allTabs: NavTab[] = [
-        'home',
-        'summer_course',
-        'committees',
-        'exams',
-        'ceremonies',
-        'calendar',
-        'courses',
-        'assistants',
-        'stats',
-        'daily_alerts',
-      ];
-      const firstAllowed = allTabs.find((t) => AuthService.canAccessTab(t, currentUser)) || 'home';
-      setActiveTab(firstAllowed);
+      const allTabs: NavTab[] = ['home', 'summer_course', 'committees', 'exams', 'ceremonies', 'calendar', 'courses', 'assistants', 'stats', 'daily_alerts'];
+      setActiveTab(allTabs.find((t) => AuthService.canAccessTab(t, currentUser)) || 'home');
     }
   }, [currentUser, activeTab]);
 
-  // Pagination (6 items per page)
   const ITEMS_PER_PAGE = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Modals state
-  const [selectedCommitteeForDetails, setSelectedCommitteeForDetails] = useState<Committee | null>(null);
+  const [selectedCommitteeId, setSelectedCommitteeId] = useState<string | null>(null);
+  const selectedCommitteeForDetails = useMemo(
+    () => committees.find((c) => c.id === selectedCommitteeId) ?? null,
+    [committees, selectedCommitteeId]
+  );
+  const setSelectedCommitteeForDetails = (c: Committee | null) => setSelectedCommitteeId(c?.id ?? null);
   const [isAddCommitteeOpen, setIsAddCommitteeOpen] = useState(false);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
   const [isAddBookOpen, setIsAddBookOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
 
-  // Notifications state
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  // ---------------- Committees ----------------
 
-  // Sync to Google Sheets Webhook in background
-  const triggerGoogleSheetsSync = async (currentList: Committee[] = committees) => {
-    const nowStamp = getCurrentFormattedDateTime();
-    setSheetsConfig((prev) => ({ ...prev, lastSyncedAt: nowStamp }));
-
-    if (sheetsConfig.webhookUrl && sheetsConfig.autoSync) {
-      try {
-        const payload = {
-          action: 'sync_all',
-          timestamp: nowStamp,
-          committees: currentList.map((c) => ({
-            number: c.committeeNumber,
-            name: c.committeeName,
-            type: c.isWomenCommittee ? 'لجنة نسائية' : '-',
-            sheikhName: c.sheikhName || '',
-            sheikhPhone: c.sheikhPhone || '',
-            sheikhCountry: c.sheikhCountry || '',
-            studentsCount: c.studentsCount || 0,
-            book: c.competitionBook,
-            branch: c.branch,
-            association: c.associationName || '',
-            members: c.members.join('، '),
-            currentStage: calculateCurrentStage(c.stages).label,
-            tRegistration: c.stages.registration?.completedAt || '',
-            tExam: c.stages.exam?.completedAt || '',
-            tScoring: c.stages.scoring?.completedAt || '',
-            tAggregation: c.stages.aggregation?.completedAt || '',
-            tSheet: c.stages.sheet?.completedAt || '',
-            tReview: c.stages.review?.completedAt || '',
-            tAnnouncement: c.stages.announcement?.completedAt || '',
-            tCeremony: c.stages.ceremony?.completedAt || '',
-            notes: c.generalNotes || '',
-          })),
-        };
-
-        await fetch(sheetsConfig.webhookUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } catch (err) {
-        console.warn('Google Sheets background sync notice:', err);
-      }
-    }
+  const patchCommittee = async (committeeId: string, patch: CommitteePatch, success?: string) => {
+    const saved = await attempt(() => DataService.patchCommittee(committeeId, patch), success);
+    if (saved) replaceCommittee(saved);
+    return saved;
   };
 
-  // Quick toggle a stage from card
   const handleQuickToggleStage = (committeeId: string, stageKey: StageKey) => {
-    const nowStamp = getCurrentFormattedDateTime();
-    setCommittees((prev) => {
-      const updated = prev.map((c) => {
-        if (c.id === committeeId) {
-          const isDone = c.stages[stageKey]?.completed;
-          const updatedComm = {
-            ...c,
-            stages: {
-              ...c.stages,
-              [stageKey]: {
-                completed: !isDone,
-                completedAt: !isDone ? nowStamp : undefined,
-              },
-            },
-          };
-          // Persist directly to Supabase
-          SupabaseService.saveCommittee(updatedComm);
-          return updatedComm;
-        }
-        return c;
-      });
-      triggerGoogleSheetsSync(updated);
-      return updated;
+    const c = committees.find((x) => x.id === committeeId);
+    if (!c) return;
+    const isDone = Boolean(c.stages[stageKey]?.completed);
+    patchCommittee(committeeId, {
+      stages: { [stageKey]: { completed: !isDone, completedAt: !isDone ? getCurrentFormattedDateTime() : undefined } },
     });
   };
 
-  // Save changes from CommitteeDetailModal
-  const handleSaveCommittee = (updated: Committee) => {
-    setCommittees((prev) => {
-      const exists = prev.some((c) => c.id === updated.id);
-      const newList = exists
-        ? prev.map((c) => (c.id === updated.id ? updated : c))
-        : [updated, ...prev];
-      triggerGoogleSheetsSync(newList);
-      return newList;
+  const handleSetStage = (committeeId: string, stageKey: StageKey, completed: boolean) =>
+    patchCommittee(committeeId, {
+      stages: { [stageKey]: { completed, completedAt: completed ? getCurrentFormattedDateTime() : undefined } },
     });
-    setSelectedCommitteeForDetails(updated);
 
-    // Persist directly to Supabase PostgreSQL database
-    SupabaseService.saveCommittee(updated);
-
-    // Sync ceremony details with schedule tasks if ceremonyDate is set
-    const cDetails = updated.ceremonyDetails;
-    if (cDetails && cDetails.ceremonyDate) {
-      const cDate = cDetails.ceremonyDate;
-      const cTime = cDetails.ceremonyTime || '4 العصر';
-      const cPlace = cDetails.ceremonyPlace || updated.branch || 'مسجد البخاري';
-      const cNotes = cDetails.notes || '';
-      const cCount = cDetails.honoredStudentsCount ?? updated.studentsCount ?? 15;
-      const cSheikhs = cDetails.attendingSheikhs || [];
-
-      setScheduleTasks((prev) => {
-        const existingTaskIndex = prev.findIndex(
-          (t) => t.type === 'ceremony' && t.committeeNumber === updated.committeeNumber
-        );
-        const ceremonyTask: ScheduleTask = {
-          id: existingTaskIndex >= 0 ? prev[existingTaskIndex].id : `task-ceremony-${Date.now()}`,
-          title: `🎉 حفل تكريم وتوزيع جوائز: لجنة #${updated.committeeNumber} (${updated.sheikhName || updated.committeeName})`,
-          date: cDate,
-          time: cTime,
-          type: 'ceremony',
-          priority: 'urgent',
-          committeeNumber: updated.committeeNumber,
-          assignedAssistantName: 'لجنة الاحتفالات والجوائز',
-          deliverable: `تجهيز شهادات التقدير لعدد (${cCount}) طالباً مكرماً + دروع التكريم + حضور المشايخ: (${cSheikhs.join('، ') || 'المشايخ الضيوف'})`,
-          notes: `مكان الحفل: ${cPlace}. ${cNotes}`,
-          completed: updated.stages?.ceremony?.completed || false,
-        };
-
-        if (existingTaskIndex >= 0) {
-          const copy = [...prev];
-          copy[existingTaskIndex] = ceremonyTask;
-          return copy;
-        }
-        return [ceremonyTask, ...prev];
-      });
-    }
+  /** Ceremony schedule task linked to the committee, built only from what the user entered. */
+  const syncCeremonyTask = async (committee: Committee) => {
+    const d = committee.ceremonyDetails;
+    if (!d?.ceremonyDate || !can('tasks.write')) return;
+    const existing = scheduleTasks.find((t) => t.type === 'ceremony' && t.committeeId === committee.id);
+    const sheikhs = d.attendingSheikhs?.filter(Boolean) ?? [];
+    const task: ScheduleTask = {
+      id: existing?.id ?? `task-ceremony-${committee.id}`,
+      title: `حفل تكريم لجنة #${committee.committeeNumber} (${committee.sheikhName || committee.committeeName})`,
+      date: d.ceremonyDate,
+      time: d.ceremonyTime || undefined,
+      type: 'ceremony',
+      priority: 'urgent',
+      committeeId: committee.id,
+      committeeNumber: committee.committeeNumber,
+      deliverable: [
+        d.honoredStudentsCount ? `تكريم ${d.honoredStudentsCount} طالباً` : '',
+        sheikhs.length ? `حضور: ${sheikhs.join('، ')}` : '',
+      ].filter(Boolean).join(' • ') || undefined,
+      notes: [d.ceremonyPlace ? `مكان الحفل: ${d.ceremonyPlace}` : '', d.notes || ''].filter(Boolean).join('. ') || undefined,
+      completed: committee.stages?.ceremony?.completed || false,
+    };
+    const saved = await attempt(() => DataService.saveTask(task));
+    if (saved) replaceTask(saved);
   };
 
-  // Open full committee details from summer course tracker row (seamless DB sync)
-  const handleOpenRowDetails = (row: SummerCourseRow) => {
-    // 1. Check if committee already exists in committees by ID or committeeNumber
-    let matched = committees.find(
-      (c) => (row.committeeId && c.id === row.committeeId) || c.committeeNumber === row.number
-    );
-
-    if (!matched) {
-      // Create and persist the linked committee into database / state so it's fully linked!
-      const activeCourse = courses.find((crs) => crs.status === 'active') || courses[0];
-      const newComm: Committee = {
-        id: row.committeeId || `comm-row-${row.id}`,
-        committeeNumber: row.number,
-        committeeName: row.sheikh_name ? `لجنة ${row.sheikh_name}` : `لجنة #${row.number}`,
-        sheikhName: row.sheikh_name || '',
-        sheikhPhone: '',
-        sheikhCountry: 'مصر',
-        studentsCount: row.students_count || 0,
-        branch: row.place || 'مسجد الإمام البخاري',
-        competitionBook: row.book || '',
-        courseId: activeCourse?.id || 'course-summer-1448',
-        members: ['المشرف العام'],
-        generalNotes: row.notes || '',
-        stages: {
-          registration: { completed: true, completedAt: getCurrentFormattedDateTime().split(' - ')[0] },
-          exam: { completed: row.delivered },
-          scoring: { completed: row.corrected },
-          aggregation: { completed: false },
-          review: { completed: row.reviewed },
-          sheet: { completed: false },
-          accreditation: { completed: false },
-          announcement: { completed: row.announced },
-          ceremony: { completed: row.ceremony },
-        },
-        createdDate: getCurrentFormattedDateTime().split(' - ')[0],
-        createdAtTime: getCurrentFormattedDateTime().split(' - ')[1] || '',
-      };
-
-      handleAddCommittee(newComm, row.book);
-      matched = newComm;
+  /**
+   * Saves edits from the detail modal. Users who may edit the whole committee get one
+   * transactional save; others (assistants, teachers) send only the stage/detail changes
+   * they are allowed to make.
+   */
+  const handleSaveCommittee = async (updated: Committee) => {
+    const existing = committees.find((c) => c.id === updated.id);
+    let saved: Committee | undefined;
+    if (!existing || can('committees.update')) {
+      saved = await attempt(() => DataService.saveCommittee(updated), 'تم حفظ بيانات اللجنة');
     } else {
-      // Sync any updated fields like studentsCount or stages or sheikhName if modified in row
-      let needsSync = false;
-      const updatedComm: Committee = { ...matched };
-
-      if (row.students_count !== undefined && matched.studentsCount !== row.students_count) {
-        updatedComm.studentsCount = row.students_count;
-        needsSync = true;
+      if (BASE_COMMITTEE_FIELDS.some((f) => !same((updated as any)[f], (existing as any)[f]))) {
+        toast.error('ليس لديك صلاحية تعديل البيانات الأساسية للجنة');
+        return;
       }
-      if (row.sheikh_name && matched.sheikhName !== row.sheikh_name) {
-        updatedComm.sheikhName = row.sheikh_name;
-        needsSync = true;
-      }
-      if (row.book && matched.competitionBook !== row.book) {
-        updatedComm.competitionBook = row.book;
-        needsSync = true;
-      }
-      if (row.place && matched.branch !== row.place) {
-        updatedComm.branch = row.place;
-        needsSync = true;
-      }
-      if (row.notes && matched.generalNotes !== row.notes) {
-        updatedComm.generalNotes = row.notes;
-        needsSync = true;
-      }
-
-      if (needsSync) {
-        handleSaveCommittee(updatedComm);
-        matched = updatedComm;
-      }
+      const patch: CommitteePatch = { expectedUpdatedAt: (existing as any).updatedAt };
+      const changedStages = Object.fromEntries(
+        Object.entries(updated.stages).filter(([k, v]) => !same(v, existing.stages[k as StageKey]))
+      );
+      if (Object.keys(changedStages).length) patch.stages = changedStages;
+      if (!same(updated.scoringDetails, existing.scoringDetails)) patch.scoringDetails = updated.scoringDetails;
+      if (!same(updated.aggregationDetails, existing.aggregationDetails)) patch.aggregationDetails = updated.aggregationDetails;
+      if (!same(updated.ceremonyDetails, existing.ceremonyDetails)) patch.ceremonyDetails = updated.ceremonyDetails;
+      if (Object.keys(patch).length === 1) return;
+      saved = await attempt(() => DataService.patchCommittee(updated.id, patch), 'تم حفظ التعديلات');
     }
-
-    setSelectedCommitteeForDetails(matched);
+    if (!saved) return;
+    replaceCommittee(saved);
+    if (!same(saved.ceremonyDetails, existing?.ceremonyDetails)) await syncCeremonyTask(saved);
   };
 
-  // Add new committee
-  const handleAddCommittee = (newComm: Committee, newBookName?: string) => {
-    setCommittees((prev) => {
-      const newList = [newComm, ...prev];
-      triggerGoogleSheetsSync(newList);
-      return newList;
+  const handleAddCommittee = async (newComm: Committee, newBookName?: string) => {
+    const saved = await attempt(() => DataService.saveCommittee(newComm), `تم تسجيل اللجنة رقم ${newComm.committeeNumber}`);
+    if (!saved) return undefined;
+    replaceCommittee(saved);
+    if (newBookName && !savedBooks.includes(newBookName) && can('books.write')) await handleAddBook(newBookName);
+    return saved;
+  };
+
+  // Opens the committee linked to a course-sheet row, creating it from the row's own data if needed.
+  const handleOpenRowDetails = async (row: SummerCourseRow) => {
+    const matched =
+      committees.find((c) => row.committeeId && c.id === row.committeeId) ||
+      committees.find((c) => c.committeeNumber === row.number && (!row.courseId || c.courseId === row.courseId));
+    if (matched) {
+      setSelectedCommitteeForDetails(matched);
+      return;
+    }
+    const courseId = row.courseId || courses.find((c) => c.isDefault)?.id;
+    if (!courseId) {
+      toast.error('حدد الدورة التي يتبعها هذا الصف قبل فتح تفاصيل اللجنة');
+      return;
+    }
+    const now = getCurrentFormattedDateTime();
+    const created = await handleAddCommittee({
+      id: row.committeeId || `comm-${crypto.randomUUID()}`,
+      committeeNumber: row.number,
+      committeeName: row.sheikh_name ? `لجنة ${row.sheikh_name}` : `لجنة #${row.number}`,
+      sheikhName: row.sheikh_name || undefined,
+      studentsCount: row.students_count || 0,
+      branch: row.place || '',
+      competitionBook: row.book || '',
+      courseId,
+      members: [],
+      generalNotes: row.notes || '',
+      stages: {
+        registration: { completed: true, completedAt: now },
+        exam: { completed: row.delivered },
+        scoring: { completed: row.corrected },
+        aggregation: { completed: false },
+        review: { completed: row.reviewed },
+        sheet: { completed: false },
+        accreditation: { completed: false },
+        announcement: { completed: row.announced },
+        ceremony: { completed: row.ceremony },
+      },
+      createdDate: now.split(' - ')[0],
+      createdAtTime: now.split(' - ')[1] || '',
     });
-
-    // Save directly to Supabase PostgreSQL database
-    SupabaseService.saveCommittee(newComm);
-
-    if (newBookName && !savedBooks.includes(newBookName)) {
-      setSavedBooks((prev) => [newBookName, ...prev]);
-    }
-
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `تسجيل لجنة جديدة: ${newComm.committeeName}`,
-      description: `تم إدراج لجنة #${newComm.committeeNumber} في ${newComm.competitionBook} ومزامنة البيانات في Supabase.`,
-      time: 'الآن',
-      type: 'info',
-      read: false,
-      committeeId: newComm.id,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
+    if (created) setSelectedCommitteeForDetails(created);
   };
 
-  // Delete committee
-  const handleDeleteCommittee = (committeeId: string) => {
-    setCommittees((prev) => {
-      const filtered = prev.filter((c) => c.id !== committeeId);
-      triggerGoogleSheetsSync(filtered);
-      return filtered;
-    });
-
-    // Delete directly from Supabase PostgreSQL database
-    SupabaseService.deleteCommittee(committeeId);
+  const handleDeleteCommittee = async (committeeId: string) => {
+    const ok = await attempt(() => DataService.deleteCommittee(committeeId), 'تم حذف اللجنة');
+    if (ok) setCommittees((prev) => prev.filter((c) => c.id !== committeeId));
   };
 
-  // Add new exam
-  const handleAddExam = (newExam: ExamItem) => {
-    setExams((prev) => [newExam, ...prev]);
-    SupabaseService.saveExam(newExam).catch(console.error);
-    if (newExam.book && !savedBooks.includes(newExam.book)) {
-      setSavedBooks((prev) => [newExam.book, ...prev]);
-    }
+  const handleReceiveCommittee = (committeeId: string) =>
+    patchCommittee(committeeId, { receivedByAssistant: { status: 'received' } }, 'تم توثيق استلام اللجنة');
 
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `رفع امتحان جديد: ${newExam.title}`,
-      description: `تم رفع نموذج PDF (${newExam.pdfFileName}) لمسار ${newExam.book}.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
+  const handleApproveExamReadiness = (committeeId: string) =>
+    patchCommittee(committeeId, { examApprovedBy: {} }, 'تم اعتماد جاهزية الامتحان');
 
-  // Add new book
-  const handleAddBook = (bookName: string, author?: string, notes?: string) => {
-    if (!savedBooks.includes(bookName)) {
-      setSavedBooks((prev) => [bookName, ...prev]);
-    }
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `إضافة كتاب جديد: ${bookName}`,
-      description: author
-        ? `تم اعتماد كتاب "${bookName}" للمصنف ${author} في مسابقات مسجد البخاري.`
-        : `تم اعتماد كتاب "${bookName}" في قائمة متون المسابقة.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Delete book
-  const handleDeleteBook = (bookName: string) => {
-    setSavedBooks((prev) => prev.filter((b) => b !== bookName));
-  };
-
-  // Delete exam
-  const handleDeleteExam = (examId: string) => {
-    setExams((prev) => prev.filter((e) => e.id !== examId));
-    SupabaseService.deleteExam(examId).catch(console.error);
-  };
-
-  // Approve assistant & join request
-  const handleApproveAssistant = (
-    userId: string,
-    permissions: AssistantPermission[],
-    assignedCommittees: number[],
-    role: any = 'assistant'
-  ) => {
-    approveUser(userId, permissions, assignedCommittees, role);
-    const approvedUser = users.find((u) => u.id === userId);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `اعتماد حساب: ${approvedUser?.name || ''}`,
-      description: `تم اعتماد الحساب وتحديد الصلاحيات واللجان الميدانية بنجاح.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Schedule interview for applicant
-  const handleScheduleInterview = (
-    userId: string,
-    interviewDate: string,
-    interviewNotes?: string
-  ) => {
-    scheduleInterview(userId, interviewDate, interviewNotes);
-    const applicant = users.find((u) => u.id === userId);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `موعد مقابلة: ${applicant?.name || ''}`,
-      description: `تم تحديد موعد مقابلة شخصية واختبار تجريبي ليوم (${interviewDate}).`,
-      time: 'الآن',
-      type: 'info',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Reject assistant with formal reason
-  const handleRejectAssistant = (userId: string, reason?: string) => {
-    rejectUser(userId, reason);
-    const rejectedUser = users.find((u) => u.id === userId);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `اعتذار عن طلب: ${rejectedUser?.name || ''}`,
-      description: 'تم توثيق الاعتذار عن الطلب وتحديث السجل.',
-      time: 'الآن',
-      type: 'info',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Update assistant permissions & assigned committees
-  const handleUpdateAssistantPermissions = (
-    userId: string,
-    permissions: AssistantPermission[],
-    assignedCommittees: number[]
-  ) => {
-    const target = users.find((u) => u.id === userId);
-    if (target) {
-      updateUser({
-        ...target,
-        permissions,
-        assignedCommittees,
-      });
-    }
-  };
-
-  // Full assistant update (name, phone, email, notes, permissions, assignedCommittees)
-  const handleUpdateAssistantUser = (updatedUser: AppUser) => {
-    updateUser(updatedUser);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `تعديل بيانات المستخدم: ${updatedUser.name}`,
-      description: `تم حفظ البيانات الجديدة وصلاحيات ولجان المستخدم بنجاح.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Add custom permission (كتبتها بمزاجك)
-  const handleAddCustomPermission = (label: string) => {
-    const id = `perm_${Date.now()}`;
-    setCustomPermissions((prev) => [...prev, { id, label, isCustom: true }]);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `إضافة صلاحية جديدة: ${label}`,
-      description: 'أصبحت الصلاحية متاحة الآن لتعيينها لأي معاون.',
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Delete custom permission
-  const handleDeleteCustomPermission = (id: string) => {
-    setCustomPermissions((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  // Add new course
-  const handleAddCourse = (newCourseData: Omit<Course, 'id' | 'createdAt'>) => {
-    const newCourse: Course = {
-      ...newCourseData,
-      id: `course-${Date.now()}`,
-      createdAt: getCurrentFormattedDateTime().split(' - ')[0],
-    };
-
-    setCourses((prev) => {
-      const updated = newCourse.isDefault
-        ? prev.map((c) => ({ ...c, isDefault: false }))
-        : [...prev];
-      return [newCourse, ...updated];
-    });
-
-    // Persist directly to Supabase PostgreSQL
-    SupabaseService.saveCourse(newCourse);
-
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `إضافة دورة جديدة: ${newCourse.name}`,
-      description: `تم إنشاء الدورة بنجاح وحفظها مباشرة في قاعدة بيانات Supabase.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-    return newCourse;
-  };
-
-  // Update course
-  const handleUpdateCourse = (updatedCourse: Course) => {
-    setCourses((prev) =>
-      prev.map((c) => (c.id === updatedCourse.id ? updatedCourse : c))
-    );
-
-    // Persist directly to Supabase PostgreSQL
-    SupabaseService.saveCourse(updatedCourse);
-
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `تحديث دورة: ${updatedCourse.name}`,
-      description: `تم حفظ التعديلات على الدورة في Supabase بنجاح.`,
-      time: 'الآن',
-      type: 'info',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Delete course
-  const handleDeleteCourse = (courseId: string) => {
-    setCourses((prev) => prev.filter((c) => c.id !== courseId));
-
-    // Delete directly from Supabase PostgreSQL
-    SupabaseService.deleteCourse(courseId);
-  };
-
-  // Set default active course
-  const handleSetDefaultCourse = (courseId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => ({
-        ...c,
-        isDefault: c.id === courseId,
-        status: c.id === courseId ? 'active' : c.status,
-      }))
-    );
-  };
-
-  // Add schedule task
-  const handleAddScheduleTask = (newTaskData: Omit<ScheduleTask, 'id'>) => {
-    const newTask: ScheduleTask = {
-      ...newTaskData,
-      id: `task-${Date.now()}`,
-    };
-    setScheduleTasks((prev) => [newTask, ...prev]);
-    SupabaseService.saveTask(newTask).catch(console.error);
-
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `🔔 تنبيه وجدولة عمل في التقويم: ${newTask.title}`,
-      description: `تمت جدولة العمل ليوم (${newTask.date}) الساعة (${newTask.time || '10:00 ص'})، وسيظهر في شريط تذكير مهام اليوم بالأعلى.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Toggle schedule task completed
-  const handleToggleTaskComplete = (taskId: string) => {
-    let nextState = false;
-    let timeStamp: string | undefined;
-
-    setScheduleTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          nextState = !t.completed;
-          timeStamp = nextState ? getCurrentFormattedDateTime() : undefined;
-          return {
-            ...t,
-            completed: nextState,
-            completedAt: timeStamp,
-          };
-        }
-        return t;
-      })
-    );
-
-    SupabaseService.toggleTask(taskId, nextState, timeStamp).catch(console.error);
-  };
-
-  // Delete schedule task
-  const handleDeleteScheduleTask = (taskId: string) => {
-    setScheduleTasks((prev) => prev.filter((t) => t.id !== taskId));
-    SupabaseService.deleteTask(taskId).catch(console.error);
-  };
-
-  // Update committee ceremony details & sync with database
-  const handleUpdateCommitteeCeremony = (
+  const handleUpdateCommitteeCeremony = async (
     committeeId: string,
-    ceremonyInfo: {
-      date: string;
-      time: string;
-      place: string;
-      notes?: string;
-      completed: boolean;
-      honoredCount?: number;
-      attendingSheikhs?: string[];
-    }
+    info: { date: string; time: string; place: string; notes?: string; completed: boolean; honoredCount?: number; attendingSheikhs?: string[] }
   ) => {
-    let targetUpdated: Committee | undefined;
-    setCommittees((prev) =>
-      prev.map((c) => {
-        if (c.id === committeeId) {
-          targetUpdated = {
-            ...c,
-            associationName: ceremonyInfo.place || c.associationName,
-            ceremonyDetails: {
-              honoredStudentsCount: ceremonyInfo.honoredCount ?? c.ceremonyDetails?.honoredStudentsCount ?? c.studentsCount ?? 15,
-              attendingSheikhs:
-                ceremonyInfo.attendingSheikhs ||
-                c.ceremonyDetails?.attendingSheikhs ||
-                (c.sheikhName ? [c.sheikhName] : ['الشيخ المشرف']),
-              ceremonyDate: ceremonyInfo.date,
-              ceremonyTime: ceremonyInfo.time,
-              ceremonyPlace: ceremonyInfo.place,
-              notes: ceremonyInfo.notes,
-            },
-            stages: {
-              ...c.stages,
-              ceremony: {
-                completed: ceremonyInfo.completed,
-                completedAt: ceremonyInfo.completed
-                  ? `${ceremonyInfo.date} ${ceremonyInfo.time}`
-                  : c.stages.ceremony?.completedAt,
-              },
-            },
-          };
-          return targetUpdated;
-        }
-        return c;
-      })
+    const c = committees.find((x) => x.id === committeeId);
+    if (!c) return;
+    const saved = await patchCommittee(
+      committeeId,
+      {
+        ceremonyDetails: {
+          honoredStudentsCount: info.honoredCount ?? c.ceremonyDetails?.honoredStudentsCount,
+          attendingSheikhs: info.attendingSheikhs ?? c.ceremonyDetails?.attendingSheikhs ?? [],
+          ceremonyDate: info.date,
+          ceremonyTime: info.time,
+          ceremonyPlace: info.place,
+          notes: info.notes,
+        },
+        stages: {
+          ceremony: {
+            completed: info.completed,
+            completedAt: info.completed ? `${info.date} ${info.time}`.trim() : undefined,
+          },
+        },
+      },
+      'تم حفظ موعد الحفل'
     );
+    if (saved) await syncCeremonyTask(saved);
+  };
 
-    if (targetUpdated) {
-      SupabaseService.saveCommittee(targetUpdated).catch(console.error);
+  // ---------------- Exams & books ----------------
+
+  const handleAddExam = async (newExam: ExamItem, file?: File) => {
+    const saved = await attempt(() => DataService.saveExam(newExam));
+    if (!saved) return;
+    let final = saved;
+    if (file) {
+      const uploaded = await attempt(() => DataService.uploadExamFile(saved.id, file, file.name));
+      if (!uploaded) {
+        toast.error('تم حفظ بيانات الامتحان لكن تعذر رفع ملف PDF، أعد رفعه من بطاقة الامتحان');
+      } else {
+        final = { ...saved, hasFile: true, pdfFileName: file.name };
+      }
     }
-
-    const comm = committees.find((c) => c.id === committeeId);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `🎉 جدولة حفل لجنة #${comm?.committeeNumber || ''}`,
-      description: `تم تحديد موعد حفل التكريم ليوم (${ceremonyInfo.date}) في (${ceremonyInfo.place}) وإدراجه في المهام والتقويم.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
+    setExams((prev) => [final, ...prev.filter((e) => e.id !== final.id)]);
+    toast.success('تم حفظ الامتحان');
+    if (newExam.book && !savedBooks.includes(newExam.book) && can('books.write')) await handleAddBook(newExam.book);
   };
 
-  // Add assistant direct
-  const handleAddAssistantDirect = (newUserData: Omit<AppUser, 'id' | 'createdAt'>) => {
-    const newUser = addDirectUser(newUserData);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `إضافة مباشر: ${newUser.name}`,
-      description: 'تم تفعيل حساب المستخدم ومنحه الصلاحيات المحددة فوراً.',
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
+  const handleDeleteExam = async (examId: string) => {
+    const ok = await attempt(() => DataService.deleteExam(examId), 'تم حذف الامتحان');
+    if (ok) setExams((prev) => prev.filter((e) => e.id !== examId));
   };
 
-  // Delete assistant
-  const handleDeleteAssistant = (userId: string) => {
-    deleteUser(userId);
+  const handleAddBook = async (bookName: string) => {
+    const name = bookName.trim();
+    if (!name || savedBooks.includes(name)) return;
+    const saved = await attempt(() => DataService.saveBook({ id: `book-${crypto.randomUUID()}`, name }), 'تمت إضافة الكتاب');
+    if (saved) setBooks((prev) => [...prev, saved].sort((a, b) => a.name.localeCompare(b.name, 'ar')));
   };
 
-  // User login handler from Central Gateway
-  const handleLogin = (user: AppUser, rememberMe = true) => {
-    quickLogin(user, rememberMe);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `تم تسجيل الدخول: ${user.name}`,
-      description: `تم التحقق من الصلاحيات والاتصال بقاعدة البيانات بنجاح (${AuthService.getRoleLabel(user.role)}).`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
+  const handleDeleteBook = async (bookName: string) => {
+    const book = books.find((b) => b.name === bookName);
+    if (!book) return;
+    const ok = await attempt(() => DataService.deleteBook(book.id), 'تم حذف الكتاب');
+    if (ok) setBooks((prev) => prev.filter((b) => b.id !== book.id));
   };
 
-  // User logout handler - Exits system to external Central Portal
+  // ---------------- Users ----------------
+
+  const handleApproveAssistant = (userId: string, permissions: AssistantPermission[], assignedCommittees: number[], role: any = 'assistant') =>
+    attempt(() => approveUser(userId, permissions, assignedCommittees, role), 'تم اعتماد الحساب');
+
+  const handleScheduleInterview = (userId: string, interviewDate: string, interviewNotes?: string) =>
+    attempt(() => scheduleInterview(userId, interviewDate, interviewNotes), 'تم تحديد موعد المقابلة');
+
+  const handleRejectAssistant = (userId: string, reason?: string) =>
+    attempt(() => rejectUser(userId, reason), 'تم تسجيل الاعتذار عن الطلب');
+
+  const handleUpdateAssistantPermissions = (userId: string, permissions: AssistantPermission[], assignedCommittees: number[]) => {
+    const target = users.find((u) => u.id === userId);
+    if (target) attempt(() => updateUser({ ...target, permissions, assignedCommittees }), 'تم تحديث الصلاحيات');
+  };
+
+  const handleUpdateAssistantUser = (updatedUser: AppUser) => attempt(() => updateUser(updatedUser), 'تم حفظ بيانات المستخدم');
+
+  const handleAddAssistantDirect = (newUserData: Omit<AppUser, 'id' | 'createdAt'> & { password: string }) =>
+    attempt(() => createUser(newUserData), 'تم إنشاء الحساب');
+
+  const handleDeleteAssistant = (userId: string) => attempt(() => deleteUser(userId), 'تم حذف المستخدم');
+
+  const handleAddCustomPermission = async (label: string) => {
+    const saved = await attempt(() => DataService.saveCustomPermission({ id: `perm_${crypto.randomUUID()}`, label }), 'تمت إضافة الصلاحية');
+    if (saved) setCustomPermissions((prev) => [...prev, saved]);
+  };
+
+  const handleDeleteCustomPermission = async (id: string) => {
+    const ok = await attempt(() => DataService.deleteCustomPermission(id), 'تم حذف الصلاحية');
+    if (ok) setCustomPermissions((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // ---------------- Courses ----------------
+
+  const handleAddCourse = async (newCourseData: Omit<Course, 'id' | 'createdAt'>): Promise<Course | undefined> => {
+    const saved = await attempt(
+      () => DataService.saveCourse({ ...newCourseData, id: `course-${crypto.randomUUID()}`, createdAt: todayISO() }),
+      `تمت إضافة الدورة: ${newCourseData.name}`
+    );
+    if (!saved) return undefined;
+    setCourses((prev) => [saved, ...prev.map((c) => (saved.isDefault ? { ...c, isDefault: false } : c))]);
+    return saved;
+  };
+
+  const handleUpdateCourse = async (updatedCourse: Course) => {
+    const saved = await attempt(() => DataService.saveCourse(updatedCourse), 'تم حفظ الدورة');
+    if (!saved) return;
+    setCourses((prev) => prev.map((c) => (c.id === saved.id ? saved : saved.isDefault ? { ...c, isDefault: false } : c)));
+    // The server renames the course on its committees too.
+    setCommittees((prev) => prev.map((c) => (c.courseId === saved.id ? { ...c, courseName: saved.name } : c)));
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    const ok = await attempt(() => DataService.deleteCourse(courseId), 'تم حذف الدورة');
+    if (ok) setCourses((prev) => prev.filter((c) => c.id !== courseId));
+  };
+
+  const handleSetDefaultCourse = (courseId: string) => {
+    const target = courses.find((c) => c.id === courseId);
+    if (target) handleUpdateCourse({ ...target, isDefault: true, status: 'active' });
+  };
+
+  // ---------------- Tasks ----------------
+
+  const handleAddScheduleTask = async (newTaskData: Omit<ScheduleTask, 'id'>) => {
+    const saved = await attempt(() => DataService.saveTask({ ...newTaskData, id: `task-${crypto.randomUUID()}` }), 'تمت جدولة المهمة');
+    if (saved) replaceTask(saved);
+  };
+
+  const handleToggleTaskComplete = async (taskId: string) => {
+    const task = scheduleTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const saved = await attempt(() => DataService.toggleTask(taskId, !task.completed));
+    if (saved) replaceTask(saved);
+  };
+
+  const handleDeleteScheduleTask = async (taskId: string) => {
+    const ok = await attempt(() => DataService.deleteTask(taskId), 'تم حذف المهمة');
+    if (ok) setScheduleTasks((prev) => prev.filter((t) => t.id !== taskId));
+  };
+
+  // ---------------- Session ----------------
+
   const handleLogout = () => {
+    setSelectedCommitteeId(null);
+    setActiveTab('home');
     logout();
   };
 
-  // Register new staff/assistant / Join Request
-  const handleRegisterAssistant = (
-    newUserData: Partial<AppUser> | string,
-    phone = '',
-    email = '',
-    notes?: string,
-    role: any = 'assistant',
-    password = '',
-    passportNumber = '',
-    status: any = 'pending',
-    permissions?: any[],
-    assignedCommittees?: number[]
-  ) => {
-    const payload: Partial<AppUser> =
-      typeof newUserData === 'object'
-        ? newUserData
-        : {
-            name: newUserData,
-            phone,
-            email,
-            notes,
-            role,
-            password,
-            passportNumber,
-            status,
-            permissions,
-            assignedCommittees,
-          };
-
-    const isApproved = payload.status === 'approved';
-    const created = registerUser(payload);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: isApproved
-        ? `انضمام كادر معتمد: ${created.name}`
-        : `طلب انضمام جديد (${created.requestCode || 'REQ'}): ${created.name}`,
-      description: isApproved
-        ? `المعاون (${created.name} - ${created.phone}) تم تفعيله ومنحه الصلاحيات الميدانية مباشرة.`
-        : `المتقدم (${created.name} - ${created.phone}) أرسل طلب انضمام كـ (${AuthService.getRoleLabel(created.role)}) وهو بانتظار دراسة المشرف العام.`,
-      time: 'الآن',
-      type: isApproved ? 'success' : 'urgent',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-    return created;
+  const handleMarkNotificationsAsRead = async () => {
+    if (!notifications.some((n) => !n.read)) return;
+    const ok = await attempt(() => DataService.markAllNotificationsRead());
+    if (ok) setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
-  // Assistant: Receive Committee
-  const handleReceiveCommittee = (committeeId: string) => {
-    const nowStamp = getCurrentFormattedDateTime();
-    const updated = committees.map((c) => {
-      if (c.id === committeeId) {
-        return {
-          ...c,
-          receivedByAssistant: {
-            assistantId: currentUser?.id || 'system-user',
-            assistantName: currentUser?.name || 'معاون النظام',
-            receivedAt: nowStamp,
-            status: 'received' as const,
-          },
-        };
-      }
-      return c;
-    });
-    setCommittees(updated);
-    triggerGoogleSheetsSync(updated);
+  // ---------------- Derived values ----------------
 
-    const c = committees.find((item) => item.id === committeeId);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `استلام لجنة #${c?.committeeNumber || ''}`,
-      description: `تم تسجيل استلام اللجنة بواسطة المعاون (${currentUser?.name || 'معاون النظام'}) في القاعة.`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-      committeeId,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Assistant: Approve Exam Readiness
-  const handleApproveExamReadiness = (committeeId: string) => {
-    const nowStamp = getCurrentFormattedDateTime();
-    const updated = committees.map((c) => {
-      if (c.id === committeeId) {
-        return {
-          ...c,
-          examApprovedBy: {
-            assistantId: currentUser?.id || 'system-user',
-            assistantName: currentUser?.name || 'معاون النظام',
-            approvedAt: nowStamp,
-          },
-        };
-      }
-      return c;
-    });
-    setCommittees(updated);
-    triggerGoogleSheetsSync(updated);
-
-    const c = committees.find((item) => item.id === committeeId);
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: `اعتماد جاهزية الامتحان للجنة #${c?.committeeNumber || ''}`,
-      description: `تم التأكد من أوراق الامتحان وتوزيعها بواسطة (${currentUser?.name || 'معاون النظام'}).`,
-      time: 'الآن',
-      type: 'success',
-      read: false,
-      committeeId,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Mark notifications as read
-  const handleMarkNotificationsAsRead = () => {
-    setNotifications((prev) => {
-      prev.forEach((n) => {
-        if (!n.read) SupabaseService.markNotificationRead(n.id).catch(console.error);
-      });
-      return prev.map((n) => ({ ...n, read: true }));
-    });
-  };
-
-  // Stage counts for filter tabs
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { all: committees.length };
     STAGES_LIST.forEach((s) => {
       counts[s.key] = 0;
     });
-
     committees.forEach((c) => {
       const status = calculateCurrentStage(c.stages);
       counts[status.key] = (counts[status.key] || 0) + 1;
     });
-
     return counts;
   }, [committees]);
 
-  const activeCommitteesCount = useMemo(() => {
-    return committees.filter((c) => !c.stages.ceremony?.completed).length;
-  }, [committees]);
+  const activeCommitteesCount = useMemo(() => committees.filter((c) => !c.stages.ceremony?.completed).length, [committees]);
+  const completedCeremonyCount = useMemo(() => committees.filter((c) => c.stages.ceremony?.completed).length, [committees]);
 
-  const completedCeremonyCount = useMemo(() => {
-    return committees.filter((c) => c.stages.ceremony?.completed).length;
-  }, [committees]);
-
-  // Filtered committees
   const filteredCommittees = useMemo(() => {
     let list = [...committees];
-
-    if (selectedStage !== 'all') {
-      list = list.filter((c) => {
-        const status = calculateCurrentStage(c.stages);
-        return status.key === selectedStage;
-      });
-    }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        list = list.filter(
-          (c) =>
-            String(c.committeeNumber).includes(q) ||
-            c.committeeName.toLowerCase().includes(q) ||
-            c.competitionBook.toLowerCase().includes(q) ||
-            c.branch.toLowerCase().includes(q) ||
-            (c.associationName && c.associationName.toLowerCase().includes(q)) ||
-            c.members.some((m) => m.toLowerCase().includes(q)) ||
-            (c.sheikhName && c.sheikhName.toLowerCase().includes(q)) ||
-            (c.sheikhPhone && c.sheikhPhone.toLowerCase().includes(q)) ||
-            (c.sheikhCountry && c.sheikhCountry.toLowerCase().includes(q)) ||
-            (c.generalNotes && c.generalNotes.toLowerCase().includes(q))
-        );
-      }
-
-      if (genderFilter === 'women') {
-        list = list.filter((c) => c.isWomenCommittee);
-      } else if (genderFilter === 'men') {
-        list = list.filter((c) => !c.isWomenCommittee);
-      }
-
-    if (selectedCourseFilter !== 'all') {
+    if (selectedStage !== 'all') list = list.filter((c) => calculateCurrentStage(c.stages).key === selectedStage);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
       list = list.filter(
-        (c) => c.courseId === selectedCourseFilter || (!c.courseId && selectedCourseFilter === 'course-summer-1447')
+        (c) =>
+          String(c.committeeNumber).includes(q) ||
+          c.committeeName.toLowerCase().includes(q) ||
+          c.competitionBook.toLowerCase().includes(q) ||
+          c.branch.toLowerCase().includes(q) ||
+          (c.associationName && c.associationName.toLowerCase().includes(q)) ||
+          c.members.some((m) => m.toLowerCase().includes(q)) ||
+          (c.sheikhName && c.sheikhName.toLowerCase().includes(q)) ||
+          (c.sheikhPhone && c.sheikhPhone.toLowerCase().includes(q)) ||
+          (c.sheikhCountry && c.sheikhCountry.toLowerCase().includes(q)) ||
+          (c.generalNotes && c.generalNotes.toLowerCase().includes(q))
       );
     }
-
+    if (genderFilter === 'women') list = list.filter((c) => c.isWomenCommittee);
+    else if (genderFilter === 'men') list = list.filter((c) => !c.isWomenCommittee);
+    if (selectedCourseFilter !== 'all') list = list.filter((c) => c.courseId === selectedCourseFilter);
     if (currentUser?.role === 'assistant' && assistantOnlyFilter) {
       list = list.filter((c) => currentUser.assignedCommittees.includes(c.committeeNumber));
     }
-
-    if (needsScoringFilter) {
-      list = list.filter((c) => c.scoringDetails?.questions?.some((q) => !q.completed));
-    }
-
-    if (sortBy === 'newest') {
-      list.sort((a, b) => b.committeeNumber - a.committeeNumber);
-    } else if (sortBy === 'oldest') {
-      list.sort((a, b) => a.committeeNumber - b.committeeNumber);
-    } else if (sortBy === 'committeeNumber') {
-      list.sort((a, b) => a.committeeNumber - b.committeeNumber);
-    } else if (sortBy === 'book') {
-      list.sort((a, b) => a.competitionBook.localeCompare(b.competitionBook, 'ar'));
-    }
-
+    if (needsScoringFilter) list = list.filter((c) => c.scoringDetails?.questions?.some((q) => !q.completed));
+    if (sortBy === 'newest') list.sort((a, b) => b.committeeNumber - a.committeeNumber);
+    else if (sortBy === 'oldest' || sortBy === 'committeeNumber') list.sort((a, b) => a.committeeNumber - b.committeeNumber);
+    else if (sortBy === 'book') list.sort((a, b) => a.competitionBook.localeCompare(b.competitionBook, 'ar'));
     return list;
-  }, [committees, selectedStage, searchQuery, sortBy, assistantOnlyFilter, needsScoringFilter, currentUser, selectedCourseFilter]);
+  }, [committees, selectedStage, searchQuery, sortBy, assistantOnlyFilter, needsScoringFilter, currentUser, selectedCourseFilter, genderFilter]);
 
   const totalPages = Math.ceil(filteredCommittees.length / ITEMS_PER_PAGE) || 1;
-
   const paginatedCommittees = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredCommittees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredCommittees, currentPage]);
-
   const startIndexDisplay = (currentPage - 1) * ITEMS_PER_PAGE + 1;
   const endIndexDisplay = Math.min(currentPage * ITEMS_PER_PAGE, filteredCommittees.length);
 
+  const defaultCourseId = courses.find((c) => c.isDefault)?.id || courses.find((c) => c.status === 'active')?.id;
   const nextCommitteeNumber = useMemo(() => {
-    if (committees.length === 0) return 1;
-    return Math.max(...committees.map((c) => c.committeeNumber), 0) + 1;
-  }, [committees]);
+    const inCourse = committees.filter((c) => !defaultCourseId || c.courseId === defaultCourseId);
+    return inCourse.length === 0 ? 1 : Math.max(...inCourse.map((c) => c.committeeNumber), 0) + 1;
+  }, [committees, defaultCourseId]);
 
-  const pendingAssistantsCount = useMemo(() => {
-    return users.filter((u) => u.status === 'pending').length;
-  }, [users]);
-
-  // Calculate today's tasks count from real database schedule (Centering on Monday 2026-10-05)
+  const pendingAssistantsCount = useMemo(() => users.filter((u) => u.status === 'pending').length, [users]);
   const todaysTasksCount = useMemo(() => {
-    const mondayISO = '2026-10-05';
-    const mondayTasks = scheduleTasks.filter((t) => t.date === mondayISO && !t.completed);
-    if (mondayTasks.length > 0) return mondayTasks.length;
-    const realISO = new Date().toISOString().split('T')[0];
-    const direct = scheduleTasks.filter((t) => t.date === realISO && !t.completed);
-    return direct.length;
+    const today = todayISO();
+    return scheduleTasks.filter((t) => t.date === today && !t.completed).length;
   }, [scheduleTasks]);
 
-  // Gatekeeper: Unauthenticated users are presented with the Central Enterprise Login Portal
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff] text-[#3e4947] font-['IBM_Plex_Sans_Arabic']" role="status">
+        جارٍ التحقق من الجلسة...
+      </div>
+    );
+  }
+
+  // Unauthenticated users see the login / join-request portal.
   if (!currentUser) {
     return (
-      <CentralLoginPortal
-        users={users}
-        onLogin={handleLogin}
-        onRegisterUser={(newUser) => {
-          handleRegisterAssistant(newUser);
-        }}
-      />
+      <>
+        <CentralLoginPortal />
+        <Toasts />
+      </>
     );
   }
 
@@ -1311,7 +625,7 @@ export default function App() {
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
           onOpenExport={() => setIsExportOpen(true)}
-          onOpenDatabaseModal={() => setIsSupabaseModalOpen(true)}
+          onOpenDatabaseModal={can('database.admin') ? () => setIsSupabaseModalOpen(true) : undefined}
           onSignOut={handleLogout}
           notifications={notifications}
           onOpenNotificationCommittee={(commId) => {
@@ -1329,6 +643,19 @@ export default function App() {
 
         {/* Tab Views */}
         <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24 lg:pb-8">
+          {isLoadingDatabase && (
+            <div role="status" className="mb-4 rounded-xl bg-[#dce9ff]/60 text-[#0d1c2e] text-sm px-4 py-3">
+              جارٍ تحميل البيانات من الخادم...
+            </div>
+          )}
+          {loadError && (
+            <div role="alert" className="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+              <span>تعذر تحميل البيانات: {loadError}</span>
+              <button type="button" onClick={loadAll} className="px-3 py-1.5 rounded-lg bg-red-700 text-white text-xs font-bold cursor-pointer">
+                إعادة المحاولة
+              </button>
+            </div>
+          )}
           {activeTab === 'home' && (
             <HomeOverviewView
               committees={committees}
@@ -1355,19 +682,11 @@ export default function App() {
               committees={committees}
               courses={courses}
               currentUser={currentUser}
-              onToggleCommitteeStage={handleQuickToggleStage}
+              onSetCommitteeStage={handleSetStage}
               onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
-              onUpdateCommitteeCourse={(committeeId, courseId, courseName) => {
-                setCommittees((prev) => {
-                  const updated = prev.map((c) =>
-                    c.id === committeeId ? { ...c, courseId, courseName } : c
-                  );
-                  const target = updated.find((c) => c.id === committeeId);
-                  if (target) {
-                    SupabaseService.saveCommittee(target);
-                  }
-                  return updated;
-                });
+              onUpdateCommitteeCourse={(committeeId, courseId) => {
+                const target = committees.find((c) => c.id === committeeId);
+                if (target) handleSaveCommittee({ ...target, courseId });
               }}
               onAddCourse={handleAddCourse}
               onNavigateToCommittees={() => setActiveTab('committees')}
@@ -1482,7 +801,7 @@ export default function App() {
                 <div className="mb-6 p-4 rounded-2xl bg-gradient-to-l from-emerald-50 via-teal-50 to-white border border-teal-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
                   <div>
                     <span className="font-bold text-[#005c55] text-sm block flex items-center gap-1.5 mb-1">
-                      <span className="material-symbols-outlined text-lg" aria-hidden="true">person_pin</span>
+                      <span className="material-symbols-outlined text-lg">person_pin</span>
                       <span>مرحباً بك: {currentUser.name} (معاون ميداني)</span>
                     </span>
                     <span className="text-[#3e4947] block leading-relaxed">
@@ -1504,7 +823,7 @@ export default function App() {
                           : 'bg-white border border-[#bdc9c6] text-[#0d1c2e] hover:bg-emerald-50'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm" aria-hidden="true">filter_alt</span>
+                      <span className="material-symbols-outlined text-sm">filter_alt</span>
                       <span>لجاني المسندة فقط ({currentUser.assignedCommittees.length})</span>
                     </button>
 
@@ -1521,7 +840,7 @@ export default function App() {
                           : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-50'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm" aria-hidden="true">edit_note</span>
+                      <span className="material-symbols-outlined text-sm">edit_note</span>
                       <span>لجان بها أسئلة تحتاج تصحيح</span>
                     </button>
                   </div>
@@ -1575,13 +894,13 @@ export default function App() {
                       onApproveExamReadiness={handleApproveExamReadiness}
                       onViewDetails={(c) => setSelectedCommitteeForDetails(c)}
                       onQuickToggleStage={handleQuickToggleStage}
-                      onDeleteCommittee={currentUser.role === 'super_admin' ? handleDeleteCommittee : undefined}
+                      onDeleteCommittee={can('committees.delete') ? handleDeleteCommittee : undefined}
                     />
                   ))}
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl p-12 text-center border border-[#bdc9c6]/40 shadow-xs">
-                  <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block" aria-hidden="true">
+                  <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block">
                     search_off
                   </span>
                   <h3 className="font-bold text-base text-[#0d1c2e] mb-1">
@@ -1625,7 +944,7 @@ export default function App() {
                     className="p-2 rounded-lg border border-[#bdc9c6]/60 text-[#6e7977] hover:text-[#0d1c2e] hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                     title="الصفحة السابقة"
                   >
-                    <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_right</span>
+                    <span className="material-symbols-outlined text-lg">chevron_right</span>
                   </button>
 
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
@@ -1648,7 +967,7 @@ export default function App() {
                     className="p-2 rounded-lg border border-[#bdc9c6]/60 text-[#0d1c2e] hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                     title="الصفحة التالية"
                   >
-                    <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_left</span>
+                    <span className="material-symbols-outlined text-lg">chevron_left</span>
                   </button>
                 </div>
               </div>
@@ -1684,36 +1003,33 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         currentUser={currentUser}
-        users={users}
-        onSelectUser={(u) => handleLogin(u)}
-        onRegisterAssistant={handleRegisterAssistant}
         onLogout={handleLogout}
       />
 
-      <AddCommitteeModal
+      {isAddCommitteeOpen && <AddCommitteeModal
         isOpen={isAddCommitteeOpen}
         onClose={() => setIsAddCommitteeOpen(false)}
         onAddCommittee={handleAddCommittee}
         nextCommitteeNumber={nextCommitteeNumber}
         savedBooks={savedBooks}
         courses={courses}
-        defaultCourseId={courses.find((c) => c.status === 'active')?.id || courses[0]?.id}
+        defaultCourseId={defaultCourseId}
         onAddCourse={handleAddCourse}
-      />
+      />}
 
-      <AddExamModal
+      {isAddExamOpen && <AddExamModal
         isOpen={isAddExamOpen}
         onClose={() => setIsAddExamOpen(false)}
         onAddExam={handleAddExam}
         savedBooks={savedBooks}
-      />
+      />}
 
-      <AddBookModal
+      {isAddBookOpen && <AddBookModal
         isOpen={isAddBookOpen}
         onClose={() => setIsAddBookOpen(false)}
         onAddBook={handleAddBook}
         existingBooks={savedBooks}
-      />
+      />}
 
       <ExportModal
         isOpen={isExportOpen}
@@ -1724,17 +1040,9 @@ export default function App() {
       <SupabaseDatabaseModal
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
-        onRefreshData={async () => {
-          try {
-            const dbComms = await SupabaseService.getCommittees();
-            if (dbComms && dbComms.length > 0) setCommittees(dbComms);
-            const dbCourses = await SupabaseService.getCourses();
-            if (dbCourses && dbCourses.length > 0) setCourses(dbCourses);
-          } catch (e) {
-            console.error('Error refreshing data from Supabase:', e);
-          }
-        }}
+        onRefreshData={loadAll}
       />
+      <Toasts />
     </div>
   );
 }

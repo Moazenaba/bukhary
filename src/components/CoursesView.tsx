@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { AuthService } from '../services/AuthService';
+import { todayISO } from '../utils/stageUtils';
 import { Course, Committee, AppUser } from '../types';
 
 interface CoursesViewProps {
@@ -22,7 +24,8 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
   onSetDefaultCourse,
   onNavigateCommitteesByCourse,
 }) => {
-  const isSuperAdmin = currentUser.role === 'super_admin';
+  // Same rule as the server: only users allowed to write courses see these actions.
+  const canWriteCourses = AuthService.can('courses.write');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'upcoming'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -30,7 +33,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
   // Form state
   const [name, setName] = useState('');
   const [season, setSeason] = useState('صيفية');
-  const [year, setYear] = useState('1447هـ / 2026م');
+  const [year, setYear] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [description, setDescription] = useState('');
@@ -43,14 +46,14 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
   });
 
   const getCourseCommittees = (courseId: string) => {
-    return committees.filter((c) => c.courseId === courseId || (!c.courseId && courseId === 'course-summer-1447'));
+    return committees.filter((c) => c.courseId === courseId);
   };
 
   const handleOpenAdd = () => {
     setName('');
     setSeason('صيفية');
-    setYear('1448هـ / 2026م');
-    setStartDate(new Date().toISOString().split('T')[0]);
+    setYear('');
+    setStartDate(todayISO());
     setEndDate('');
     setDescription('');
     setTargetCommitteesCount(30);
@@ -66,7 +69,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
       name: name.trim(),
       season,
       year: year.trim(),
-      startDate: startDate || new Date().toISOString().split('T')[0],
+      startDate: startDate || todayISO(),
       endDate: endDate || '',
       status,
       description: description.trim(),
@@ -91,7 +94,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">event_repeat</span>
+              <span className="material-symbols-outlined text-2xl">event_repeat</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-bold">
               إدارة الدورات والمسابقات الموسمية
@@ -103,12 +106,12 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
           </p>
         </div>
 
-        {isSuperAdmin && (
+        {canWriteCourses && (
           <button
             onClick={handleOpenAdd}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600" aria-hidden="true">add_circle</span>
+            <span className="material-symbols-outlined text-xl text-emerald-600">add_circle</span>
             <span>+ إضافة دورة جديدة</span>
           </button>
         )}
@@ -192,7 +195,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                           : 'bg-blue-100 text-blue-800'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                      <span className="material-symbols-outlined text-lg">
                         {course.status === 'active'
                           ? 'local_fire_department'
                           : course.status === 'completed'
@@ -264,11 +267,11 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                   onClick={() => onNavigateCommitteesByCourse(course.id)}
                   className="w-full py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] transition-all"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
+                  <span className="material-symbols-outlined text-sm">groups</span>
                   <span>عرض لجان هذه الدورة ({courseComms.length})</span>
                 </button>
 
-                {isSuperAdmin && (
+                {canWriteCourses && (
                   <div className="flex items-center justify-between gap-2 pt-1 text-xs">
                     {!course.isDefault && (
                       <button
@@ -309,12 +312,12 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
 
       {/* ADD COURSE MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
             <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl" aria-hidden="true">event_repeat</span>
+                  <span className="material-symbols-outlined text-xl">event_repeat</span>
                 </span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
@@ -329,7 +332,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 onClick={() => setIsAddModalOpen(false)}
                 className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
@@ -456,12 +459,12 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
 
       {/* EDIT COURSE MODAL */}
       {editingCourse && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
             <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl" aria-hidden="true">edit</span>
+                  <span className="material-symbols-outlined text-xl">edit</span>
                 </span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
@@ -476,7 +479,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 onClick={() => setEditingCourse(null)}
                 className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 

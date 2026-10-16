@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     0
   );
 
-  const canAddNewCommittee = isSuperAdmin || perms.includes('add_new_committee');
+  const canAddNewCommittee = AuthService.can('committees.create');
 
   const handleSelectTab = (tab: NavTab) => {
     setActiveTab(tab);
@@ -157,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpenMobile && (
         <div
           onClick={() => setIsOpenMobile(false)}
-          className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-xs transition-opacity duration-300"
+          aria-hidden="true" className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-xs transition-opacity duration-300"
         />
       )}
 
@@ -168,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="hidden lg:flex fixed top-20 right-0 z-40 items-center gap-2 px-3 py-2.5 bg-[#005c55] hover:bg-[#004742] text-white rounded-l-2xl shadow-xl transition-all hover:pr-4 cursor-pointer font-bold text-xs border border-white/20 active:scale-95 animate-fadeIn"
           title="فتح القائمة الجانبية (Slide bar)"
         >
-          <span className="material-symbols-outlined text-lg" aria-hidden="true">menu_open</span>
+          <span className="material-symbols-outlined text-lg">menu_open</span>
           <span>القائمة الجانبية</span>
         </button>
       )}
@@ -189,14 +189,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#005c55] to-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">mosque</span>
+              <span className="material-symbols-outlined text-2xl">mosque</span>
             </div>
             <div className="overflow-hidden">
               <h1 className="font-black text-base text-slate-900 leading-tight truncate tracking-tight">
                 مسجد الإمام البخاري
               </h1>
               <p className="text-[11px] text-[#005c55] font-extrabold truncate mt-0.5">
-                الدورات والمسابقات 1448هـ
+                الدورات والمسابقات
               </p>
             </div>
           </div>
@@ -208,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="إغلاق القائمة الجانبية"
             aria-label="إغلاق القائمة الجانبية"
           >
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
+            <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
@@ -265,10 +265,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className={`material-symbols-outlined text-xl ${
+                          <span
+                            className={`material-symbols-outlined text-xl ${
                               isActive ? 'text-white' : 'text-slate-400 group-hover:text-[#005c55]'
                             }`}
-                           aria-hidden="true">
+                          >
                             {item.icon}
                           </span>
                           <span>{item.label}</span>
@@ -310,7 +311,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[#005c55] transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">add_circle</span>
+                <span className="material-symbols-outlined text-lg">add_circle</span>
                 <span>+ إضافة لجنة جديدة</span>
               </button>
             </div>
@@ -319,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* If non-admin has no granted tabs */}
           {totalVisibleCount === 0 && (
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs text-center space-y-1">
-              <span className="material-symbols-outlined text-2xl text-amber-500 block mb-1" aria-hidden="true">lock</span>
+              <span className="material-symbols-outlined text-2xl text-amber-500 block mb-1">lock</span>
               <p className="font-bold">لا توجد أقسام مفعلة لك حالياً</p>
               <p className="text-[11px] text-slate-500">يرجى مراجعة فضيلة المشرف العام لمنحك الصلاحيات المناسبة.</p>
             </div>
@@ -328,7 +329,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer info (Clean, subtle) */}
         <div className="p-3 border-t border-slate-100 bg-slate-50 text-[11px] text-slate-500 text-center font-medium shrink-0">
-          <span>مسجد الإمام البخاري © 1448هـ / 2026م</span>
+          <span>مسجد الإمام البخاري © {new Date().getFullYear()}</span>
         </div>
       </aside>
     </>

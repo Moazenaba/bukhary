@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { todayISO } from '../utils/stageUtils';
 import {
   Sparkles,
   Plus,
@@ -34,84 +35,79 @@ import {
   PlusCircle,
   X,
 } from 'lucide-react';
-import {
-  SummerCourseRow,
-  CourseFilterStatus,
-  SummerCourseStats,
-} from '../types/summerCourse';
+import { SummerCourseRow, CourseFilterStatus, SummerCourseStats } from '../types/summerCourse';
 import { Committee, StageKey, Course, AppUser } from '../types';
-import { syncRowsWithCommittees } from '../utils/committeeSync';
+import { mergeRowsWithCommittees, ROW_STAGE } from '../utils/committeeSync';
 import { MergeConfirmModal } from './MergeConfirmModal';
-import {
-  exportCourseRowsToExcel,
-  exportCourseRowsToCSV,
-  parseCourseRowsFromFile,
-} from '../utils/summerCourseExport';
+import { exportCourseRowsToExcel, exportCourseRowsToCSV, parseCourseRowsFromFile } from '../utils/summerCourseExport';
+import { DataService } from '../services/DataService';
+import { errorMessage } from '../services/api';
+import { AuthService } from '../services/AuthService';
+import { toast } from './Toasts';
+import { ImageWorkbench } from './ImageWorkbench';
+
 
 interface SummerCourseTrackerViewProps {
   committees?: Committee[];
   courses?: Course[];
   currentUser?: AppUser;
-  onToggleCommitteeStage?: (committeeId: string, stageKey: StageKey) => void;
-  onAddCommitteeFromRow?: (newComm: Committee) => void;
+  /** Sets (not toggles) one stage of a committee on the server. */
+  onSetCommitteeStage?: (committeeId: string, stageKey: StageKey, completed: boolean) => unknown;
+  onAddCommitteeFromRow?: (newComm: Committee) => Promise<Committee | undefined>;
   onUpdateCommitteeCourse?: (committeeId: string, courseId: string, courseName: string) => void;
-  onAddCourse?: (newCourse: Omit<Course, 'id' | 'createdAt'>) => Course;
+  onAddCourse?: (newCourse: Omit<Course, 'id' | 'createdAt'>) => Promise<Course | undefined>;
   onNavigateToCommittees?: () => void;
   onOpenCommitteeDetails?: (row: SummerCourseRow) => void;
 }
-
-const LOCAL_STORAGE_KEY = 'bukhari_summer_course_table_rows_v4';
-
-// Initial sample data is completely empty (on zero as requested)
-const INITIAL_SAMPLE_ROWS: SummerCourseRow[] = [];
 
 export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = ({
   committees = [],
   courses = [],
   currentUser,
-  onToggleCommitteeStage,
+  onSetCommitteeStage,
   onAddCommitteeFromRow,
   onUpdateCommitteeCourse,
   onAddCourse,
   onNavigateToCommittees,
   onOpenCommitteeDetails,
 }) => {
-  const [rows, setRows] = useState<SummerCourseRow[]>(() => {
-    try {
-      // Clear legacy storage keys containing mock data
-      localStorage.removeItem('summer_course_table_data_1448');
-      localStorage.removeItem('summer_course_table_data_v3');
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const seen = new Set<string>();
-          return parsed.map((item, i) => {
-            let itemId = item.id || `row-${i}-${Date.now()}`;
-            if (seen.has(itemId)) {
-              itemId = `${itemId}-${i}-${Math.random().toString(36).slice(2, 6)}`;
-            }
-            seen.add(itemId);
-            return { ...item, id: itemId };
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load summer course data from localStorage', e);
-    }
-    return [];
-  });
+  // Saved rows come from the server; what is displayed merges them with the committees.
+  const [savedRows, setSavedRows] = useState<SummerCourseRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const rows = useMemo(() => mergeRowsWithCommittees(savedRows, committees), [savedRows, committees]);
+  const canEdit = AuthService.can('summerRows.write');
 
-  // Automatically update stages of existing rows linked to committees if their stages change
-  useEffect(() => {
-    if (committees && committees.length > 0) {
-      setRows((prev) => {
-        // Do not auto-populate mock committees if table was reset to zero
-        if (prev.length === 0) return prev;
-        return syncRowsWithCommittees(prev, committees);
-      });
+  const loadRows = async () => {
+    setIsLoading(true);
+    try {
+      setSavedRows(await DataService.getSummerCourseRows());
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setIsLoading(false);
     }
-  }, [committees]);
+  };
+
+  useEffect(() => {
+    loadRows();
+  }, []);
+
+  const upsertSaved = (row: SummerCourseRow) =>
+    setSavedRows((prev) => (prev.some((r) => r.id === row.id) ? prev.map((r) => (r.id === row.id ? row : r)) : [...prev, row]));
+
+  /** Saves a row. A virtual row (a committee without a sheet row) becomes a real, linked row. */
+  const saveRowToDb = async (row: SummerCourseRow): Promise<SummerCourseRow | undefined> => {
+    const { virtual, ...rest } = row;
+    const toSave = virtual ? { ...rest, id: `row-${crypto.randomUUID()}` } : rest;
+    try {
+      const saved = await DataService.saveSummerCourseRow(toSave);
+      upsertSaved(saved);
+      return saved;
+    } catch (err) {
+      toast.error(errorMessage(err));
+      return undefined;
+    }
+  };
 
   // Import / Modal states
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -151,20 +147,20 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
   // New Course Form State
   const [newCourseName, setNewCourseName] = useState('');
-  const [newCourseSeason, setNewCourseSeason] = useState('صيفية');
-  const [newCourseYear, setNewCourseYear] = useState('1448هـ / 2026م');
-  const [newCourseStartDate, setNewCourseStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newCourseSeason, setNewCourseSeason] = useState('');
+  const [newCourseYear, setNewCourseYear] = useState('');
+  const [newCourseStartDate, setNewCourseStartDate] = useState(todayISO());
   const [newCourseEndDate, setNewCourseEndDate] = useState('');
   const [newCourseStatus, setNewCourseStatus] = useState<'active' | 'completed' | 'upcoming'>('active');
-  const [newCourseTargetCommittees, setNewCourseTargetCommittees] = useState<number>(30);
+  const [newCourseTargetCommittees, setNewCourseTargetCommittees] = useState<number | ''>('');
   const [newCourseDescription, setNewCourseDescription] = useState('');
 
   // New Row Form State
   const [newRowNumber, setNewRowNumber] = useState<number>(1);
   const [newRowCourseId, setNewRowCourseId] = useState<string>('');
   const [newRowSheikhName, setNewRowSheikhName] = useState<string>('');
-  const [newRowPlace, setNewRowPlace] = useState<string>('مسجد الإمام البخاري');
-  const [newRowBook, setNewRowBook] = useState<string>('الأصول الثلاثة');
+  const [newRowPlace, setNewRowPlace] = useState<string>('');
+  const [newRowBook, setNewRowBook] = useState<string>('');
   const [newRowStudentsCount, setNewRowStudentsCount] = useState<number>(0);
   const [newRowDelivered, setNewRowDelivered] = useState<boolean>(false);
   const [newRowCorrected, setNewRowCorrected] = useState<boolean>(false);
@@ -179,22 +175,44 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     return courses.find((c) => c.status === 'active' || c.isDefault) || courses[0];
   }, [courses]);
 
-  // Notification / Toast state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => toast.success(msg);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  // Persist to localStorage whenever rows change
-  useEffect(() => {
+  // Table extraction from a photo of a handwritten/printed sheet (server-side OCR).
+  const [isOcrOpen, setIsOcrOpen] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const handleOcrExtract = async (imageBase64: string) => {
+    setIsExtracting(true);
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(rows));
-    } catch (e) {
-      console.error('Failed to save summer course data to localStorage', e);
+      const mimeType = imageBase64.match(/^data:(image\/[a-z]+);/)?.[1] ?? 'image/jpeg';
+      const { rows: extracted } = await DataService.extractTable(imageBase64, mimeType);
+      const mapped: Omit<SummerCourseRow, 'id'>[] = extracted.map((r: any) => ({
+        number: Number(r.number) || 0,
+        sheikh_name: String(r.sheikh_name ?? ''),
+        place: String(r.place ?? ''),
+        book: String(r.book ?? ''),
+        students_count: Number(r.students_count) || 0,
+        delivered: Boolean(r.delivered),
+        corrected: Boolean(r.corrected),
+        reviewed: Boolean(r.reviewed),
+        announced: Boolean(r.announced),
+        ceremony: Boolean(r.ceremony),
+        struck_out: false,
+        // Read by a machine: flagged so a person checks every row before relying on it.
+        uncertain: true,
+        notes: String(r.notes ?? ''),
+      }));
+      if (mapped.length === 0) {
+        toast.error('لم يتم العثور على صفوف في الصورة');
+        return;
+      }
+      setIsOcrOpen(false);
+      await handleDataExtracted(mapped);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setIsExtracting(false);
     }
-  }, [rows]);
+  };
 
   // Statistics calculation
   const stats: SummerCourseStats = useMemo(() => {
@@ -298,120 +316,98 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     });
   }, [rows, searchQuery, statusFilter, selectedBook, selectedPlace, selectedCourseFilter, activeDefaultCourse]);
 
-  // Handle data returned from scanner
-  const handleDataExtracted = (extracted: Omit<SummerCourseRow, 'id'>[]) => {
-    if (rows.length === 0) {
-      // Direct replace
-      const formatted = extracted.map((r, i) => ({
-        ...r,
-        id: `row-${Date.now()}-${i}`,
-      }));
-      setRows(formatted);
-      showToast(`تم إدراج ${formatted.length} صفاً بنجاح في جدول الكشف.`);
+  const targetCourseForImport = () =>
+    selectedCourseFilter !== 'all' ? selectedCourseFilter : activeDefaultCourse?.id;
+
+  const saveImported = async (incoming: SummerCourseRow[], replace: boolean) => {
+    const courseId = targetCourseForImport();
+    if (!courseId) {
+      toast.error('اختر الدورة التي تريد استيراد الكشف إليها أولاً');
+      return false;
+    }
+    try {
+      const saved = await DataService.saveSummerCourseRowsBulk(
+        incoming.map((r) => ({ ...r, courseId })),
+        replace ? courseId : undefined
+      );
+      await loadRows();
+      return true;
+    } catch (err) {
+      toast.error(errorMessage(err));
+      return false;
+    }
+  };
+
+  // Handle data returned from the file import
+  const handleDataExtracted = async (extracted: Omit<SummerCourseRow, 'id'>[]) => {
+    if (savedRows.length === 0) {
+      const formatted = extracted.map((r) => ({ ...r, id: `row-${crypto.randomUUID()}` }));
+      if (await saveImported(formatted, false)) showToast(`تم إدراج ${formatted.length} صفاً وحفظها في قاعدة البيانات.`);
     } else {
-      // Ask user to merge or replace
       setPendingExtractedRows(extracted);
       setIsMergeModalOpen(true);
     }
   };
 
-  const executeMerge = () => {
+  const executeMerge = async () => {
     if (!pendingExtractedRows) return;
-    const maxNumber = rows.reduce((max, r) => Math.max(max, r.number || 0), 0);
-
-    const formatted = pendingExtractedRows.map((r, i) => ({
-      ...r,
-      id: `row-${Date.now()}-${i}`,
-      number: maxNumber + i + 1, // automatic serial incrementing
-    }));
-
-    setRows((prev) => [...prev, ...formatted]);
+    const existingNumbers = new Set(rows.map((r) => r.number));
+    let nextAvailableNumber = rows.reduce((max, r) => Math.max(max, r.number || 0), 0) + 1;
+    const formatted = pendingExtractedRows.map((r) => {
+      let finalNumber = r.number;
+      if (!finalNumber || existingNumbers.has(finalNumber)) finalNumber = nextAvailableNumber++;
+      existingNumbers.add(finalNumber);
+      return { ...r, id: `row-${crypto.randomUUID()}`, number: finalNumber };
+    });
+    if (await saveImported(formatted, false)) showToast(`تم دمج ${formatted.length} صفاً جديداً وحفظها في قاعدة البيانات.`);
     setPendingExtractedRows(null);
-    showToast(`تم دمج ${formatted.length} صفاً جديداً مع البيانات الحالية.`);
   };
 
-  const executeReplace = () => {
+  const executeReplace = async () => {
     if (!pendingExtractedRows) return;
-    const formatted = pendingExtractedRows.map((r, i) => ({
-      ...r,
-      id: `row-${Date.now()}-${i}`,
-      number: i + 1,
-    }));
-
-    setRows(formatted);
+    let nextAvailableNumber = 1;
+    const formatted = pendingExtractedRows.map((r) => ({ ...r, id: `row-${crypto.randomUUID()}`, number: r.number || nextAvailableNumber++ }));
+    // The server deletes this course's old rows in the same transaction.
+    if (await saveImported(formatted, true)) showToast(`تم استبدال كشف الدورة بالكامل (${formatted.length} صفاً).`);
     setPendingExtractedRows(null);
-    showToast(`تم استبدال البيانات بالكامل (${formatted.length} صفاً جديداً).`);
   };
 
   // Row update handlers
-  const updateRowField = <K extends keyof SummerCourseRow>(
-    id: string,
-    field: K,
-    value: SummerCourseRow[K]
-  ) => {
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-    );
-  };
-
-  const toggleRowCheckbox = (
-    id: string,
-    field: 'delivered' | 'corrected' | 'reviewed' | 'announced' | 'ceremony'
-  ) => {
+  const updateRowField = async <K extends keyof SummerCourseRow>(id: string, field: K, value: SummerCourseRow[K]) => {
     const row = rows.find((r) => r.id === id);
     if (!row) return;
-
-    const newChecked = !row[field];
-
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: newChecked } : r))
-    );
-
-    // If row is linked to a committee, synchronize the stage in the committees system!
-    const targetCommId =
-      row.committeeId ||
-      committees.find((c) => c.committeeNumber === row.number)?.id;
-
-    if (targetCommId && onToggleCommitteeStage) {
-      const stageMap: Record<
-        'delivered' | 'corrected' | 'reviewed' | 'announced' | 'ceremony',
-        StageKey
-      > = {
-        delivered: 'exam',
-        corrected: 'scoring',
-        reviewed: 'review',
-        announced: 'announcement',
-        ceremony: 'ceremony',
-      };
-      onToggleCommitteeStage(targetCommId, stageMap[field]);
-    }
+    await saveRowToDb({ ...row, [field]: value });
   };
 
-  // Change Course for a row and sync linked committee
-  const handleRowCourseChange = (rowId: string, newCourseId: string) => {
-    const targetCourse = courses.find((c) => c.id === newCourseId);
-    if (!targetCourse) return;
-
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id === rowId
-          ? { ...r, courseId: targetCourse.id, courseName: targetCourse.name }
-          : r
-      )
-    );
-
-    const targetRow = rows.find((r) => r.id === rowId);
-    if (targetRow && targetRow.committeeId && onUpdateCommitteeCourse) {
-      onUpdateCommitteeCourse(
-        targetRow.committeeId,
-        targetCourse.id,
-        targetCourse.name
-      );
+  const toggleRowCheckbox = async (id: string, field: 'delivered' | 'corrected' | 'reviewed' | 'announced' | 'ceremony') => {
+    const row = rows.find((r) => r.id === id);
+    if (!row) return;
+    const newChecked = !row[field];
+    const committee = row.committeeId ? committees.find((c) => c.id === row.committeeId) : undefined;
+    if (committee) {
+      // Linked rows reflect the committee's stages; change the stage itself.
+      const stage = ROW_STAGE[field];
+      if (!newChecked && !committee.stages[stage]?.completed) {
+        toast.error('هذه الخانة مكتملة لأن مرحلة لاحقة في اللجنة مكتملة؛ ألغِ المرحلة اللاحقة أولاً من تفاصيل اللجنة');
+        return;
+      }
+      await onSetCommitteeStage?.(committee.id, stage, newChecked);
+      return;
     }
+    await saveRowToDb({ ...row, [field]: newChecked });
+  };
 
-    showToast(
-      `✓ تم ربط لجنة #${targetRow?.number || ''} بدورة (${targetCourse.name}) وتحديث قاعدة البيانات.`
-    );
+  // Change the course of a row (and of its committee, if linked)
+  const handleRowCourseChange = async (rowId: string, newCourseId: string) => {
+    const targetCourse = courses.find((c) => c.id === newCourseId);
+    const targetRow = rows.find((r) => r.id === rowId);
+    if (!targetCourse || !targetRow) return;
+    if (targetRow.committeeId && onUpdateCommitteeCourse) {
+      onUpdateCommitteeCourse(targetRow.committeeId, targetCourse.id, targetCourse.name);
+      return;
+    }
+    const saved = await saveRowToDb({ ...targetRow, courseId: targetCourse.id, courseName: targetCourse.name });
+    if (saved) showToast(`تم نقل الصف #${targetRow.number} إلى دورة (${targetCourse.name}).`);
   };
 
   // Open Add Row Modal
@@ -425,8 +421,8 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       selectedCourseFilter !== 'all' ? selectedCourseFilter : activeDefaultCourse?.id || ''
     );
     setNewRowSheikhName('');
-    setNewRowPlace('مسجد الإمام البخاري');
-    setNewRowBook('الأصول الثلاثة');
+    setNewRowPlace('');
+    setNewRowBook('');
     setNewRowStudentsCount(0);
     setNewRowDelivered(false);
     setNewRowCorrected(false);
@@ -437,75 +433,47 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     setIsAddRowModalOpen(true);
   };
 
-  // Submit Add Row Modal
-  const handleAddRowModalSubmit = (e: React.FormEvent) => {
+  // Submit Add Row Modal: creates the committee; the sheet then shows it.
+  const handleAddRowModalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveCourseId = newRowCourseId || activeDefaultCourse?.id;
-    const targetCourse = courses.find((c) => c.id === effectiveCourseId) || activeDefaultCourse;
-    const commId = `comm-auto-${Date.now()}`;
-
-    const newRow: SummerCourseRow = {
-      id: `row-${Date.now()}`,
-      number: newRowNumber,
-      sheikh_name: newRowSheikhName.trim(),
-      place: newRowPlace.trim() || 'مسجد الإمام البخاري',
-      book: newRowBook.trim() || 'متن مقرر',
-      students_count: Number(newRowStudentsCount) || 0,
-      delivered: newRowDelivered,
-      corrected: newRowCorrected,
-      reviewed: newRowReviewed,
-      announced: newRowAnnounced,
-      ceremony: newRowCeremony,
-      struck_out: false,
-      uncertain: false,
-      notes: newRowNotes.trim() || '',
-      committeeId: commId,
-      courseId: targetCourse?.id,
-      courseName: targetCourse?.name,
-    };
-
-    setRows((prev) => [...prev, newRow]);
-
-    if (onAddCommitteeFromRow) {
-      const newComm: Committee = {
-        id: commId,
-        committeeNumber: newRowNumber,
-        committeeName: newRowSheikhName.trim()
-          ? `لجنة ${newRowSheikhName.trim()}`
-          : `لجنة #${newRowNumber}`,
-        sheikhName: newRowSheikhName.trim(),
-        branch: newRowPlace.trim() || 'مسجد الإمام البخاري',
-        competitionBook: newRowBook.trim() || '',
-        studentsCount: Number(newRowStudentsCount) || 0,
-        courseId: targetCourse?.id,
-        courseName: targetCourse?.name,
-        members: ['المشرف العام'],
-        generalNotes: newRowNotes.trim() || '',
-        stages: {
-          registration: { completed: true, completedAt: new Date().toLocaleDateString('ar-EG') },
-          exam: { completed: newRowDelivered },
-          scoring: { completed: newRowCorrected },
-          aggregation: { completed: false },
-          review: { completed: newRowReviewed },
-          sheet: { completed: false },
-          accreditation: { completed: false },
-          announcement: { completed: newRowAnnounced },
-          ceremony: { completed: newRowCeremony },
-        },
-        createdDate: new Date().toLocaleDateString('ar-EG'),
-        createdAtTime: new Date().toLocaleTimeString('ar-EG'),
-      };
-      onAddCommitteeFromRow(newComm);
+    const targetCourse = courses.find((c) => c.id === (newRowCourseId || activeDefaultCourse?.id));
+    if (!targetCourse) {
+      toast.error('اختر الدورة أولاً');
+      return;
     }
-
-    setIsAddRowModalOpen(false);
-    showToast(
-      `✓ تمت إضافة الصف ولجنة #${newRowNumber} وربطها بدورة (${targetCourse?.name || 'العامة'}) في قاعدة البيانات.`
-    );
+    if (!onAddCommitteeFromRow) return;
+    const now = new Date();
+    const created = await onAddCommitteeFromRow({
+      id: `comm-${crypto.randomUUID()}`,
+      committeeNumber: newRowNumber,
+      committeeName: newRowSheikhName.trim() ? `لجنة ${newRowSheikhName.trim()}` : `لجنة #${newRowNumber}`,
+      sheikhName: newRowSheikhName.trim() || undefined,
+      branch: newRowPlace.trim(),
+      competitionBook: newRowBook.trim(),
+      studentsCount: Number(newRowStudentsCount) || 0,
+      courseId: targetCourse.id,
+      courseName: targetCourse.name,
+      members: [],
+      generalNotes: newRowNotes.trim(),
+      stages: {
+        registration: { completed: true, completedAt: now.toLocaleDateString('ar-EG') },
+        exam: { completed: newRowDelivered },
+        scoring: { completed: newRowCorrected },
+        aggregation: { completed: false },
+        review: { completed: newRowReviewed },
+        sheet: { completed: false },
+        accreditation: { completed: false },
+        announcement: { completed: newRowAnnounced },
+        ceremony: { completed: newRowCeremony },
+      },
+      createdDate: todayISO(now),
+      createdAtTime: now.toLocaleTimeString('ar-EG'),
+    });
+    if (created) setIsAddRowModalOpen(false);
   };
 
   // Submit Create Course Modal
-  const handleCreateCourseSubmit = (e: React.FormEvent) => {
+  const handleCreateCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseName.trim()) {
       showToast('يرجى إدخال اسم الدورة أولاً.');
@@ -513,19 +481,19 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     }
 
     if (onAddCourse) {
-      const created = onAddCourse({
+      const created = await onAddCourse({
         name: newCourseName.trim(),
         season: newCourseSeason,
         year: newCourseYear.trim(),
-        startDate: newCourseStartDate || new Date().toISOString().split('T')[0],
+        startDate: newCourseStartDate || todayISO(),
         endDate: newCourseEndDate || '',
         status: newCourseStatus,
-        targetCommitteesCount: Number(newCourseTargetCommittees) || 30,
+        targetCommitteesCount: Number(newCourseTargetCommittees) || undefined,
         description: newCourseDescription.trim(),
         isDefault: newCourseStatus === 'active',
       });
+      if (!created) return;
       setSelectedCourseFilter(created.id);
-      showToast(`✓ تم إنشاء دورة (${created.name}) بنجاح وربطها بالنظام.`);
     }
 
     setIsAddCourseModalOpen(false);
@@ -533,108 +501,74 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     setNewCourseDescription('');
   };
 
-  const handleAddNewRow = (customCourseId?: string | React.MouseEvent) => {
-    const maxRowNumber = rows.reduce((max, r) => Math.max(max, r.number || 0), 0);
-    const maxCommNumber = committees.reduce((max, c) => Math.max(max, c.committeeNumber || 0), 0);
-    const nextNum = Math.max(maxRowNumber, maxCommNumber) + 1;
-    const commId = `comm-auto-${Date.now()}`;
-
+  const handleAddNewRow = async (customCourseId?: string | React.MouseEvent) => {
     const effectiveCourseId =
       (typeof customCourseId === 'string' ? customCourseId : undefined) ||
       (selectedCourseFilter !== 'all' ? selectedCourseFilter : activeDefaultCourse?.id);
-    const targetCourse =
-      courses.find((c) => c.id === effectiveCourseId) || activeDefaultCourse;
-
-    const newRow: SummerCourseRow = {
-      id: `row-${Date.now()}`,
-      number: nextNum,
-      sheikh_name: '',
-      place: 'مسجد الإمام البخاري',
-      book: '',
-      students_count: 0,
-      delivered: false,
-      corrected: false,
-      reviewed: false,
-      announced: false,
-      ceremony: false,
-      struck_out: false,
-      uncertain: false,
-      notes: '',
-      committeeId: commId,
-      courseId: targetCourse?.id,
-      courseName: targetCourse?.name,
-    };
-    setRows((prev) => [...prev, newRow]);
-
-    // Also automatically create a linked committee in the committees management system!
-    if (onAddCommitteeFromRow) {
-      const newComm: Committee = {
-        id: commId,
-        committeeNumber: nextNum,
-        committeeName: `لجنة #${nextNum}`,
-        sheikhName: '',
-        branch: 'مسجد الإمام البخاري',
-        competitionBook: '',
-        studentsCount: 0,
-        courseId: targetCourse?.id,
-        courseName: targetCourse?.name,
-        members: ['المشرف العام'],
-        generalNotes: '',
-        stages: {
-          registration: { completed: true, completedAt: new Date().toLocaleDateString('ar-EG') },
-          exam: { completed: false },
-          scoring: { completed: false },
-          aggregation: { completed: false },
-          review: { completed: false },
-          sheet: { completed: false },
-          accreditation: { completed: false },
-          announcement: { completed: false },
-          ceremony: { completed: false },
-        },
-        createdDate: new Date().toLocaleDateString('ar-EG'),
-        createdAtTime: new Date().toLocaleTimeString('ar-EG'),
-      };
-      onAddCommitteeFromRow(newComm);
+    const targetCourse = courses.find((c) => c.id === effectiveCourseId);
+    if (!targetCourse) {
+      toast.error('اختر الدورة أولاً');
+      return;
     }
-    showToast(
-      `تمت إضافة الصف ولجنة #${nextNum} وربطها بدورة (${targetCourse?.name || 'العامة'}) تلقائياً في قاعدة البيانات ✓`
-    );
+    const inCourse = committees.filter((c) => c.courseId === targetCourse.id);
+    const nextNum = inCourse.reduce((max, c) => Math.max(max, c.committeeNumber || 0), 0) + 1;
+    const now = new Date();
+    await onAddCommitteeFromRow?.({
+      id: `comm-${crypto.randomUUID()}`,
+      committeeNumber: nextNum,
+      committeeName: `لجنة #${nextNum}`,
+      branch: '',
+      competitionBook: '',
+      studentsCount: 0,
+      courseId: targetCourse.id,
+      courseName: targetCourse.name,
+      members: [],
+      generalNotes: '',
+      stages: {
+        registration: { completed: true, completedAt: now.toLocaleDateString('ar-EG') },
+        exam: { completed: false },
+        scoring: { completed: false },
+        aggregation: { completed: false },
+        review: { completed: false },
+        sheet: { completed: false },
+        accreditation: { completed: false },
+        announcement: { completed: false },
+        ceremony: { completed: false },
+      },
+      createdDate: todayISO(now),
+      createdAtTime: now.toLocaleTimeString('ar-EG'),
+    });
   };
 
-  const handleDeleteRow = (id: string, num: number) => {
-    if (confirm(`هل أنت متأكد من حذف الصف رقم ${num}؟`)) {
-      setRows((prev) => prev.filter((r) => r.id !== id));
+  const handleDeleteRow = async (id: string, num: number) => {
+    const row = rows.find((r) => r.id === id);
+    if (row?.virtual) {
+      toast.info('هذا الصف يعرض لجنة مسجلة؛ احذف اللجنة من شاشة اللجان إن أردت إزالتها.');
+      return;
+    }
+    if (!confirm(`هل أنت متأكد من حذف الصف رقم ${num}؟`)) return;
+    try {
+      await DataService.deleteSummerCourseRow(id);
+      setSavedRows((prev) => prev.filter((r) => r.id !== id));
       showToast(`تم حذف الصف رقم ${num}`);
+    } catch (err) {
+      toast.error(errorMessage(err));
     }
   };
 
-  const handleClearAll = () => {
-    if (
-      confirm(
-        'هل أنت متأكد من تفريغ كافة البيانات في الجدول؟ لا يمكن التراجع عن هذا الإجراء.'
-      )
-    ) {
-      setRows([]);
-      showToast('تم تفريغ الجدول بالكامل.');
+  // Deletes the saved sheet rows of the selected course (committees are not touched).
+  const handleClearAll = async () => {
+    const courseId = targetCourseForImport();
+    if (!courseId) {
+      toast.error('اختر الدورة التي تريد تفريغ كشفها أولاً');
+      return;
     }
-  };
-
-  const handleResetSampleData = () => {
-    if (confirm('هل ترغب في إعادة تحميل البيانات النموذجية التوضيحية؟')) {
-      setRows(INITIAL_SAMPLE_ROWS);
-      showToast('تمت استعادة البيانات النموذجية.');
-    }
+    if (!confirm('سيتم حذف صفوف الكشف المحفوظة لهذه الدورة (اللجان نفسها لن تُحذف). هل أنت متأكد؟')) return;
+    if (await saveImported([], true)) showToast('تم تفريغ صفوف الكشف المحفوظة لهذه الدورة.');
   };
 
   return (
     <div className="space-y-6">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-semibold shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Main Hero Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-[#003b36] via-[#005c55] to-[#04332e] text-white p-6 sm:p-8 shadow-xl border border-emerald-600/30">
@@ -651,11 +585,11 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
-              متابعة الدورة العلمية الصيفية - مسجد الإمام البخاري 1448هـ / 2026م
+              متابعة {activeDefaultCourse?.name || 'الدورة العلمية'} {activeDefaultCourse?.year || ''}
             </h1>
             <p className="text-emerald-100/90 text-sm max-w-2xl leading-relaxed">
-              نظام إدارة ومتابعة دورات مسجد الإمام البخاري العلمية الصيفية: رصد حالات تم الامتحان،
-              التصحيح، المراجعة، الإعلان، وإقامة الحفل، مع التعديل الفوري والتصدير المباشر.
+              نظام إدارة ومتابعة دورات مسجد الإمام البخاري العلمية: رصد حالات تم الامتحان،
+              التصحيح، المراجعة، الإعلان، وإقامة الحفل، مع التعديل الفوري والحفظ السحابي الآمن.
             </p>
           </div>
 
@@ -701,6 +635,18 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               <Upload className="w-4 h-4 text-emerald-300" />
               <span>استيراد كشف</span>
             </button>
+
+            {AuthService.can('ocr.use') && (
+              <button
+                type="button"
+                onClick={() => setIsOcrOpen(true)}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-sm border border-white/20 transition-all cursor-pointer"
+                title="استخراج كشف من صورة"
+              >
+                <Camera className="w-4 h-4 text-emerald-300" />
+                <span>استخراج من صورة</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -999,7 +945,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
               <button
                 type="button"
                 onClick={() => {
-                  setRows((prev) => syncRowsWithCommittees(prev, committees));
+                  loadRows();
                   showToast(`تمت مزامنة ${committees.length} لجنة مع كشف الدورة بنجاح ✓`);
                 }}
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-teal-50 text-teal-900 hover:bg-teal-100 border border-teal-200 text-xs font-bold transition-colors"
@@ -1604,14 +1550,6 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleResetSampleData}
-              className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
-            >
-              استعادة نموذج تجريبي
-            </button>
-            <span className="text-slate-300">|</span>
-            <button
-              type="button"
               onClick={handleClearAll}
               className="text-xs text-rose-600 hover:text-rose-800 font-semibold hover:underline"
             >
@@ -1622,6 +1560,22 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       </div>
 
       {/* Modals */}
+      {isOcrOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 overflow-y-auto" role="dialog" aria-modal="true" aria-label="استخراج كشف من صورة">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-4 relative">
+            <button
+              type="button"
+              onClick={() => setIsOcrOpen(false)}
+              aria-label="إغلاق"
+              className="absolute top-3 left-3 w-8 h-8 rounded-lg text-slate-500 hover:text-slate-900 cursor-pointer"
+            >
+              ✕
+            </button>
+            <ImageWorkbench onExtract={(img) => handleOcrExtract(img)} isExtracting={isExtracting} />
+          </div>
+        </div>
+      )}
+
       <MergeConfirmModal
         isOpen={isMergeModalOpen}
         onClose={() => setIsMergeModalOpen(false)}

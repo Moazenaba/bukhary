@@ -48,106 +48,69 @@ export function isCommitteeCeremony(c: Committee): boolean {
   return Boolean(c.stages.ceremony?.completed);
 }
 
-export function mapCommitteeToCourseRow(c: Committee): SummerCourseRow {
-  const safeId = c.id ? `comm-row-${c.id}` : `comm-row-num-${c.committeeNumber}`;
+export const ROW_STAGE: Record<'delivered' | 'corrected' | 'reviewed' | 'announced' | 'ceremony', StageKey> = {
+  delivered: 'exam',
+  corrected: 'scoring',
+  reviewed: 'review',
+  announced: 'announcement',
+  ceremony: 'ceremony',
+};
+
+/** Sheet flags shown for a committee. A later completed stage implies the earlier ones. */
+export function committeeFlags(c: Committee) {
   return {
-    id: safeId,
-    number: c.committeeNumber,
-    sheikh_name: c.sheikhName || c.committeeName || `اللجنة رقم ${c.committeeNumber}`,
-    place: c.branch || 'مسجد الإمام البخاري',
-    book: c.competitionBook || '',
-    students_count: c.studentsCount || 0,
     delivered: isCommitteeDelivered(c),
     corrected: isCommitteeCorrected(c),
     reviewed: isCommitteeReviewed(c),
     announced: isCommitteeAnnounced(c),
     ceremony: isCommitteeCeremony(c),
-    struck_out: false,
-    uncertain: false,
-    notes: c.generalNotes || '',
-    committeeId: c.id,
-    courseId: c.courseId,
-    courseName: c.courseName,
   };
 }
 
 /**
- * Synchronize existing rows with committees list:
- * - Updates existing rows linked to committees with latest stage status.
- * - Appends any new committees that do not have a row yet.
- * - Strictly ensures all row IDs are unique to prevent React key duplication errors.
+ * Rows to display in the course sheet:
+ * - saved rows linked to a committee show that committee's stage flags (the committee is the source of truth);
+ * - saved rows without a committee keep their own flags;
+ * - committees that have no saved row appear as read-only "virtual" rows built from the committee.
+ * Nothing here is written to the server; edits go through explicit saves.
  */
-export function syncRowsWithCommittees(
-  currentRows: SummerCourseRow[],
-  committees: Committee[]
-): SummerCourseRow[] {
-  if (!committees || committees.length === 0) return currentRows;
-
-  // Deduplicate initial rows by id
-  const seenIds = new Set<string>();
-  const initialDeduplicated: SummerCourseRow[] = [];
-
-  for (const r of currentRows) {
-    if (!r.id || seenIds.has(r.id)) {
-      const uniqueId = `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      seenIds.add(uniqueId);
-      initialDeduplicated.push({ ...r, id: uniqueId });
-    } else {
-      seenIds.add(r.id);
-      initialDeduplicated.push(r);
-    }
+export function mergeRowsWithCommittees(savedRows: SummerCourseRow[], committees: Committee[]): SummerCourseRow[] {
+  const byId = new Map(committees.map((c) => [c.id, c]));
+  const linked = new Set<string>();
+  const out: SummerCourseRow[] = savedRows.map((r) => {
+    const c = r.committeeId ? byId.get(r.committeeId) : undefined;
+    if (!c) return r;
+    linked.add(c.id);
+    return {
+      ...r,
+      number: c.committeeNumber,
+      sheikh_name: r.sheikh_name || c.sheikhName || c.committeeName,
+      place: r.place || c.branch || '',
+      book: r.book || c.competitionBook || '',
+      students_count: r.students_count || c.studentsCount || 0,
+      courseId: c.courseId,
+      courseName: c.courseName,
+      ...committeeFlags(c),
+    };
+  });
+  for (const c of committees) {
+    if (linked.has(c.id)) continue;
+    out.push({
+      id: `committee:${c.id}`,
+      virtual: true,
+      number: c.committeeNumber,
+      sheikh_name: c.sheikhName || c.committeeName,
+      place: c.branch || '',
+      book: c.competitionBook || '',
+      students_count: c.studentsCount || 0,
+      struck_out: false,
+      uncertain: false,
+      notes: '',
+      committeeId: c.id,
+      courseId: c.courseId,
+      courseName: c.courseName,
+      ...committeeFlags(c),
+    });
   }
-
-  const rowMap = new Map<string, SummerCourseRow>();
-  const numMap = new Map<number, SummerCourseRow>();
-
-  initialDeduplicated.forEach((r) => {
-    if (r.committeeId) {
-      rowMap.set(r.committeeId, r);
-    }
-    numMap.set(r.number, r);
-  });
-
-  const updatedRows = [...initialDeduplicated];
-
-  committees.forEach((c) => {
-    const existing = rowMap.get(c.id) || numMap.get(c.committeeNumber);
-
-    if (existing) {
-      // Update status in place
-      const idx = updatedRows.findIndex((r) => r.id === existing.id);
-      if (idx !== -1) {
-        updatedRows[idx] = {
-          ...updatedRows[idx],
-          committeeId: c.id,
-          number: c.committeeNumber,
-          sheikh_name: updatedRows[idx].sheikh_name || c.sheikhName || c.committeeName,
-          place: updatedRows[idx].place || c.branch || 'مسجد الإمام البخاري',
-          book: updatedRows[idx].book || c.competitionBook || '',
-          students_count:
-            updatedRows[idx].students_count !== undefined
-              ? updatedRows[idx].students_count
-              : (c.studentsCount || 0),
-          courseId: updatedRows[idx].courseId || c.courseId,
-          courseName: updatedRows[idx].courseName || c.courseName,
-          delivered: isCommitteeDelivered(c),
-          corrected: isCommitteeCorrected(c),
-          reviewed: isCommitteeReviewed(c),
-          announced: isCommitteeAnnounced(c),
-          ceremony: isCommitteeCeremony(c),
-        };
-      }
-    } else {
-      // Add new row for this committee, guaranteeing unique ID
-      const newRow = mapCommitteeToCourseRow(c);
-      let targetId = newRow.id;
-      if (seenIds.has(targetId)) {
-        targetId = `${targetId}-${Math.random().toString(36).slice(2, 6)}`;
-      }
-      seenIds.add(targetId);
-      updatedRows.push({ ...newRow, id: targetId });
-    }
-  });
-
-  return updatedRows;
+  return out.sort((a, b) => a.number - b.number);
 }

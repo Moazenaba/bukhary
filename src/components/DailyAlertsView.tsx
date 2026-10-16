@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { todayISO } from '../utils/stageUtils';
 import { ScheduleTask, Committee, AppUser } from '../types';
 
 interface DailyAlertsViewProps {
@@ -37,11 +38,11 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
   onNavigateToCeremonies,
   onUpdateCommitteeCeremony,
 }) => {
-  // Current active operational date: Monday 5 October 2026
-  const primaryMondayISO = '2026-10-05';
+  // Current active operational date based on real time
+  const primaryTodayISO = todayISO();
 
-  // Selected date filter (Defaults to Monday)
-  const [selectedDate, setSelectedDate] = useState<string>(primaryMondayISO);
+  // Selected date filter (Defaults to Today)
+  const [selectedDate, setSelectedDate] = useState<string>(primaryTodayISO);
   const [viewMode, setViewMode] = useState<'selected_day' | 'all_schedule'>('selected_day');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,15 +55,13 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
   );
   const [ceremonyDay, setCeremonyDay] = useState<string>('الاثنين');
   const [ceremonyDateInput, setCeremonyDateInput] = useState<string>(selectedDate);
-  const [ceremonyTimeInput, setCeremonyTimeInput] = useState<string>('4 العصر');
-  const [ceremonyHonoredCount, setCeremonyHonoredCount] = useState<number>(15);
+  const [ceremonyTimeInput, setCeremonyTimeInput] = useState<string>('');
+  const [ceremonyHonoredCount, setCeremonyHonoredCount] = useState<number>(0);
   const [ceremonySheikhs, setCeremonySheikhs] = useState<string[]>([
-    committees[0]?.sheikhName || 'الشيخ المشرف',
+    ...(committees[0]?.sheikhName ? [committees[0].sheikhName] : []),
   ]);
   const [ceremonyNewSheikh, setCeremonyNewSheikh] = useState<string>('');
-  const [ceremonyPlaceInput, setCeremonyPlaceInput] = useState<string>(
-    'القاعة الكبرى - مسجد الإمام البخاري'
-  );
+  const [ceremonyPlaceInput, setCeremonyPlaceInput] = useState<string>('');
   const [ceremonyNotesInput, setCeremonyNotesInput] = useState<string>('');
 
   // Ceremonies scheduled for selectedDate
@@ -70,16 +69,20 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
     return tasks.filter((t) => t.type === 'ceremony' && t.date === selectedDate);
   }, [tasks, selectedDate]);
 
-  // Quick switcher days centered on Monday as Today
-  const quickDays = [
-    { dateStr: '2026-10-05', label: 'اليوم (الاثنين 10/5)', isToday: true },
-    { dateStr: '2026-10-06', label: 'الثلاثاء 10/6', isToday: false },
-    { dateStr: '2026-10-07', label: 'الأربعاء 10/7', isToday: false },
-    { dateStr: '2026-10-08', label: 'الخميس 10/8', isToday: false },
-    { dateStr: '2026-10-09', label: 'الجمعة 10/9', isToday: false },
-    { dateStr: '2026-10-10', label: 'السبت 10/10', isToday: false },
-    { dateStr: '2026-10-11', label: 'الأحد 10/11', isToday: false },
-  ];
+  // Generate dynamic quick switcher days starting from today
+  const quickDays = useMemo(() => {
+    const days = [];
+    const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      const iso = todayISO(d);
+      const label = i === 0 ? `اليوم (${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1})` : `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+      days.push({ dateStr: iso, label, isToday: i === 0 });
+    }
+    return days;
+  }, []);
 
   // Form State for Adding a New Task
   const [newTitle, setNewTitle] = useState('');
@@ -233,7 +236,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">notifications_active</span>
+            <span className="material-symbols-outlined text-2xl">notifications_active</span>
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -259,7 +262,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">celebration</span>
+            <span className="material-symbols-outlined text-lg">celebration</span>
             <span>+ إضافة وجدولة حفلة</span>
           </button>
 
@@ -271,7 +274,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">add_task</span>
+            <span className="material-symbols-outlined text-lg">add_task</span>
             <span>+ إضافة عمل / تنبيه لليوم</span>
           </button>
 
@@ -280,7 +283,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             onClick={onNavigateToCalendar}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition-all cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-lg text-slate-600" aria-hidden="true">calendar_month</span>
+            <span className="material-symbols-outlined text-lg text-slate-600">calendar_month</span>
             <span>عرض جدول التقويم الكامل ↗</span>
           </button>
         </div>
@@ -291,7 +294,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-              <span className="material-symbols-outlined text-base text-[#005c55]" aria-hidden="true">event</span>
+              <span className="material-symbols-outlined text-base text-[#005c55]">event</span>
               <span>عرض المواعيد والتنبيهات حسب:</span>
             </span>
             <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
@@ -378,7 +381,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
           </div>
           <span className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">list_alt</span>
+            <span className="material-symbols-outlined text-xl">list_alt</span>
           </span>
         </div>
 
@@ -390,7 +393,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
           </div>
           <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">pending_actions</span>
+            <span className="material-symbols-outlined text-xl">pending_actions</span>
           </span>
         </div>
 
@@ -402,7 +405,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
           </div>
           <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">check_circle</span>
+            <span className="material-symbols-outlined text-xl">check_circle</span>
           </span>
         </div>
       </div>
@@ -452,7 +455,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         {/* Search */}
         <div className="relative w-full sm:w-80">
-          <span className="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg" aria-hidden="true">
+          <span className="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">
             search
           </span>
           <input
@@ -506,7 +509,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       <div className="space-y-3">
         {displayedTasks.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <span className="material-symbols-outlined text-4xl text-slate-400 mb-2 block" aria-hidden="true">
+            <span className="material-symbols-outlined text-4xl text-slate-400 mb-2 block">
               task_alt
             </span>
             <h3 className="text-base font-bold text-slate-800 mb-1">
@@ -525,7 +528,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
               }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+              <span className="material-symbols-outlined text-sm">add</span>
               <span>+ إضافة عمل ليوم {formattedSelectedDate.split(' ')[0]}</span>
             </button>
           </div>
@@ -557,7 +560,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     }`}
                     title={task.completed ? 'إلغاء التحديد' : 'تحديد كمنجز الآن'}
                   >
-                    <span className="material-symbols-outlined text-xl" aria-hidden="true">
+                    <span className="material-symbols-outlined text-xl">
                       {task.completed ? 'check' : 'radio_button_unchecked'}
                     </span>
                   </button>
@@ -605,8 +608,8 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                       )}
 
                       <span className="text-[11px] font-bold text-slate-500 font-mono flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-xs text-slate-400" aria-hidden="true">schedule</span>
-                        <span>{task.time || '10:00 ص'}</span>
+                        <span className="material-symbols-outlined text-xs text-slate-400">schedule</span>
+                        <span>{task.time || 'بدون وقت محدد'}</span>
                       </span>
 
                       {isUrgent && !task.completed && (
@@ -641,7 +644,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 {/* Left Meta & Delete Actions */}
                 <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
                   <span className="text-xs text-slate-500 font-medium bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-                    👤 المكلف: {task.assignedAssistantName || 'المشرف العام'}
+                    👤 المكلف: {task.assignedAssistantName || 'غير محدد'}
                   </span>
 
                   <button
@@ -650,7 +653,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="حذف هذا التنبيه"
                   >
-                    <span className="material-symbols-outlined text-lg" aria-hidden="true">delete</span>
+                    <span className="material-symbols-outlined text-lg">delete</span>
                   </button>
                 </div>
               </div>
@@ -661,12 +664,12 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
 
       {/* Add Task Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 text-right">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black">
-                  <span className="material-symbols-outlined text-lg" aria-hidden="true">add_task</span>
+                  <span className="material-symbols-outlined text-lg">add_task</span>
                 </span>
                 <h3 className="text-base font-black text-slate-900">إضافة تنبيه / عمل جديد في التقويم</h3>
               </div>
@@ -675,7 +678,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 onClick={() => setIsAddModalOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
 
@@ -826,12 +829,12 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
 
       {/* Dedicated Add Ceremony Modal */}
       {isAddCeremonyModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 text-right">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-xs">
-                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">celebration</span>
+                  <span className="material-symbols-outlined text-2xl">celebration</span>
                 </span>
                 <div>
                   <h3 className="text-base font-black text-slate-900">إضافة وجدولة حفل تكريم جديد</h3>
@@ -845,7 +848,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 onClick={() => setIsAddCeremonyModalOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
 
@@ -862,7 +865,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     setCeremonyCommNumber(num);
                     const found = committees.find((c) => c.committeeNumber === num);
                     if (found) {
-                      setCeremonyHonoredCount(found.studentsCount || 15);
+                      setCeremonyHonoredCount(found.studentsCount || 0);
                       if (found.sheikhName) {
                         setCeremonySheikhs([found.sheikhName]);
                       }
@@ -872,7 +875,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 >
                   {committees.map((c) => (
                     <option key={c.id} value={c.committeeNumber}>
-                      لجنة #{c.committeeNumber}: {c.committeeName} — {c.competitionBook} ({c.sheikhName || 'الشيخ'})
+                      لجنة #{c.committeeNumber}: {c.committeeName} — {c.competitionBook} ({c.sheikhName || '—'})
                     </option>
                   ))}
                 </select>
@@ -888,15 +891,14 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     value={ceremonyDay}
                     onChange={(e) => {
                       setCeremonyDay(e.target.value);
-                      const dayMap: Record<string, string> = {
-                        'الاثنين': '2026-10-05',
-                        'الثلاثاء': '2026-10-06',
-                        'الأربعاء': '2026-10-07',
-                        'الخميس': '2026-10-08',
-                        'الجمعة': '2026-10-09',
-                        'السبت': '2026-10-10',
-                        'الأحد': '2026-10-11',
-                      };
+                      const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                      const dayMap: Record<string, string> = {};
+                      const now = new Date();
+                      for (let i = 0; i < 7; i++) {
+                        const d = new Date(now);
+                        d.setDate(now.getDate() + i);
+                        dayMap[dayNames[d.getDay()]] = todayISO(d);
+                      }
                       if (dayMap[e.target.value]) {
                         setCeremonyDateInput(dayMap[e.target.value]);
                       }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Committee, STAGES_LIST } from '../types';
-import { calculateCurrentStage } from '../utils/stageUtils';
+import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -13,10 +14,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onClose,
   committees,
 }) => {
-  if (!isOpen) return null;
-
   const [exportFormat, setExportFormat] = useState<'csv' | 'print'>('csv');
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  useEscapeKey(onClose);
+  if (!isOpen) return null;
+
+  /** One CSV cell: quotes escaped, and values that a spreadsheet would run as a formula neutralized. */
+  const csvCell = (value: unknown) => {
+    let text = String(value ?? '');
+    if (text.length > 1 && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  };
 
   const handleExportCSV = () => {
     const headers = [
@@ -48,39 +56,39 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const status = calculateCurrentStage(c.stages);
       return [
         `#${c.committeeNumber}`,
-        `"${c.committeeName}"`,
-        `"${c.isWomenCommittee ? 'لجنة نسائية' : '-'}"`,
-        `"${c.sheikhName || '-'}"`,
-        `"${c.sheikhPhone || '-'}"`,
-        `"${c.sheikhCountry || '-'}"`,
-        `"${c.studentsCount || 0}"`,
-        `"${c.competitionBook}"`,
-        `"${c.branch}"`,
-        `"${c.associationName || '-'}"`,
-        `"${c.members.join(' - ')}"`,
-        `"${status.label}"`,
-        `"${c.stages.registration?.completedAt || '-'}"`,
-        `"${c.stages.exam?.completedAt || '-'}"`,
-        `"${c.stages.scoring?.completedAt || '-'}"`,
-        `"${c.stages.aggregation?.completedAt || '-'}"`,
-        `"${c.stages.review?.completedAt || '-'}"`,
-        `"${c.stages.sheet?.completedAt || '-'}"`,
-        `"${c.stages.accreditation?.completedAt || '-'}"`,
-        `"${c.stages.announcement?.completedAt || '-'}"`,
-        `"${c.stages.ceremony?.completedAt || '-'}"`,
-        `"${c.generalNotes ? c.generalNotes.replace(/"/g, '""') : '-'}"`,
-      ];
+        c.committeeName,
+        c.isWomenCommittee ? 'لجنة نسائية' : '-',
+        c.sheikhName || '-',
+        c.sheikhPhone || '-',
+        c.sheikhCountry || '-',
+        c.studentsCount || 0,
+        c.competitionBook,
+        c.branch,
+        c.associationName || '-',
+        c.members.join(' - '),
+        status.label,
+        c.stages.registration?.completedAt || '-',
+        c.stages.exam?.completedAt || '-',
+        c.stages.scoring?.completedAt || '-',
+        c.stages.aggregation?.completedAt || '-',
+        c.stages.review?.completedAt || '-',
+        c.stages.sheet?.completedAt || '-',
+        c.stages.accreditation?.completedAt || '-',
+        c.stages.announcement?.completedAt || '-',
+        c.stages.ceremony?.completedAt || '-',
+        c.generalNotes || '-',
+      ].map(csvCell);
     });
 
     const csvContent =
-      '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+      '\uFEFF' + [headers.map(csvCell).join(','), ...rows.map((e) => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute(
       'download',
-      `كشوفات_مسابقات_مسجد_البخاري_${new Date().toISOString().slice(0, 10)}.csv`
+      `كشوفات_مسابقات_مسجد_البخاري_${todayISO()}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -95,21 +103,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+    <div role="dialog" aria-modal="true" aria-label="تصدير الكشوف" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[#005c55]">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">file_download</span>
+            <span className="material-symbols-outlined text-2xl">file_download</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">
               تصدير كشوفات لجان مسابقات مسجد البخاري
             </h3>
           </div>
           <button
+            aria-label="إغلاق"
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
@@ -130,7 +139,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               }`}
             >
               <div className="flex items-center gap-2 mb-1 text-[#005c55] font-bold text-sm">
-                <span className="material-symbols-outlined" aria-hidden="true">table_view</span>
+                <span className="material-symbols-outlined">table_view</span>
                 <span>تنزيل ملف CSV (إكسل وGoogle Sheets)</span>
               </div>
               <p className="text-[11px] text-[#6e7977]">
@@ -147,7 +156,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               }`}
             >
               <div className="flex items-center gap-2 mb-1 text-[#005c55] font-bold text-sm">
-                <span className="material-symbols-outlined" aria-hidden="true">print</span>
+                <span className="material-symbols-outlined">print</span>
                 <span>طباعة الكشف الرسمي</span>
               </div>
               <p className="text-[11px] text-[#6e7977]">
@@ -206,7 +215,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           {downloadSuccess && (
             <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs flex items-center gap-2">
-              <span className="material-symbols-outlined text-base" aria-hidden="true">check_circle</span>
+              <span className="material-symbols-outlined text-base">check_circle</span>
               <span>تم تنزيل كشف مسابقات مسجد البخاري بنجاح.</span>
             </div>
           )}
@@ -215,6 +224,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Footer */}
         <div className="px-5 py-3.5 bg-[#f8f9ff] border-t border-[#bdc9c6]/40 flex items-center justify-end gap-2">
           <button
+            aria-label="إغلاق"
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-[#3e4947] border border-[#bdc9c6] hover:bg-white"
           >
@@ -226,7 +236,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={handleExportCSV}
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">download</span>
+              <span className="material-symbols-outlined text-sm">download</span>
               <span>تنزيل ملف CSV الآن</span>
             </button>
           ) : (
@@ -234,7 +244,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={handlePrint}
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">print</span>
+              <span className="material-symbols-outlined text-sm">print</span>
               <span>فتح نافذة الطباعة</span>
             </button>
           )}

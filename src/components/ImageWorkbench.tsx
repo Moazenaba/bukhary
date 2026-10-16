@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { generateSampleHandwrittenTableImage } from '../utils/sampleImageGenerator';
+
 
 interface ImageWorkbenchProps {
   onExtract: (imageBase64: string, customNotes: string) => Promise<void>;
@@ -29,13 +29,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const imageElementRef = useRef<HTMLImageElement>(null);
 
-  // Load sample image by default or let user trigger it
-  const handleLoadSample = () => {
-    const sample = generateSampleHandwrittenTableImage();
-    setImageSrc(sample);
-    setRotation(0);
-    setIsCropMode(false);
-  };
+
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,13 +157,13 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
       <div className="px-5 py-4 bg-gradient-to-l from-slate-900 to-[#004d47] text-white flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/20">
-            <span className="material-symbols-outlined text-2xl text-emerald-300" aria-hidden="true">document_scanner</span>
+            <span className="material-symbols-outlined text-2xl text-emerald-300">document_scanner</span>
           </div>
           <div>
             <h2 className="text-base font-bold flex items-center gap-2">
               <span>مسح واستخراج الجدول اليدوي عبر الذكاء الاصطناعي</span>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                Gemini 2.5 Flash Vision
+                استخراج آلي بالذكاء الاصطناعي
               </span>
             </h2>
             <p className="text-xs text-slate-300">
@@ -180,16 +174,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
 
         {/* Action Buttons Top */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={handleLoadSample}
-            disabled={isExtracting}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="تجربة صورة كشف يدوي حقيقية لمسجد البخاري"
-          >
-            <span className="material-symbols-outlined text-sm text-amber-300" aria-hidden="true">lightbulb</span>
-            <span>تجربة نموذج جاهز</span>
-          </button>
+
 
           <input
             type="file"
@@ -214,7 +199,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
             disabled={isExtracting}
             className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">photo_camera</span>
+            <span className="material-symbols-outlined text-sm">photo_camera</span>
             <span>تصوير بالكاميرا</span>
           </button>
 
@@ -224,7 +209,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
             disabled={isExtracting}
             className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">upload_file</span>
+            <span className="material-symbols-outlined text-sm text-[#005c55]">upload_file</span>
             <span>رفع صورة الكشف</span>
           </button>
         </div>
@@ -239,7 +224,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
             className="border-2 border-dashed border-slate-300 hover:border-[#005c55] rounded-2xl p-8 sm:p-12 text-center bg-slate-50/70 hover:bg-emerald-50/30 transition-all cursor-pointer group"
           >
             <div className="w-16 h-16 rounded-2xl bg-white shadow-xs border border-slate-200 group-hover:scale-105 group-hover:border-emerald-300 flex items-center justify-center mx-auto mb-4 text-[#005c55] transition-all">
-              <span className="material-symbols-outlined text-3xl" aria-hidden="true">add_photo_alternate</span>
+              <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
             </div>
             <h3 className="text-base font-bold text-slate-800 mb-1.5">
               اسحب وأفلت صورة جدول الكشف هنا، أو اضغط للتصفح
@@ -247,19 +232,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
             <p className="text-xs text-slate-500 max-w-md mx-auto mb-4 leading-relaxed">
               يدعم النموذج الصور المائلة والخطوط اليدوية المختلفة. يمكنك تدوير الصورة وقص الأطراف قبل إرسالها للتحليل.
             </p>
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLoadSample();
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-sm text-amber-500" aria-hidden="true">auto_fix_high</span>
-                <span>أو جرّب كشفاً نموذجياً معداً مسبقاً لمسجد البخاري</span>
-              </button>
-            </div>
+
           </div>
         ) : (
           // Image Preview & Manipulation Workbench
@@ -268,7 +241,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
             <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-100/80 rounded-xl border border-slate-200 flex-wrap text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold text-slate-700 ml-1 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-base text-[#005c55]" aria-hidden="true">tune</span>
+                  <span className="material-symbols-outlined text-base text-[#005c55]">tune</span>
                   <span>معالجة وضبط الصورة:</span>
                 </span>
 
@@ -278,7 +251,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
                   className="px-2.5 py-1.5 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 font-bold text-slate-700 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
                   title="تدوير 90 درجة لليسار"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">rotate_left</span>
+                  <span className="material-symbols-outlined text-sm">rotate_left</span>
                   <span>تدوير يساراً</span>
                 </button>
 
@@ -288,7 +261,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
                   className="px-2.5 py-1.5 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 font-bold text-slate-700 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
                   title="تدوير 90 درجة لليمين"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">rotate_right</span>
+                  <span className="material-symbols-outlined text-sm">rotate_right</span>
                   <span>تدوير يميناً</span>
                 </button>
 
@@ -302,7 +275,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
                   }`}
                   title="قص وتحديد منطقة الجدول فقط"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">crop</span>
+                  <span className="material-symbols-outlined text-sm">crop</span>
                   <span>{isCropMode ? 'إلغاء وضع القص' : 'قص وتحديد'}</span>
                 </button>
 
@@ -316,7 +289,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
                   }`}
                   title="زيادة التباين لجعل خط القلم أوضح"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">contrast</span>
+                  <span className="material-symbols-outlined text-sm">contrast</span>
                   <span>تعزيز وضوح الحبر</span>
                 </button>
               </div>
@@ -331,7 +304,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
                   }}
                   className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-all"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
+                  <span className="material-symbols-outlined text-sm">delete</span>
                   <span>إزالة الصورة</span>
                 </button>
               </div>
@@ -373,7 +346,7 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
                   className="border-2 border-emerald-400 bg-emerald-500/10 cursor-move rounded ring-4 ring-black/40 flex flex-col justify-between p-2"
                 >
                   <div className="flex justify-between items-center text-[10px] font-bold text-white bg-slate-900/80 px-2 py-0.5 rounded backdrop-blur-xs w-max">
-                    <span className="material-symbols-outlined text-xs text-emerald-400 ml-1" aria-hidden="true">crop</span>
+                    <span className="material-symbols-outlined text-xs text-emerald-400 ml-1">crop</span>
                     <span>منطقة الاستخراج المحددة (اسحب للتحريك)</span>
                   </div>
 
@@ -414,9 +387,9 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
               {isExtracting && (
                 <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center text-white p-6 z-20">
                   <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center animate-spin mb-4">
-                    <span className="material-symbols-outlined text-3xl text-emerald-400" aria-hidden="true">autorenew</span>
+                    <span className="material-symbols-outlined text-3xl text-emerald-400">autorenew</span>
                   </div>
-                  <h4 className="text-base font-bold mb-1">جاري قراءة خط اليد وتفريغ البيانات عبر Gemini...</h4>
+                  <h4 className="text-base font-bold mb-1">جاري قراءة الصورة وتفريغ البيانات...</h4>
                   <p className="text-xs text-slate-300 text-center max-w-sm">
                     يتم تحليل أسماء المشايخ، الأماكن، المتون، وحالات التسليم والتصحيح بدقة
                   </p>
@@ -444,12 +417,12 @@ export const ImageWorkbench: React.FC<ImageWorkbenchProps> = ({
               >
                 {isExtracting ? (
                   <>
-                    <span className="material-symbols-outlined text-sm animate-spin" aria-hidden="true">sync</span>
+                    <span className="material-symbols-outlined text-sm animate-spin">sync</span>
                     <span>جاري الاستخراج والتحليل...</span>
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-base text-emerald-300" aria-hidden="true">magic_button</span>
+                    <span className="material-symbols-outlined text-base text-emerald-300">magic_button</span>
                     <span>استخراج البيانات من الصورة (AI)</span>
                   </>
                 )}

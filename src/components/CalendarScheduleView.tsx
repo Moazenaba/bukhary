@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { todayISO } from '../utils/stageUtils';
 import { ScheduleTask, Committee, AppUser } from '../types';
 
 interface CalendarScheduleViewProps {
@@ -33,9 +34,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   onOpenCommitteeDetails,
   onUpdateCommitteeCeremony,
 }) => {
-  // Current view date (year and month). Defaults to October 2026 (Monday 5 October 2026)
-  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 9, 5));
-  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-10-05');
+  // Current view date (year and month). Defaults to today
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(todayISO());
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'mine' | 'deliverables'>('all');
 
@@ -45,28 +46,33 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   // Ceremony specific states
   const [ceremonyCommitteeId, setCeremonyCommitteeId] = useState<string>('');
   const [ceremonyCommitteeNumber, setCeremonyCommitteeNumber] = useState<number | ''>('');
-  const [ceremonyHonoredCount, setCeremonyHonoredCount] = useState<number | ''>(15);
+  const [ceremonyHonoredCount, setCeremonyHonoredCount] = useState<number | ''>('');
   const [ceremonySheikhs, setCeremonySheikhs] = useState<string[]>([]);
   const [ceremonyNewSheikhInput, setCeremonyNewSheikhInput] = useState<string>('');
-  const [ceremonyDate, setCeremonyDate] = useState<string>('2026-10-05');
-  const [ceremonyTime, setCeremonyTime] = useState<string>('4 العصر');
+  const [ceremonyDate, setCeremonyDate] = useState<string>(todayISO());
+  const [ceremonyTime, setCeremonyTime] = useState<string>('');
   const [ceremonyPlace, setCeremonyPlace] = useState<string>('مسجد الإمام البخاري');
   const [ceremonyNotes, setCeremonyNotes] = useState<string>('');
 
-  // Quick switcher days
-  const quickDates = [
-    { dateStr: '2026-10-05', label: 'اليوم (الاثنين 10/5)', isFriday: false },
-    { dateStr: '2026-10-06', label: 'الثلاثاء 10/6', isFriday: false },
-    { dateStr: '2026-10-07', label: 'الأربعاء 10/7', isFriday: false },
-    { dateStr: '2026-10-08', label: 'الخميس 10/8', isFriday: false },
-    { dateStr: '2026-10-09', label: 'الجمعة 10/9 (التسليمات الكبرى)', isFriday: true },
-    { dateStr: '2026-10-10', label: 'السبت 10/10', isFriday: false },
-    { dateStr: '2026-10-02', label: 'الجمعة السابقة 10/2', isFriday: true },
-  ];
+  // Generate dynamic quick switcher days starting from current date
+  const quickDates = useMemo(() => {
+    const dates = [];
+    const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      const iso = todayISO(d);
+      const dayOfWeek = d.getDay();
+      const label = i === 0 ? `اليوم (${dayNames[dayOfWeek]} ${d.getDate()}/${d.getMonth() + 1})` : `${dayNames[dayOfWeek]} ${d.getDate()}/${d.getMonth() + 1}`;
+      dates.push({ dateStr: iso, label, isFriday: dayOfWeek === 5 });
+    }
+    return dates;
+  }, []);
 
   // New task form state
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDate, setNewTaskDate] = useState('2026-10-05');
+  const [newTaskDate, setNewTaskDate] = useState(todayISO());
   const [newTaskTime, setNewTaskTime] = useState('10:00 ص');
   const [newTaskDeliverable, setNewTaskDeliverable] = useState('');
   const [newTaskCommitteeNumber, setNewTaskCommitteeNumber] = useState<number | ''>('');
@@ -86,9 +92,9 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     setCurrentDate(new Date(year, month + 1, 1));
   };
   const goToToday = () => {
-    const today = new Date(2026, 9, 5);
+    const today = new Date();
     setCurrentDate(today);
-    setSelectedDateStr('2026-10-05');
+    setSelectedDateStr(todayISO(today));
   };
 
   // Days in month calculation
@@ -217,16 +223,16 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     if (firstComm) {
       setCeremonyCommitteeId(firstComm.id);
       setCeremonyCommitteeNumber(firstComm.committeeNumber);
-      setCeremonyHonoredCount(firstComm.ceremonyDetails?.honoredStudentsCount ?? firstComm.studentsCount ?? 15);
+      setCeremonyHonoredCount(firstComm.ceremonyDetails?.honoredStudentsCount ?? firstComm.studentsCount ?? '');
       setCeremonySheikhs(
         firstComm.ceremonyDetails?.attendingSheikhs?.length
           ? [...firstComm.ceremonyDetails.attendingSheikhs]
           : firstComm.sheikhName
           ? [firstComm.sheikhName]
-          : ['الشيخ المشرف']
+          : []
       );
-      setCeremonyPlace(firstComm.ceremonyDetails?.ceremonyPlace || firstComm.branch || 'مسجد الإمام البخاري');
-      setCeremonyTime(firstComm.ceremonyDetails?.ceremonyTime || '4 العصر');
+      setCeremonyPlace(firstComm.ceremonyDetails?.ceremonyPlace || firstComm.branch || '');
+      setCeremonyTime(firstComm.ceremonyDetails?.ceremonyTime || '');
       setCeremonyNotes(firstComm.ceremonyDetails?.notes || '');
     }
     setIsAddModalOpen(true);
@@ -263,15 +269,15 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           ? ceremonySheikhs
           : selectedComm?.sheikhName
           ? [selectedComm.sheikhName]
-          : ['الشيخ المشرف'];
+          : [];
       const count =
-        ceremonyHonoredCount !== '' ? Number(ceremonyHonoredCount) : selectedComm?.studentsCount || 15;
+        ceremonyHonoredCount !== '' ? Number(ceremonyHonoredCount) : selectedComm?.studentsCount || undefined;
 
       if (onUpdateCommitteeCeremony && selectedComm) {
         onUpdateCommitteeCeremony(selectedComm.id, {
           date: ceremonyDate,
-          time: ceremonyTime.trim() || '4 العصر',
-          place: ceremonyPlace.trim() || selectedComm.branch || 'مسجد الإمام البخاري',
+          time: ceremonyTime.trim(),
+          place: ceremonyPlace.trim() || selectedComm.branch || '',
           notes: ceremonyNotes.trim(),
           completed: false,
           honoredCount: count,
@@ -282,7 +288,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       onAddTask({
         title: `🎉 حفل تكريم وتوزيع جوائز: لجنة #${commNum} (${selectedComm?.sheikhName || selectedComm?.committeeName || 'المكرمين'})`,
         date: ceremonyDate,
-        time: ceremonyTime.trim() || '4 العصر',
+        time: ceremonyTime.trim(),
         deliverable: `تجهيز شهادات التكريم لعدد (${count}) طالباً مكرماً + دروع التكريم + حضور المشايخ: (${sheikhs.join('، ')})`,
         committeeId: commId,
         committeeNumber: commNum,
@@ -290,7 +296,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         type: 'ceremony',
         priority: 'urgent',
         completed: false,
-        notes: `مكان الحفل: ${ceremonyPlace.trim() || 'مسجد البخاري'}. ${ceremonyNotes.trim() || ''}`,
+        notes: [ceremonyPlace.trim() ? `مكان الحفل: ${ceremonyPlace.trim()}` : '', ceremonyNotes.trim()].filter(Boolean).join('. ') || undefined,
       });
 
       setIsAddModalOpen(false);
@@ -308,7 +314,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
     onAddTask({
       title: newTaskTitle.trim(),
       date: newTaskDate,
-      time: newTaskTime.trim() || '10:00 ص',
+      time: newTaskTime.trim() || undefined,
       deliverable: newTaskDeliverable.trim() || undefined,
       committeeId: linkedCommId,
       committeeNumber: newTaskCommitteeNumber !== '' ? Number(newTaskCommitteeNumber) : undefined,
@@ -329,7 +335,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">calendar_month</span>
+              <span className="material-symbols-outlined text-2xl">calendar_month</span>
             </span>
             <h2 className="text-xl sm:text-2xl font-bold">
               جدول المواعيد وأعمال اللجان والتسليمات
@@ -346,7 +352,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             onClick={() => handleOpenAddModal(selectedDateStr)}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-xl text-emerald-600" aria-hidden="true">add_task</span>
+            <span className="material-symbols-outlined text-xl text-emerald-600">add_task</span>
             <span>+ إضافة عمل / تسليم جديد</span>
           </button>
 
@@ -354,8 +360,8 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             onClick={goToToday}
             className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">today</span>
-            <span>الذهاب ليوم الجمعة (10/2)</span>
+            <span className="material-symbols-outlined text-lg">today</span>
+            <span>الذهاب لليوم الحالي</span>
           </button>
         </div>
       </div>
@@ -365,7 +371,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">event_upcoming</span>
+              <span className="material-symbols-outlined text-lg">event_upcoming</span>
             </span>
             <div>
               <span className="font-bold text-xs sm:text-sm text-[#0d1c2e] block">
@@ -431,7 +437,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 {monthNamesArabic[month]} {year}
               </h3>
               <span className="text-xs text-[#6e7977] font-semibold">
-                (ربيع الأول / ربيع الثاني 1448هـ)
+                ({new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { month: 'long', year: 'numeric' }).format(new Date(year, month, 15))})
               </span>
             </div>
 
@@ -442,7 +448,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
                 title="الشهر السابق"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_right</span>
+                <span className="material-symbols-outlined text-lg">chevron_right</span>
               </button>
               <button
                 type="button"
@@ -450,7 +456,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
                 title="الشهر التالي"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">chevron_left</span>
+                <span className="material-symbols-outlined text-lg">chevron_left</span>
               </button>
             </div>
           </div>
@@ -582,7 +588,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold text-sm">
-                    <span className="material-symbols-outlined text-lg" aria-hidden="true">event</span>
+                    <span className="material-symbols-outlined text-lg">event</span>
                   </span>
                   <div>
                     <h3 className="font-bold text-base text-[#0d1c2e] leading-snug">
@@ -611,7 +617,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   onClick={() => handleOpenAddModal(selectedDateStr)}
                   className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+                  <span className="material-symbols-outlined text-sm">add</span>
                   <span>إضافة تسليم</span>
                 </button>
               </div>
@@ -628,7 +634,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-xl text-emerald-700" aria-hidden="true">checklist</span>
+                <span className="material-symbols-outlined text-xl text-emerald-700">checklist</span>
                 <div>
                   <span className="font-bold block text-sm">
                     {selectedDayTasks.length > 0
@@ -774,12 +780,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           onClick={() => onOpenCommitteeDetails && onOpenCommitteeDetails(linkedCommittee)}
                           className="text-[11px] text-[#005c55] font-bold flex items-center gap-1 hover:underline cursor-pointer"
                         >
-                          <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
+                          <span className="material-symbols-outlined text-sm">groups</span>
                           <span>لجنة #{linkedCommittee.committeeNumber}: {linkedCommittee.committeeName} &larr;</span>
                         </button>
                       ) : task.committeeNumber ? (
                         <span className="text-[11px] text-[#005c55] font-bold flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
+                          <span className="material-symbols-outlined text-sm">groups</span>
                           <span>مرتبط بلجنة #{task.committeeNumber}</span>
                         </span>
                       ) : (
@@ -800,7 +806,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
               {selectedDayTasks.length === 0 && (
                 <div className="p-8 text-center bg-[#f8f9ff] rounded-xl border border-dashed border-[#bdc9c6]/60">
-                  <span className="material-symbols-outlined text-3xl text-gray-400 mb-1 block" aria-hidden="true">
+                  <span className="material-symbols-outlined text-3xl text-gray-400 mb-1 block">
                     event_available
                   </span>
                   <p className="text-xs font-bold text-gray-600">
@@ -821,7 +827,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               onClick={() => handleOpenAddModal(selectedDateStr)}
               className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-[#005c55]/40 text-[#005c55] hover:bg-[#eff4ff] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">add_circle</span>
+              <span className="material-symbols-outlined text-sm">add_circle</span>
               <span>+ إضافة مهمة أو تسليم ليوم {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})</span>
             </button>
           </div>
@@ -830,12 +836,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
       {/* ADD TASK MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+        <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
             <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
-                  <span className="material-symbols-outlined text-xl" aria-hidden="true">add_task</span>
+                  <span className="material-symbols-outlined text-xl">add_task</span>
                 </span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
@@ -850,7 +856,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 onClick={() => setIsAddModalOpen(false)}
                 className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
@@ -865,7 +871,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">inventory_2</span>
+                <span className="material-symbols-outlined text-sm">inventory_2</span>
                 <span>تسليم يدوي / استلام أوراق ومهام</span>
               </button>
 
@@ -910,17 +916,17 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           setCeremonyCommitteeId(found.id);
                           setCeremonyCommitteeNumber(found.committeeNumber);
                           setCeremonyHonoredCount(
-                            found.ceremonyDetails?.honoredStudentsCount ?? found.studentsCount ?? 15
+                            found.ceremonyDetails?.honoredStudentsCount ?? found.studentsCount ?? ''
                           );
                           setCeremonySheikhs(
                             found.ceremonyDetails?.attendingSheikhs?.length
                               ? [...found.ceremonyDetails.attendingSheikhs]
                               : found.sheikhName
                               ? [found.sheikhName]
-                              : ['الشيخ المشرف']
+                              : []
                           );
                           setCeremonyPlace(
-                            found.ceremonyDetails?.ceremonyPlace || found.branch || 'مسجد الإمام البخاري'
+                            found.ceremonyDetails?.ceremonyPlace || found.branch || ''
                           );
                         }
                       }}
@@ -930,7 +936,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       {committees.map((c) => (
                         <option key={c.id} value={c.id}>
                           لجنة #{c.committeeNumber} - {c.committeeName} ({c.competitionBook}) - الشيخ:{' '}
-                          {c.sheikhName || 'المشرف'}
+                          {c.sheikhName || '—'}
                         </option>
                       ))}
                     </select>
@@ -991,7 +997,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">person_add</span>
+                        <span className="material-symbols-outlined text-sm text-[#005c55]">person_add</span>
                         <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
                       </label>
                       <span className="text-[11px] font-bold text-slate-500 font-mono">
@@ -1039,7 +1045,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         onClick={handleAddCeremonySheikh}
                         className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+                        <span className="material-symbols-outlined text-sm">add</span>
                         <span>+ إضافة عضو آخر</span>
                       </button>
                     </div>

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Committee, StageKey, Course } from '../types';
-import { getCurrentFormattedDateTime } from '../utils/stageUtils';
+import { getCurrentFormattedDateTime, todayISO } from '../utils/stageUtils';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface AddCommitteeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddCommittee: (newCommittee: Committee, newBookName?: string) => void;
+  onAddCommittee: (newCommittee: Committee, newBookName?: string) => unknown;
   nextCommitteeNumber: number;
   savedBooks: string[];
   courses?: Course[];
   defaultCourseId?: string;
-  onAddCourse?: (newCourse: Omit<Course, 'id' | 'createdAt'>) => Course | void;
+  onAddCourse?: (newCourse: Omit<Course, 'id' | 'createdAt'>) => Promise<Course | undefined>;
 }
 
 export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
@@ -23,13 +24,11 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   defaultCourseId,
   onAddCourse,
 }) => {
-  if (!isOpen) return null;
-
   const [committeeName, setCommitteeName] = useState('');
   const [committeeNumber, setCommitteeNumber] = useState(nextCommitteeNumber);
   const [initialStage, setInitialStage] = useState<StageKey>('exam');
   const [selectedCourseId, setSelectedCourseId] = useState<string>(() => {
-    return defaultCourseId || courses.find((c) => c.status === 'active')?.id || courses[0]?.id || 'course-summer-1447';
+    return defaultCourseId || courses.find((c) => c.status === 'active')?.id || courses[0]?.id || '';
   });
   const [members, setMembers] = useState<string[]>(['']);
   const [associationName, setAssociationName] = useState('');
@@ -42,35 +41,33 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   const [sheikhName, setSheikhName] = useState<string>('');
   const [sheikhPhone, setSheikhPhone] = useState<string>('');
   const [sheikhCountry, setSheikhCountry] = useState<string>('');
-  const [studentsCount, setStudentsCount] = useState<number | ''>(20);
+  const [studentsCount, setStudentsCount] = useState<number | ''>('');
+  const [questionsCount, setQuestionsCount] = useState<number>(5);
 
   // Inline quick course creation state
   const [isCreatingInline, setIsCreatingInline] = useState(false);
   const [quickCourseName, setQuickCourseName] = useState('');
 
+  useEscapeKey(onClose);
+
+  if (!isOpen) return null;
+
   const selectedCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
 
-  const handleQuickCreateCourse = (e?: React.FormEvent) => {
+  const handleQuickCreateCourse = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const trimmed = quickCourseName.trim();
-    if (!trimmed) return;
-
-    if (onAddCourse) {
-      const created = onAddCourse({
-        name: trimmed,
-        season: 'موسمية',
-        year: '1448هـ / 2026م',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: '',
-        status: 'active',
-        targetCommitteesCount: 30,
-        isDefault: false,
-        description: `دورة ${trimmed} المخصصة لمسابقات ولجان مسجد البخاري`,
-      });
-      if (created && created.id) {
-        setSelectedCourseId(created.id);
-      }
-    }
+    if (!trimmed || !onAddCourse) return;
+    const created = await onAddCourse({
+      name: trimmed,
+      year: '',
+      startDate: todayISO(),
+      endDate: '',
+      status: 'active',
+      isDefault: false,
+    });
+    if (!created) return;
+    setSelectedCourseId(created.id);
 
     setQuickCourseName('');
     setIsCreatingInline(false);
@@ -98,11 +95,9 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!committeeName.trim()) return;
+    if (!committeeName.trim() || !selectedCourseId) return;
 
-    const filteredMembers = members.map((m) => m.trim()).filter(Boolean);
-    const finalMembers =
-      filteredMembers.length > 0 ? filteredMembers : ['فضيلة الشيخ رئيس اللجنة'];
+    const finalMembers = members.map((m) => m.trim()).filter(Boolean);
 
     const currentFormattedTime = getCurrentFormattedDateTime();
 
@@ -117,13 +112,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
     const isInitialCeremony = initialStage === 'ceremony';
 
     const newCommittee: Committee = {
-      id: String(committeeNumber),
+      id: `comm-${crypto.randomUUID()}`,
       committeeNumber,
       committeeName: committeeName.trim(),
       associationName: associationName.trim() || undefined,
       members: finalMembers,
-      branch: branch.trim() || 'الفرع العام',
-      competitionBook: competitionBook.trim() || 'مسابقة كتاب الأصول الثلاثة',
+      branch: branch.trim(),
+      competitionBook: competitionBook.trim(),
       generalNotes: generalNotes.trim(),
       stages: {
         registration: { completed: true, completedAt: currentFormattedTime },
@@ -207,30 +202,29 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           completedAt: isInitialCeremony ? currentFormattedTime : undefined,
         },
       },
-      createdDate: new Date().toISOString().slice(0, 10),
-      createdAtTime: currentFormattedTime.split(' - ')[1] || 'الآن',
-      courseId: selectedCourseId || selectedCourse?.id || 'course-summer-1447',
-      courseName: courses.find((c) => c.id === selectedCourseId)?.name || selectedCourse?.name || 'دورة الصيف 1447هـ',
+      createdDate: todayISO(),
+      createdAtTime: currentFormattedTime.split(' - ')[1] || '',
+      courseId: selectedCourseId,
+      courseName: courses.find((c) => c.id === selectedCourseId)?.name,
       sheikhName: sheikhName.trim() || undefined,
       sheikhPhone: sheikhPhone.trim() || undefined,
       sheikhCountry: sheikhCountry.trim() || undefined,
       studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
       isWomenCommittee,
       scoringDetails: {
-        scorerName: finalMembers[0] || 'الشيخ المصحح',
-        scoringReviewerName: finalMembers[1] || 'الشيخ مراجع التصحيح',
-        questions: [
-          { id: 'q-1', questionNumber: 1, label: 'السؤال الأول', completed: false },
-          { id: 'q-2', questionNumber: 2, label: 'السؤال الثاني', completed: false },
-          { id: 'q-3', questionNumber: 3, label: 'السؤال الثالث', completed: false },
-          { id: 'q-4', questionNumber: 4, label: 'السؤال الرابع', completed: false },
-          { id: 'q-5', questionNumber: 5, label: 'السؤال الخامس', completed: false },
-        ],
+        scorerName: finalMembers[0] || '',
+        scoringReviewerName: finalMembers[1] || '',
+        questions: Array.from({ length: questionsCount }, (_, i) => ({
+          id: `q-${i + 1}`,
+          questionNumber: i + 1,
+          label: `السؤال ${i + 1}`,
+          completed: false,
+        })),
       },
       aggregationDetails: {
-        aggregatorName: finalMembers[1] || finalMembers[0] || 'مجمع الدرجات',
-        scoringReviewerName: finalMembers[0] || 'مراجع التصحيح',
-        aggregationReviewerName: finalMembers[2] || 'مراجع التجميع',
+        aggregatorName: finalMembers[1] || finalMembers[0] || '',
+        scoringReviewerName: finalMembers[0] || '',
+        aggregationReviewerName: finalMembers[2] || '',
         reviewConfirmed: false,
       },
     };
@@ -240,19 +234,20 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div role="dialog" aria-modal="true" aria-label="إضافة لجنة جديدة" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150 max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[#005c55]">
-            <span className="material-symbols-outlined text-2xl" aria-hidden="true">add_circle</span>
+            <span className="material-symbols-outlined text-2xl">add_circle</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">إضافة لجنة جديدة</h3>
           </div>
           <button
+            aria-label="إغلاق"
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
@@ -280,6 +275,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               </label>
 
               <select
+                required
                 value={isCreatingInline ? '__new__' : selectedCourseId}
                 onChange={(e) => {
                   if (e.target.value === '__new__') {
@@ -298,7 +294,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     </option>
                   ))
                 ) : (
-                  <option value="course-summer-1447">دورة الصيف 1447هـ - متون العقيدة والتوحيد</option>
+                  <option value="" disabled>لا توجد دورات بعد — أضف دورة أولاً</option>
                 )}
                 {onAddCourse && (
                   <option value="__new__">➕ + إضافة دورة جديدة...</option>
@@ -351,7 +347,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     ✓ ربط تلقائي بـ: <strong>{selectedCourse.name}</strong>
                   </span>
                   <span className="font-mono text-emerald-700 font-bold shrink-0">
-                    {selectedCourse.season || 'موسمية'}
+                    {selectedCourse.season || ''}
                   </span>
                 </div>
               )}
@@ -415,6 +411,39 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               </span>
             </div>
 
+            {/* عدد الأسئلة في الاختبار */}
+            <div>
+              <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
+                عدد الأسئلة في الاختبار المقرر
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={questionsCount}
+                  onChange={(e) => setQuestionsCount(parseInt(e.target.value) || 5)}
+                  className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                />
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionsCount((prev) => Math.max(1, prev - 1))}
+                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuestionsCount((prev) => Math.min(50, prev + 1))}
+                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* خيار: لجنة نسائية (اختياري) */}
             <div className="flex flex-col justify-center">
               <label className="text-xs font-bold text-[#0d1c2e] mb-1.5 block">
@@ -452,7 +481,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           <div className="bg-[#f8f9ff] border border-[#bdc9c6]/60 p-3.5 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base" aria-hidden="true">person_pin</span>
+                <span className="material-symbols-outlined text-base">person_pin</span>
                 <span>بيانات الشيخ المرسل إليه:</span>
               </span>
               <span className="text-[10px] text-[#6e7977]">
@@ -556,7 +585,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 onClick={handleAddMemberField}
                 className="text-xs text-[#005c55] font-bold hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+                <span className="material-symbols-outlined text-sm">add</span>
                 <span>+ إضافة عضو آخر</span>
               </button>
             </div>
@@ -581,7 +610,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                       className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg"
                       title="حذف هذا العضو"
                     >
-                      <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
+                      <span className="material-symbols-outlined text-sm">delete</span>
                     </button>
                   )}
                 </div>
@@ -687,7 +716,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               type="submit"
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>
+              <span className="material-symbols-outlined text-sm">check</span>
               <span>تسجيل اللجنة واعتمادها</span>
             </button>
           </div>

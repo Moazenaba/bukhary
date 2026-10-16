@@ -1,6 +1,6 @@
 import React from 'react';
 import { Committee, STAGES_LIST, AppUser, Course, ScheduleTask } from '../types';
-import { calculateCurrentStage } from '../utils/stageUtils';
+import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
 import { NavTab } from './Sidebar';
 
 interface HomeOverviewViewProps {
@@ -34,8 +34,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
     (c) => calculateCurrentStage(c.stages).key === 'scoring'
   ).length;
 
-  // Friday / October 2 tasks
-  const fridayTasks = scheduleTasks.filter((t) => t.date === '2026-10-02');
+  // Today's tasks for quick overview
+  const todayIso = todayISO();
+  const todayTasks = scheduleTasks.filter((t) => t.date === todayIso);
   const myAssignedCommittees = committees.filter((c) =>
     currentUser.assignedCommittees.includes(c.committeeNumber)
   );
@@ -46,7 +47,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       <div className="bg-gradient-to-l from-[#005c55] via-[#0f766e] to-[#005c55] rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-3">
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">verified</span>
+            <span className="material-symbols-outlined text-sm">verified</span>
             مسابقات مسجد البخاري العلمية
           </span>
 
@@ -69,15 +70,15 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                   onClick={onOpenNewCommittee}
                   className="px-4 py-2 rounded-xl bg-[#9cf2e8]/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">add_circle</span>
+                  <span className="material-symbols-outlined text-sm">add_circle</span>
                   <span>تسجيل لجنة جديدة</span>
                 </button>
                 <button
                   onClick={() => onNavigateTab('calendar')}
                   className="px-4 py-2 rounded-xl bg-emerald-900/60 border border-white/30 text-white font-semibold text-xs hover:bg-emerald-900/80 transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_month</span>
-                  <span>جدول تسليمات الجمعة (10/2)</span>
+                  <span className="material-symbols-outlined text-sm">calendar_month</span>
+                  <span>جدول تسليمات اليوم</span>
                 </button>
               </div>
             </>
@@ -87,7 +88,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                 مرحباً بك: {currentUser.name}
               </h2>
               <p className="text-sm text-teal-50 leading-relaxed mb-4">
-                أنت مسجل حالياً بحساب <strong>معاون معتمد</strong> • الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'استلام لجان ميدانية'}</strong>.
+                أنت مسجل حالياً بحساب <strong>معاون معتمد</strong> • الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'لا توجد صلاحيات إضافية'}</strong>.
                 {myAssignedCommittees.length > 0
                   ? ` لديك (${myAssignedCommittees.length}) لجان مسندة إليك لمتابعتها وتوثيق استلامها.`
                   : ' يمكنك متابعة جدول أعمالك والتسليمات الميدانية المقررة.'}
@@ -97,14 +98,14 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                   onClick={() => onNavigateCommittees()}
                   className="px-4 py-2 rounded-xl bg-white text-[#005c55] font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
+                  <span className="material-symbols-outlined text-sm">groups</span>
                   <span>عرض لجاني المسندة ({myAssignedCommittees.length})</span>
                 </button>
                 <button
                   onClick={() => onNavigateTab('calendar')}
                   className="px-4 py-2 rounded-xl bg-[#9cf2e8]/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">calendar_month</span>
+                  <span className="material-symbols-outlined text-sm">calendar_month</span>
                   <span>جدول أعمالي وتسليماتي في التقويم</span>
                 </button>
               </div>
@@ -114,7 +115,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
         {/* Decorative background shape */}
         <div className="absolute left-6 -bottom-10 opacity-15 pointer-events-none">
-          <span className="material-symbols-outlined text-[180px]" aria-hidden="true">mosque</span>
+          <span className="material-symbols-outlined text-[180px]">mosque</span>
         </div>
       </div>
 
@@ -123,15 +124,15 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-xl" aria-hidden="true">calendar_today</span>
+              <span className="material-symbols-outlined text-xl">calendar_today</span>
             </span>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
-                  تسليمات وأعمال يوم الجمعة (10/2) بمسجد البخاري:
+                  تسليمات وأعمال اليوم بمسجد البخاري:
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
-                  {fridayTasks.length} أعمال مقررة
+                  {todayTasks.length} أعمال مقررة
                 </span>
               </div>
               <p className="text-[11px] text-[#6e7977]">
@@ -146,12 +147,12 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
           >
             <span>فتح التقويم والكاليندر بالكامل</span>
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span>
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {fridayTasks.slice(0, 4).map((task) => (
+          {todayTasks.slice(0, 4).map((task) => (
             <div
               key={task.id}
               onClick={() => onNavigateTab('calendar')}
@@ -193,7 +194,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         <div className="bg-white rounded-2xl p-5 border border-[#bdc9c6]/50 shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#bdc9c6]/30">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-xl text-[#005c55]" aria-hidden="true">event_repeat</span>
+              <span className="material-symbols-outlined text-xl text-[#005c55]">event_repeat</span>
               <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
                 الدورات والمسابقات الموسمية واللجان المربوطة بها:
               </h3>
@@ -208,7 +209,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             {courses.slice(0, 3).map((c) => {
-              const count = committees.filter((comm) => comm.courseId === c.id || (!comm.courseId && c.id === 'course-summer-1447')).length;
+              const count = committees.filter((comm) => comm.courseId === c.id).length;
               return (
                 <div
                   key={c.id}
@@ -297,7 +298,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         >
           <div className="flex items-center justify-between mb-2">
             <span className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#005c55] flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined" aria-hidden="true">menu_book</span>
+              <span className="material-symbols-outlined">menu_book</span>
             </span>
             <span className="text-2xl font-bold font-mono text-[#005c55]">{total}</span>
           </div>

@@ -59,7 +59,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           {/* Wide Search Box */}
           <div className="relative w-full md:flex-1">
             <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-[#6e7977]">
-              <span className="material-symbols-outlined text-xl" aria-hidden="true">search</span>
+              <span className="material-symbols-outlined text-xl">search</span>
             </div>
             <input
               ref={searchInputRef}
@@ -74,7 +74,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                 onClick={() => setSearchQuery('')}
                 className="absolute inset-y-0 left-16 sm:left-20 flex items-center pl-2 text-gray-400 hover:text-gray-600"
               >
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
+                <span className="material-symbols-outlined text-sm">close</span>
               </button>
             )}
             <div className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -109,7 +109,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             {/* Course Filter Dropdown */}
             {courses.length > 0 && setSelectedCourseId && (
               <div className="flex items-center gap-1.5 bg-[#f8f9ff] border border-[#bdc9c6]/70 rounded-xl px-2.5 py-1.5">
-                <span className="material-symbols-outlined text-sm text-[#005c55]" aria-hidden="true">event_repeat</span>
+                <span className="material-symbols-outlined text-sm text-[#005c55]">event_repeat</span>
                 <span className="text-[11px] font-bold text-[#6e7977] hidden sm:inline">الدورة:</span>
                 <select
                   value={selectedCourseId}
@@ -132,7 +132,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
                 className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-[#bdc9c6]/70 bg-white text-[#3e4947] hover:bg-[#e6eeff]/40 text-xs font-semibold transition-colors active:scale-[0.98] cursor-pointer"
               >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">swap_vert</span>
+                <span className="material-symbols-outlined text-base">swap_vert</span>
                 <span>{sortLabels[sortBy]}</span>
               </button>
 
@@ -148,7 +148,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                     }`}
                   >
                     <span>الأحدث أولاً</span>
-                    {sortBy === 'newest' && <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>}
+                    {sortBy === 'newest' && <span className="material-symbols-outlined text-sm">check</span>}
                   </button>
                   <button
                     onClick={() => {
@@ -160,7 +160,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                     }`}
                   >
                     <span>الأقدم أولاً</span>
-                    {sortBy === 'oldest' && <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>}
+                    {sortBy === 'oldest' && <span className="material-symbols-outlined text-sm">check</span>}
                   </button>
                   <button
                     onClick={() => {
@@ -172,7 +172,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                     }`}
                   >
                     <span>رقم اللجنة</span>
-                    {sortBy === 'committeeNumber' && <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>}
+                    {sortBy === 'committeeNumber' && <span className="material-symbols-outlined text-sm">check</span>}
                   </button>
                   <button
                     onClick={() => {
@@ -184,7 +184,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                     }`}
                   >
                     <span>اسم الكتاب</span>
-                    {sortBy === 'book' && <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>}
+                    {sortBy === 'book' && <span className="material-symbols-outlined text-sm">check</span>}
                   </button>
                 </div>
               )}

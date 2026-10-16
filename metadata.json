@@ -1,6 +1,0 @@
-{
-  "name": "متابعة الدورة العلمية الصيفية - مسجد الإمام البخاري 1448هـ / 2026م",
-  "description": "نظام إدارة ومتابعة كشوفات الدورة العلمية الصيفية بمسجد الإمام البخاري وجداول البيانات المنظمة.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

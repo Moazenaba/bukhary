@@ -103,6 +103,10 @@ export const calculateCurrentStage = (
 /**
  * Returns a formatted Arabic date & time string: "2026/09/25 - 10:30 ص"
  */
+/** A date as YYYY-MM-DD in the user's local time zone. (toISOString() would use UTC and be off by a day around midnight.) */
+export const todayISO = (d: Date = new Date()): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export const getCurrentFormattedDateTime = (): string => {
   const now = new Date();
   const year = now.getFullYear();

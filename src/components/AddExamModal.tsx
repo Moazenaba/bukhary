@@ -1,11 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { ExamItem } from '../types';
 import { getCurrentFormattedDateTime } from '../utils/stageUtils';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
 interface AddExamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddExam: (newExam: ExamItem) => void;
+  /** The PDF (if any) is uploaded separately after the exam is saved. */
+  onAddExam: (newExam: ExamItem, file?: File) => void | Promise<void>;
   savedBooks: string[];
 }
 
@@ -15,83 +19,80 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
   onAddExam,
   savedBooks,
 }) => {
-  if (!isOpen) return null;
-
   const [title, setTitle] = useState('');
-  const [book, setBook] = useState(savedBooks[0] || 'مسابقة كتاب الأصول الثلاثة');
-  const [branch, setBranch] = useState('فرع الكبار');
+  const [book, setBook] = useState(savedBooks[0] || '');
+  const [branch, setBranch] = useState('');
   const [totalMarks, setTotalMarks] = useState<number>(100);
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [questionsCount, setQuestionsCount] = useState<number>(5);
   const [notes, setNotes] = useState('');
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // PDF File upload state
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string>('');
   const [pdfFileSize, setPdfFileSize] = useState<string>('');
-  const [pdfDataUrl, setPdfDataUrl] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEscapeKey(onClose);
+
+  if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-        alert('يرجى اختيار ملف بصيغة PDF فقط.');
-        return;
-      }
-      setPdfFileName(file.name);
-      setPdfFileSize(
-        file.size > 1024 * 1024
-          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-          : `${Math.round(file.size / 1024)} KB`
-      );
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPdfDataUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    setFileError(null);
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setFileError('يرجى اختيار ملف بصيغة PDF فقط.');
+      return;
     }
+    if (file.size > MAX_PDF_BYTES) {
+      setFileError('حجم الملف أكبر من 20 ميجابايت.');
+      return;
+    }
+    setPdfFile(file);
+    setPdfFileName(file.name);
+    setPdfFileSize(file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-
+    if (!title.trim() || !book.trim()) return;
     const newExam: ExamItem = {
-      id: `exam-${Date.now()}`,
+      id: `exam-${crypto.randomUUID()}`,
       title: title.trim(),
-      book: book.trim() || 'مسابقة كتاب الأصول الثلاثة',
-      branch: branch.trim() || 'الفرع العام',
+      book: book.trim(),
+      branch: branch.trim(),
       totalMarks: Number(totalMarks) || 100,
       durationMinutes: Number(durationMinutes) || 60,
-      questionsCount: Number(questionsCount) || 5,
-      pdfFileName: pdfFileName || 'نموذج_الامتحان_المعتمد.pdf',
-      pdfFileSize: pdfFileSize || '1.2 MB',
-      pdfDataUrl: pdfDataUrl || undefined,
+      questionsCount: Number(questionsCount) || undefined,
       uploadedAt: getCurrentFormattedDateTime(),
       notes: notes.trim(),
     };
-
-    onAddExam(newExam);
+    setIsSaving(true);
+    await onAddExam(newExam, pdfFile ?? undefined);
+    setIsSaving(false);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
+    <div role="dialog" aria-modal="true" aria-label="إضافة امتحان" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
       <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150 max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-800">
-            <span className="material-symbols-outlined text-2xl text-emerald-600" aria-hidden="true">upload_file</span>
+            <span className="material-symbols-outlined text-2xl text-emerald-600">upload_file</span>
             <h3 className="font-bold text-base text-[#0d1c2e]">
               إضافة امتحان جديد ورفع ملف PDF
             </h3>
           </div>
           <button
+            aria-label="إغلاق"
             onClick={onClose}
             className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
@@ -121,6 +122,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               <input
                 type="text"
                 list="books-datalist"
+                required
                 placeholder="اختر أو اكتب اسم الكتاب..."
                 value={book}
                 onChange={(e) => setBook(e.target.value)}
@@ -201,6 +203,9 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
             />
 
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInputRef.current?.click()}
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
                 pdfFileName
@@ -211,7 +216,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               {pdfFileName ? (
                 <div className="flex items-center justify-center gap-3">
                   <span className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                    <span className="material-symbols-outlined text-2xl" aria-hidden="true">picture_as_pdf</span>
+                    <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>
                   </span>
                   <div className="text-right">
                     <span className="font-bold text-xs text-emerald-900 block truncate max-w-xs">
@@ -225,18 +230,22 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               ) : (
                 <div className="space-y-1.5">
                   <span className="w-10 h-10 rounded-xl bg-white border border-[#bdc9c6]/50 text-[#005c55] inline-flex items-center justify-center font-bold shadow-2xs">
-                    <span className="material-symbols-outlined text-2xl" aria-hidden="true">cloud_upload</span>
+                    <span className="material-symbols-outlined text-2xl">cloud_upload</span>
                   </span>
                   <p className="font-bold text-xs text-[#0d1c2e]">
                     اضغط هنا لرفع ملف الامتحان (PDF) من جهازك
                   </p>
                   <p className="text-[11px] text-[#6e7977]">
-                    يدعم المستندات بصيغة PDF فقط (حجم أقصى 25 ميجابايت)
+                    يدعم المستندات بصيغة PDF فقط (حجم أقصى 20 ميجابايت)
                   </p>
                 </div>
               )}
             </div>
           </div>
+
+          {fileError && (
+            <div role="alert" className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">{fileError}</div>
+          )}
 
           {/* 5. Notes / Instructions */}
           <div>
@@ -263,10 +272,11 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl font-semibold text-white bg-[#005c55] hover:bg-[#1b6b51] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
+              disabled={isSaving}
+              className="disabled:opacity-60 px-5 py-2 rounded-xl font-semibold text-white bg-[#005c55] hover:bg-[#1b6b51] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">check</span>
-              <span>حفظ الامتحان ورفع النموذج</span>
+              <span className="material-symbols-outlined text-sm">check</span>
+              <span>{isSaving ? 'جاري الحفظ...' : 'حفظ الامتحان ورفع النموذج'}</span>
             </button>
           </div>
         </form>

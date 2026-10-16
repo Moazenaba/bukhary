@@ -185,6 +185,8 @@ export interface Committee {
   examApprovedBy?: CommitteeExamApprovalInfo;    // توثيق اعتماد المعاون لجاهزية الامتحان
   createdDate: string;
   createdAtTime: string;
+  /** Server version of the record; sent back on save so stale edits are refused (409). */
+  updatedAt?: string;
 }
 
 export type CourseStatus = 'active' | 'completed' | 'upcoming';
@@ -372,6 +374,8 @@ export interface PermissionProfile {
 }
 
 export interface AppUser {
+  /** Server version; sent back on save so stale edits are refused (409). */
+  updatedAt?: string;
   id: string;
   name: string;
   phone: string;
@@ -436,7 +440,8 @@ export interface ExamItem {
   durationMinutes: number;       // مدة الامتحان بالدقائق
   pdfFileName?: string;          // اسم ملف الـ PDF
   pdfFileSize?: string;          // حجم الملف
-  pdfDataUrl?: string;           // رابط أو محتوى ملف الـ PDF
+  hasFile?: boolean;             // يوجد ملف مرفوع (يُنزَّل من /api/exams/:id/file للأدوار المسموح لها)
+  sampleQuestions?: string[];
   uploadedAt: string;            // تاريخ وتوقيت الرفع
   notes?: string;                // تعليمات وملاحظات
   questionsCount?: number;       // عدد الأسئلة

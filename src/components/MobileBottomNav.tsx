@@ -1,4 +1,5 @@
 import React from 'react';
+import { AuthService } from '../services/AuthService';
 import { AppUser } from '../types';
 import { NavTab } from './Sidebar';
 
@@ -17,8 +18,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   currentUser,
   pendingAssistantsCount = 0,
 }) => {
-  const isSuperAdmin = currentUser.role === 'super_admin';
-  const perms = currentUser.permissions || [];
 
   // Determine which tabs to display in the bottom app bar
   const items: Array<{
@@ -31,25 +30,25 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'summer_course',
       label: 'الكشوفات',
       icon: 'table_chart',
-      visible: isSuperAdmin || perms.includes('database_sheets'),
+      visible: AuthService.canAccessTab('summer_course', currentUser),
     },
     {
       id: 'committees',
       label: 'اللجان',
       icon: 'groups',
-      visible: isSuperAdmin || perms.includes('manage_committees'),
+      visible: AuthService.canAccessTab('committees', currentUser),
     },
     {
       id: 'exams',
       label: 'الامتحانات',
       icon: 'description',
-      visible: isSuperAdmin || perms.includes('exams_pdf'),
+      visible: AuthService.canAccessTab('exams', currentUser),
     },
     {
       id: 'calendar',
       label: 'التقويم',
       icon: 'calendar_month',
-      visible: isSuperAdmin || perms.includes('calendar_schedule'),
+      visible: AuthService.canAccessTab('calendar', currentUser),
     },
   ];
 
@@ -79,7 +78,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
               isActive ? 'bg-emerald-50 text-[#005c55]' : 'text-slate-500'
             }`}>
-              <span className="material-symbols-outlined text-xl" aria-hidden="true">
+              <span className="material-symbols-outlined text-xl">
                 {item.icon}
               </span>
             </div>
@@ -104,7 +103,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         )}
         
         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-          <span className="material-symbols-outlined text-xl" aria-hidden="true">
+          <span className="material-symbols-outlined text-xl">
             menu
           </span>
         </div>

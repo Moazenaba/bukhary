@@ -1,209 +1,139 @@
-import { Request, Response, NextFunction } from 'express';
+// Single source of truth for who may do what. The server enforces it, and
+// GET /api/me/permissions returns the evaluated result so web and mobile show
+// exactly the actions the server will accept.
 
-export type SystemRole = 'super_admin' | 'committee_head' | 'teacher' | 'assistant' | 'auditor';
+export const ROLES = ['super_admin', 'committee_head', 'teacher', 'assistant', 'auditor'] as const;
+export type Role = (typeof ROLES)[number];
 
-export interface UserContext {
-  id?: string;
-  name?: string;
-  role: SystemRole;
-  assignedCommittees: number[];
-  permissions?: string[];
+export const SYSTEM_PERMISSIONS = [
+  'database_sheets',
+  'manage_committees',
+  'add_new_committee',
+  'exams_pdf',
+  'manage_courses',
+  'calendar_schedule',
+  'progress_stats',
+  'manage_assistants',
+] as const;
+
+export interface ActionRule {
+  /** Roles that may ever perform the action (super_admin always may). */
+  roles?: readonly Role[];
+  /** The user needs at least one of these permissions... */
+  anyPermission?: readonly string[];
+  /** ...unless their role is listed here (the role itself implies the right). */
+  grantedToRoles?: readonly Role[];
+  /** Read-only actions are the only ones an auditor may perform. */
+  readOnly?: boolean;
+  /** Non-admin committee_head/assistant may act only on their assigned committees. */
+  committeeScoped?: boolean;
+  description: string;
 }
+
+const MANAGERS: readonly Role[] = ['super_admin', 'committee_head'];
 
 export const ACTIONS = {
-  COURSES_READ: 'COURSES_READ',
-  COURSES_WRITE: 'COURSES_WRITE',
-  COURSES_DELETE: 'COURSES_DELETE',
+  'committees.read': { readOnly: true, description: 'عرض اللجان' },
+  'committees.create': { roles: MANAGERS, anyPermission: ['add_new_committee'], description: 'إضافة لجنة' },
+  'committees.update': { roles: MANAGERS, anyPermission: ['manage_committees'], committeeScoped: true, description: 'تعديل بيانات اللجنة' },
+  'committees.delete': { roles: MANAGERS, anyPermission: ['manage_committees'], committeeScoped: true, description: 'حذف لجنة' },
+  'committees.reception': {
+    roles: ['super_admin', 'committee_head', 'assistant'],
+    anyPermission: ['manage_committees'],
+    grantedToRoles: ['assistant'],
+    committeeScoped: true,
+    description: 'توثيق استلام اللجنة واعتماد جاهزية الامتحان (مرحلتا التسجيل والامتحان)',
+  },
+  'committees.scoring': {
+    roles: ['super_admin', 'committee_head', 'teacher'],
+    anyPermission: ['manage_committees'],
+    grantedToRoles: ['teacher'],
+    committeeScoped: true,
+    description: 'التصحيح وتجميع الدرجات والمراجعة',
+  },
+  'committees.finalize': {
+    roles: MANAGERS,
+    anyPermission: ['manage_committees'],
+    committeeScoped: true,
+    description: 'كتابة الكشف والاعتماد وإعلان النتيجة والحفل',
+  },
+  'courses.read': { readOnly: true, description: 'عرض الدورات' },
+  'courses.write': { roles: MANAGERS, anyPermission: ['manage_courses'], description: 'إضافة وتعديل وحذف الدورات' },
+  'exams.read': { readOnly: true, description: 'عرض بيانات الامتحانات' },
+  'exams.write': { roles: MANAGERS, anyPermission: ['exams_pdf'], description: 'إضافة وتعديل الامتحانات ورفع الملفات' },
+  'exams.delete': { roles: ['super_admin'], description: 'حذف الامتحانات' },
+  'exams.file': { roles: MANAGERS, description: 'تنزيل ملف أسئلة الامتحان' },
+  'tasks.read': { readOnly: true, description: 'عرض المهام' },
+  'tasks.write': {
+    roles: ['super_admin', 'committee_head', 'teacher', 'assistant'],
+    anyPermission: ['calendar_schedule'],
+    description: 'إضافة وتعديل المهام',
+  },
+  'tasks.delete': { roles: MANAGERS, anyPermission: ['calendar_schedule'], description: 'حذف المهام' },
+  'users.read': { roles: MANAGERS, anyPermission: ['manage_assistants'], description: 'عرض المستخدمين' },
+  'users.manage': { roles: MANAGERS, anyPermission: ['manage_assistants'], description: 'قبول ورفض المعاونين وتعديل لجانهم' },
+  'users.delete': { roles: ['super_admin'], description: 'حذف المستخدمين' },
+  'users.grant': { roles: ['super_admin'], description: 'تعيين الأدوار والصلاحيات' },
+  'profiles.read': { roles: MANAGERS, anyPermission: ['manage_assistants'], description: 'عرض بروفايلات الصلاحيات' },
+  'profiles.write': { roles: ['super_admin'], description: 'تعديل بروفايلات الصلاحيات والصلاحيات المخصصة' },
+  'books.read': { readOnly: true, description: 'عرض الكتب المقررة' },
+  'books.write': {
+    roles: MANAGERS,
+    anyPermission: ['manage_courses', 'add_new_committee', 'exams_pdf'],
+    description: 'إضافة وحذف الكتب المقررة',
+  },
+  'summerRows.read': { readOnly: true, description: 'عرض كشف الدورة' },
+  'summerRows.write': {
+    roles: MANAGERS,
+    anyPermission: ['database_sheets', 'manage_committees'],
+    description: 'تعديل كشف الدورة',
+  },
+  'scoring.read': { roles: ['super_admin', 'committee_head', 'teacher', 'auditor'], readOnly: true, description: 'عرض رصد الدرجات' },
+  'scoring.write': {
+    roles: ['super_admin', 'committee_head', 'teacher'],
+    anyPermission: ['manage_committees'],
+    grantedToRoles: ['teacher'],
+    committeeScoped: true,
+    description: 'رصد درجات الطلاب',
+  },
+  'notifications.create': { roles: ['super_admin'], description: 'إرسال تنبيه عام' },
+  'audit.read': { roles: ['super_admin', 'auditor'], readOnly: true, description: 'عرض سجلات التدقيق' },
+  'stats.read': { readOnly: true, anyPermission: ['progress_stats'], grantedToRoles: ['auditor', 'committee_head'], description: 'الإحصائيات' },
+  'database.admin': { roles: ['super_admin'], description: 'حالة قاعدة البيانات' },
+  'ocr.use': { roles: MANAGERS, anyPermission: ['database_sheets'], description: 'استخراج جدول من صورة' },
+} satisfies Record<string, ActionRule>;
 
-  COMMITTEES_READ: 'COMMITTEES_READ',
-  COMMITTEES_WRITE: 'COMMITTEES_WRITE',
-  COMMITTEES_DELETE: 'COMMITTEES_DELETE',
+export type Action = keyof typeof ACTIONS;
 
-  USERS_READ: 'USERS_READ',
-  USERS_WRITE: 'USERS_WRITE',
-  USERS_DELETE: 'USERS_DELETE',
-
-  EXAMS_READ: 'EXAMS_READ',
-  EXAMS_WRITE: 'EXAMS_WRITE',
-  EXAMS_DELETE: 'EXAMS_DELETE',
-
-  TASKS_READ: 'TASKS_READ',
-  TASKS_WRITE: 'TASKS_WRITE',
-  TASKS_DELETE: 'TASKS_DELETE',
-
-  SCORING_READ: 'SCORING_READ',
-  SCORING_WRITE: 'SCORING_WRITE',
-
-  NOTIFICATIONS_READ: 'NOTIFICATIONS_READ',
-  NOTIFICATIONS_WRITE: 'NOTIFICATIONS_WRITE',
-
-  AUDIT_LOGS_READ: 'AUDIT_LOGS_READ',
-  AUDIT_LOGS_WRITE: 'AUDIT_LOGS_WRITE',
-
-  DATABASE_ADMIN: 'DATABASE_ADMIN',
-} as const;
-
-export type ActionType = (typeof ACTIONS)[keyof typeof ACTIONS];
-
-const ROLE_PERMISSIONS: Record<SystemRole, Set<ActionType>> = {
-  super_admin: new Set(Object.values(ACTIONS)),
-
-  committee_head: new Set([
-    ACTIONS.COURSES_READ,
-    ACTIONS.COMMITTEES_READ,
-    ACTIONS.COMMITTEES_WRITE,
-    ACTIONS.USERS_READ,
-    ACTIONS.EXAMS_READ,
-    ACTIONS.EXAMS_WRITE,
-    ACTIONS.TASKS_READ,
-    ACTIONS.TASKS_WRITE,
-    ACTIONS.TASKS_DELETE,
-    ACTIONS.SCORING_READ,
-    ACTIONS.SCORING_WRITE,
-    ACTIONS.NOTIFICATIONS_READ,
-    ACTIONS.NOTIFICATIONS_WRITE,
-    ACTIONS.AUDIT_LOGS_WRITE,
-  ]),
-
-  teacher: new Set([
-    ACTIONS.COURSES_READ,
-    ACTIONS.COMMITTEES_READ,
-    ACTIONS.COMMITTEES_WRITE,
-    ACTIONS.USERS_READ,
-    ACTIONS.EXAMS_READ,
-    ACTIONS.TASKS_READ,
-    ACTIONS.SCORING_READ,
-    ACTIONS.SCORING_WRITE,
-    ACTIONS.NOTIFICATIONS_READ,
-    ACTIONS.AUDIT_LOGS_WRITE,
-  ]),
-
-  assistant: new Set([
-    ACTIONS.COURSES_READ,
-    ACTIONS.COMMITTEES_READ,
-    ACTIONS.COMMITTEES_WRITE,
-    ACTIONS.USERS_READ,
-    ACTIONS.EXAMS_READ,
-    ACTIONS.TASKS_READ,
-    ACTIONS.TASKS_WRITE,
-    ACTIONS.SCORING_READ,
-    ACTIONS.SCORING_WRITE,
-    ACTIONS.NOTIFICATIONS_READ,
-    ACTIONS.NOTIFICATIONS_WRITE,
-    ACTIONS.AUDIT_LOGS_WRITE,
-  ]),
-
-  auditor: new Set([
-    ACTIONS.COURSES_READ,
-    ACTIONS.COMMITTEES_READ,
-    ACTIONS.USERS_READ,
-    ACTIONS.EXAMS_READ,
-    ACTIONS.TASKS_READ,
-    ACTIONS.SCORING_READ,
-    ACTIONS.NOTIFICATIONS_READ,
-    ACTIONS.AUDIT_LOGS_READ,
-  ]),
-};
-
-/**
- * فحص هل الدور يملك الصلاحية لتنفيذ العملية
- */
-export function isActionAllowed(role: SystemRole, action: ActionType): boolean {
-  const allowed = ROLE_PERMISSIONS[role];
-  if (!allowed) return false;
-  return allowed.has(action);
+export interface Principal {
+  id: string;
+  name: string;
+  role: Role;
+  permissions: string[];
+  assignedCommittees: number[];
 }
 
-/**
- * فحص هل المستخدم مصرح له بالتعامل مع هذه اللجنة المحددة
- */
-export function isCommitteeAllowed(
-  user: UserContext,
-  committeeNumber?: number | null
-): boolean {
+/** Whether `user` may perform `action` at all (committee scope is checked separately). */
+export function isAllowed(user: Principal, action: Action): boolean {
   if (user.role === 'super_admin') return true;
-  if (committeeNumber === undefined || committeeNumber === null) return true;
+  const rule: ActionRule = ACTIONS[action];
+  if (user.role === 'auditor' && !rule.readOnly) return false;
+  if (rule.roles && !rule.roles.includes(user.role)) return false;
+  if (rule.grantedToRoles?.includes(user.role)) return true;
+  if (rule.anyPermission && !rule.anyPermission.some((p) => user.permissions.includes(p))) return false;
+  return true;
+}
+
+/** Committee-scope rule from the business decision: heads and assistants act only on assigned committees. */
+export function isCommitteeInScope(user: Principal, committeeNumber: number | null | undefined): boolean {
+  if (user.role !== 'committee_head' && user.role !== 'assistant') return true;
+  if (committeeNumber === null || committeeNumber === undefined) return false;
   return user.assignedCommittees.includes(Number(committeeNumber));
 }
 
-/**
- * استخراج بيانات المستخدم من الترويسات
- */
-export function extractUserFromRequest(req: Request): UserContext {
-  const headerRole = req.headers['x-user-role'] as string | undefined;
-  const headerId = req.headers['x-user-id'] as string | undefined;
-  const headerCommittees = req.headers['x-user-committees'] as string | undefined;
-
-  let assignedCommittees: number[] = [];
-  if (headerCommittees) {
-    try {
-      const parsed = JSON.parse(headerCommittees);
-      if (Array.isArray(parsed)) {
-        assignedCommittees = parsed.map((n) => Number(n)).filter((n) => !isNaN(n));
-      }
-    } catch {
-      assignedCommittees = [];
-    }
-  }
-
-  // إذا لم يتم تمرير دور، وفي بيئة التطوير نفترض super_admin لتفادي كسر المسارات غير المعتمدة على ترويسات
-  const validRoles: SystemRole[] = [
-    'super_admin',
-    'committee_head',
-    'teacher',
-    'assistant',
-    'auditor',
-  ];
-
-  const role: SystemRole =
-    headerRole && validRoles.includes(headerRole as SystemRole)
-      ? (headerRole as SystemRole)
-      : 'super_admin';
-
-  return {
-    id: headerId || 'system-user',
-    role,
-    assignedCommittees,
-  };
-}
-
-/**
- * وسيط Express للتحقق من الصلاحيات وتقييد اللجان
- */
-export function requireAction(
-  action: ActionType,
-  options?: {
-    getCommitteeNumber?: (req: Request) => number | undefined | null;
-  }
-) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const user = extractUserFromRequest(req);
-
-    // 1. فحص صلاحية الدور الأساسية
-    if (!isActionAllowed(user.role, action)) {
-      res.status(403).json({
-        success: false,
-        error: 'forbidden',
-        message: `الدور الحالي (${user.role}) غير مصرح له بتنفيذ هذه العملية (${action}).`,
-      });
-      return;
-    }
-
-    // 2. فحص تقييد اللجنة الميدانية إذا كان مطلوباً
-    if (options?.getCommitteeNumber) {
-      const commNum = options.getCommitteeNumber(req);
-      if (!isCommitteeAllowed(user, commNum)) {
-        res.status(403).json({
-          success: false,
-          error: 'forbidden',
-          message: `غير مصرح لك بإجراء هذا التعديل على لجنة رقم (${commNum}) لأنها ليست ضمن اللجان المسندة إليك.`,
-        });
-        return;
-      }
-    }
-
-    // إرفاق المستخدم بالطلب للاستخدام اللاحق
-    (req as any).user = user;
-    next();
-  };
+export function evaluatedPermissions(user: Principal) {
+  const actions: Record<string, boolean> = {};
+  for (const a of Object.keys(ACTIONS) as Action[]) actions[a] = isAllowed(user, a);
+  const scoped = user.role === 'committee_head' || user.role === 'assistant';
+  return { role: user.role, actions, committeeScope: scoped ? user.assignedCommittees : 'all' as const };
 }
