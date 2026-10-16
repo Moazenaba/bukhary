@@ -79,29 +79,29 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
   return (
     <div className="space-y-6 text-right">
       {/* Top Banner: Periodic Toggle */}
-      <div className="bg-white rounded-2xl p-5 border border-[#bdc9c6]/50 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl p-5 border border-line/50 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-emerald-50 text-emerald-800">
               <span className="material-symbols-outlined text-2xl">analytics</span>
             </span>
-            <h2 className="text-lg sm:text-xl font-bold text-[#0d1c2e]">
+            <h2 className="text-lg sm:text-xl font-bold text-ink">
               لوحة الإحصائيات ونسب الإنجاز الحية
             </h2>
           </div>
-          <p className="text-xs text-[#6e7977] mt-1">
+          <p className="text-xs text-muted mt-1">
             متابعة حية لمعدلات إنجاز وتصحيح لجان مسابقات مسجد البخاري المستخرجة من قاعدة البيانات.
           </p>
         </div>
 
         {/* Period Selector Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-[#f8f9ff] border border-[#bdc9c6]/60 rounded-xl">
+        <div className="flex items-center gap-1.5 p-1 bg-canvas border border-line/60 rounded-xl">
           <button
             onClick={() => setActivePeriod('week')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activePeriod === 'week'
-                ? 'bg-[#005c55] text-white shadow-xs'
-                : 'text-[#3e4947] hover:bg-white'
+                ? 'bg-brand text-white shadow-xs'
+                : 'text-ink-soft hover:bg-white'
             }`}
           >
             <span className="material-symbols-outlined text-sm">calendar_view_week</span>
@@ -112,8 +112,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
             onClick={() => setActivePeriod('month')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activePeriod === 'month'
-                ? 'bg-[#005c55] text-white shadow-xs'
-                : 'text-[#3e4947] hover:bg-white'
+                ? 'bg-brand text-white shadow-xs'
+                : 'text-ink-soft hover:bg-white'
             }`}
           >
             <span className="material-symbols-outlined text-sm">calendar_month</span>
@@ -124,8 +124,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
             onClick={() => setActivePeriod('year')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activePeriod === 'year'
-                ? 'bg-[#005c55] text-white shadow-xs'
-                : 'text-[#3e4947] hover:bg-white'
+                ? 'bg-brand text-white shadow-xs'
+                : 'text-ink-soft hover:bg-white'
             }`}
           >
             <span className="material-symbols-outlined text-sm">event_repeat</span>
@@ -141,8 +141,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
           onClick={() => setActivePeriod('week')}
           className={`p-5 rounded-2xl border-2 transition-all cursor-pointer ${
             activePeriod === 'week'
-              ? 'bg-emerald-50/40 border-[#005c55] shadow-md ring-2 ring-[#005c55]/20'
-              : 'bg-white border-[#bdc9c6]/50 hover:border-[#005c55]/60'
+              ? 'bg-emerald-50/40 border-brand shadow-md ring-2 ring-brand/20'
+              : 'bg-white border-line/50 hover:border-brand/60'
           }`}
         >
           <div className="flex items-center justify-between mb-3">
@@ -153,14 +153,14 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               <span className="text-3xl font-mono font-bold text-teal-800">
                 {weeklyRate}%
               </span>
-              <span className="block text-[10px] text-teal-700 font-semibold mt-0.5">
+              <span className="block text-xs text-teal-700 font-semibold mt-0.5">
                 من إجمالي اللجان
               </span>
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#0d1c2e]">اللجان التي بلغت مرحلة المراجعة أو ما بعدها</h3>
-          <p className="text-xs text-[#6e7977] mt-1">
+          <h3 className="font-bold text-sm text-ink">اللجان التي بلغت مرحلة المراجعة أو ما بعدها</h3>
+          <p className="text-xs text-muted mt-1">
             <strong>{weeklyCompleted}</strong> لجنة من إجمالي <strong>{weeklyTarget}</strong> لجنة مسجلة
           </p>
 
@@ -170,7 +170,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               style={{ width: `${weeklyRate}%` }}
             />
           </div>
-          <span className="block text-[11px] text-teal-700 font-semibold mt-2">
+          <span className="block text-xs text-teal-700 font-semibold mt-2">
             {getProgressLabel(weeklyRate)}
           </span>
         </div>
@@ -181,7 +181,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
           className={`p-5 rounded-2xl border-2 transition-all cursor-pointer ${
             activePeriod === 'month'
               ? 'bg-blue-50/40 border-blue-600 shadow-md ring-2 ring-blue-600/20'
-              : 'bg-white border-[#bdc9c6]/50 hover:border-blue-400'
+              : 'bg-white border-line/50 hover:border-blue-400'
           }`}
         >
           <div className="flex items-center justify-between mb-3">
@@ -192,14 +192,14 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               <span className="text-3xl font-mono font-bold text-blue-700">
                 {monthlyRate}%
               </span>
-              <span className="block text-[10px] text-blue-700 font-semibold mt-0.5">
+              <span className="block text-xs text-blue-700 font-semibold mt-0.5">
                 من إجمالي اللجان
               </span>
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#0d1c2e]">اللجان التي أُعلنت نتيجتها</h3>
-          <p className="text-xs text-[#6e7977] mt-1">
+          <h3 className="font-bold text-sm text-ink">اللجان التي أُعلنت نتيجتها</h3>
+          <p className="text-xs text-muted mt-1">
             <strong>{monthlyCompleted}</strong> لجنة من إجمالي <strong>{monthlyTarget}</strong> لجنة مسجلة
           </p>
 
@@ -209,7 +209,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               style={{ width: `${monthlyRate}%` }}
             />
           </div>
-          <span className="block text-[11px] text-blue-700 font-semibold mt-2">
+          <span className="block text-xs text-blue-700 font-semibold mt-2">
             {getProgressLabel(monthlyRate)}
           </span>
         </div>
@@ -220,7 +220,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
           className={`p-5 rounded-2xl border-2 transition-all cursor-pointer ${
             activePeriod === 'year'
               ? 'bg-emerald-50/50 border-emerald-600 shadow-md ring-2 ring-emerald-600/20'
-              : 'bg-white border-[#bdc9c6]/50 hover:border-emerald-400'
+              : 'bg-white border-line/50 hover:border-emerald-400'
           }`}
         >
           <div className="flex items-center justify-between mb-3">
@@ -231,14 +231,14 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               <span className="text-3xl font-mono font-bold text-emerald-700">
                 {annualRate}%
               </span>
-              <span className="block text-[10px] text-emerald-700 font-semibold mt-0.5">
+              <span className="block text-xs text-emerald-700 font-semibold mt-0.5">
                 الموسم الكامل
               </span>
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#0d1c2e]">النسبة الإجمالية (الموسم)</h3>
-          <p className="text-xs text-[#6e7977] mt-1">
+          <h3 className="font-bold text-sm text-ink">النسبة الإجمالية (الموسم)</h3>
+          <p className="text-xs text-muted mt-1">
             <strong>{annualCompleted}</strong> لجان أتمت الحفل بالكامل من إجمالي <strong>{annualTarget}</strong> لجنة مسجلة
           </p>
 
@@ -248,14 +248,14 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               style={{ width: `${annualRate}%` }}
             />
           </div>
-          <span className="block text-[11px] text-emerald-700 font-semibold mt-2">
+          <span className="block text-xs text-emerald-700 font-semibold mt-2">
             تم تكريم {annualCompleted} لجان رسمياً حتى الآن
           </span>
         </div>
       </div>
 
       {/* Focus Period Banner based on selected Tab */}
-      <div className="p-4 rounded-2xl bg-gradient-to-l from-[#005c55] to-emerald-800 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+      <div className="p-4 rounded-2xl bg-gradient-to-l from-brand to-emerald-800 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
           <span className="p-2.5 rounded-xl bg-white/20 text-white">
             <span className="material-symbols-outlined text-2xl">speed</span>
@@ -280,7 +280,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
 
         {totalQuestionsCount > 0 && (
           <div className="bg-white/10 px-3.5 py-2 rounded-xl border border-white/20 text-xs shrink-0 text-center">
-            <span className="text-[11px] text-teal-100 block">إجمالي الأسئلة المصححة:</span>
+            <span className="text-xs text-teal-100 block">إجمالي الأسئلة المصححة:</span>
             <span className="font-mono font-bold text-sm text-white">
               {totalQuestionsCompleted} من {totalQuestionsCount} سؤال
             </span>
@@ -291,8 +291,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
       {/* Grid: Stages Distribution & Books Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stages Progress Distribution */}
-        <div className="bg-white p-5 rounded-2xl border border-[#bdc9c6]/50 shadow-xs">
-          <h3 className="font-bold text-base text-[#0d1c2e] mb-4">
+        <div className="bg-white p-5 rounded-2xl border border-line/50 shadow-xs">
+          <h3 className="font-bold text-base text-ink mb-4">
             توزيع اللجان حسب المرحلة الحالية
           </h3>
 
@@ -308,7 +308,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
                       <span>{stg.emoji}</span>
                       <span>{stg.activeLabel}</span>
                     </span>
-                    <span className="font-mono text-[#0d1c2e]">
+                    <span className="font-mono text-ink">
                       {count} لجنة ({pct}%)
                     </span>
                   </div>
@@ -325,8 +325,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
         </div>
 
         {/* Books Distribution */}
-        <div className="bg-white p-5 rounded-2xl border border-[#bdc9c6]/50 shadow-xs">
-          <h3 className="font-bold text-base text-[#0d1c2e] mb-4">
+        <div className="bg-white p-5 rounded-2xl border border-line/50 shadow-xs">
+          <h3 className="font-bold text-base text-ink mb-4">
             توزيع اللجان حسب الكتب المقررة
           </h3>
 
@@ -336,19 +336,19 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
               return (
                 <div
                   key={`${book}-${idx}`}
-                  className="p-3 rounded-xl bg-[#f8f9ff] border border-[#bdc9c6]/40 flex items-center justify-between"
+                  className="p-3 rounded-xl bg-canvas border border-line/40 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#005c55] text-lg">
+                    <span className="material-symbols-outlined text-brand text-lg">
                       auto_stories
                     </span>
-                    <span className="font-bold text-xs text-[#0d1c2e]">{book}</span>
+                    <span className="font-bold text-xs text-ink">{book}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[#005c55]">
+                    <span className="text-xs font-mono font-bold text-brand">
                       {count} لجنة
                     </span>
-                    <span className="text-[11px] text-[#6e7977] bg-white px-2 py-0.5 rounded-md border border-[#bdc9c6]/40">
+                    <span className="text-xs text-muted bg-white px-2 py-0.5 rounded-md border border-line/40">
                       {pct}%
                     </span>
                   </div>

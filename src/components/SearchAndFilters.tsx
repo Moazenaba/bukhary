@@ -54,11 +54,11 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   return (
     <>
       {/* Search & Actions Toolbar */}
-      <section className="bg-white border border-[#bdc9c6]/50 rounded-2xl p-4 mb-6 shadow-xs">
+      <section className="bg-white border border-line/50 rounded-2xl p-4 mb-6 shadow-xs">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Wide Search Box */}
           <div className="relative w-full md:flex-1">
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-[#6e7977]">
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-muted">
               <span className="material-symbols-outlined text-xl">search</span>
             </div>
             <input
@@ -67,7 +67,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="البحث باسم اللجنة، أو الرقم (#1)، أو اسم الشيخ / العضو، أو اسم الكتاب، أو الفرع..."
-              className="w-full bg-[#f8f9ff] border border-[#bdc9c6]/70 focus:border-[#005c55] focus:ring-4 focus:ring-[#005c55]/10 rounded-xl py-3 pr-11 pl-20 sm:pl-24 text-[#0d1c2e] text-[13px] placeholder:text-[#6e7977] transition-all duration-150 outline-none"
+              className="w-full bg-canvas border border-line/70 focus:border-brand focus:ring-4 focus:ring-brand/10 rounded-xl py-3 pr-11 pl-20 sm:pl-24 text-ink text-[13px] placeholder:text-muted transition-all duration-150 outline-none"
             />
             {searchQuery && (
               <button
@@ -78,7 +78,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
               </button>
             )}
             <div className="absolute inset-y-0 left-0 flex items-center pl-3">
-              <kbd className="hidden sm:inline-block px-2 py-0.5 text-xs text-[#bdc9c6] bg-[#dce9ff]/60 text-[#3e4947] rounded font-mono border border-[#bdc9c6]/40">
+              <kbd className="hidden sm:inline-block px-2 py-0.5 text-xs text-line bg-[#dce9ff]/60 text-ink-soft rounded font-mono border border-line/40">
                 Ctrl + K
               </kbd>
             </div>
@@ -94,27 +94,27 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                 className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
                   genderFilter === 'women'
                     ? 'bg-rose-700 text-white border-rose-700 shadow-xs ring-2 ring-rose-200'
-                    : 'bg-white border-[#bdc9c6]/70 text-[#3e4947] hover:bg-rose-50 hover:border-rose-300'
+                    : 'bg-white border-line/70 text-ink-soft hover:bg-rose-50 hover:border-rose-300'
                 }`}
                 title={genderFilter === 'women' ? 'إلغاء التصفية وعرض كافة اللجان' : 'تصفية اللجان النسائية فقط'}
               >
                 <span>🧕</span>
                 <span>اللجان النسائية</span>
                 {genderFilter === 'women' && (
-                  <span className="text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-mono">مفعل ✓</span>
+                  <span className="text-xs bg-white/25 px-1.5 py-0.2 rounded-full font-mono">مفعل ✓</span>
                 )}
               </button>
             )}
 
             {/* Course Filter Dropdown */}
             {courses.length > 0 && setSelectedCourseId && (
-              <div className="flex items-center gap-1.5 bg-[#f8f9ff] border border-[#bdc9c6]/70 rounded-xl px-2.5 py-1.5">
-                <span className="material-symbols-outlined text-sm text-[#005c55]">event_repeat</span>
-                <span className="text-[11px] font-bold text-[#6e7977] hidden sm:inline">الدورة:</span>
+              <div className="flex items-center gap-1.5 bg-canvas border border-line/70 rounded-xl px-2.5 py-1.5">
+                <span className="material-symbols-outlined text-sm text-brand">event_repeat</span>
+                <span className="text-xs font-bold text-muted hidden sm:inline">الدورة:</span>
                 <select
                   value={selectedCourseId}
                   onChange={(e) => setSelectedCourseId(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-[#005c55] outline-none cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-brand outline-none cursor-pointer"
                 >
                   <option value="all">جميع الدورات ({courses.length})</option>
                   {courses.map((course) => (
@@ -130,21 +130,21 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-[#bdc9c6]/70 bg-white text-[#3e4947] hover:bg-[#e6eeff]/40 text-xs font-semibold transition-colors active:scale-[0.98] cursor-pointer"
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line/70 bg-white text-ink-soft hover:bg-[#e6eeff]/40 text-xs font-semibold transition-colors active:scale-[0.98] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-base">swap_vert</span>
                 <span>{sortLabels[sortBy]}</span>
               </button>
 
               {showSortDropdown && (
-                <div className="absolute left-0 top-full mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-[#bdc9c6]/50 py-1.5 z-30 animate-in fade-in duration-100 text-right">
+                <div className="absolute left-0 top-full mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-line/50 py-1.5 z-30 animate-in fade-in duration-100 text-right">
                   <button
                     onClick={() => {
                       setSortBy('newest');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-[#eff4ff] flex items-center justify-between ${
-                      sortBy === 'newest' ? 'text-[#005c55] bg-[#eff4ff]' : 'text-[#0d1c2e]'
+                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-tint flex items-center justify-between ${
+                      sortBy === 'newest' ? 'text-brand bg-tint' : 'text-ink'
                     }`}
                   >
                     <span>الأحدث أولاً</span>
@@ -155,8 +155,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                       setSortBy('oldest');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-[#eff4ff] flex items-center justify-between ${
-                      sortBy === 'oldest' ? 'text-[#005c55] bg-[#eff4ff]' : 'text-[#0d1c2e]'
+                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-tint flex items-center justify-between ${
+                      sortBy === 'oldest' ? 'text-brand bg-tint' : 'text-ink'
                     }`}
                   >
                     <span>الأقدم أولاً</span>
@@ -167,8 +167,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                       setSortBy('committeeNumber');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-[#eff4ff] flex items-center justify-between ${
-                      sortBy === 'committeeNumber' ? 'text-[#005c55] bg-[#eff4ff]' : 'text-[#0d1c2e]'
+                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-tint flex items-center justify-between ${
+                      sortBy === 'committeeNumber' ? 'text-brand bg-tint' : 'text-ink'
                     }`}
                   >
                     <span>رقم اللجنة</span>
@@ -179,8 +179,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                       setSortBy('book');
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-[#eff4ff] flex items-center justify-between ${
-                      sortBy === 'book' ? 'text-[#005c55] bg-[#eff4ff]' : 'text-[#0d1c2e]'
+                    className={`w-full text-right px-4 py-2 text-xs font-semibold hover:bg-tint flex items-center justify-between ${
+                      sortBy === 'book' ? 'text-brand bg-tint' : 'text-ink'
                     }`}
                   >
                     <span>اسم الكتاب</span>
@@ -201,14 +201,14 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             onClick={() => setSelectedStage('all')}
             className={`px-4 py-2 rounded-full text-[13px] font-semibold shadow-xs flex items-center gap-2 transition-all cursor-pointer ${
               selectedStage === 'all'
-                ? 'bg-[#005c55] text-white shadow-sm'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:border-[#005c55] hover:text-[#005c55]'
+                ? 'bg-brand text-white shadow-sm'
+                : 'bg-white text-ink-soft border border-line/60 hover:border-brand hover:text-brand'
             }`}
           >
             <span>كافة اللجان</span>
             <span
               className={`px-2 py-0.5 text-xs rounded-full ${
-                selectedStage === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#0d1c2e]'
+                selectedStage === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-ink'
               }`}
             >
               {stageCounts.all || 0}
@@ -227,14 +227,14 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                 className={`px-4 py-2 rounded-full text-[13px] font-medium transition-all flex items-center gap-2 cursor-pointer ${
                   isSelected
                     ? `${stg.badgeClass} shadow-xs font-bold`
-                    : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:border-[#005c55]'
+                    : 'bg-white text-ink-soft border border-line/60 hover:border-brand'
                 }`}
               >
                 <span>{stg.emoji}</span>
                 <span>{stg.activeLabel}</span>
                 <span
                   className={`px-2 py-0.5 text-xs rounded-full ${
-                    isSelected ? 'bg-black/10' : 'bg-gray-100 text-[#0d1c2e]'
+                    isSelected ? 'bg-black/10' : 'bg-gray-100 text-ink'
                   }`}
                 >
                   {count}

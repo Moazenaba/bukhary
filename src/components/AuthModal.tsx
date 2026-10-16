@@ -48,7 +48,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUs
   };
 
   const input =
-    'w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left';
+    'w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left';
 
   return (
     <div
@@ -57,8 +57,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUs
       aria-modal="true"
       aria-labelledby="account-title"
     >
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden">
-        <div className="px-5 py-4 bg-gradient-to-l from-[#005c55] to-emerald-800 text-white flex items-center justify-between">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-line/50 overflow-hidden">
+        <div className="px-5 py-4 bg-gradient-to-l from-brand to-emerald-800 text-white flex items-center justify-between">
           <h3 id="account-title" className="font-bold text-base">حسابي</h3>
           <button type="button" onClick={onClose} aria-label="إغلاق" className="w-8 h-8 rounded-lg text-white/80 hover:text-white flex items-center justify-center cursor-pointer">
             <span className="material-symbols-outlined text-xl">close</span>
@@ -66,23 +66,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUs
         </div>
 
         <div className="p-5 space-y-5">
-          <div className="p-4 rounded-xl bg-[#f8f9ff] border border-[#bdc9c6]/40 text-xs space-y-1">
-            <div className="font-bold text-sm text-[#0d1c2e]">{currentUser.name}</div>
-            <div className="text-[#3e4947]">{AuthService.getRoleLabel(currentUser.role)}</div>
-            <div className="font-mono text-[#6e7977]">{currentUser.phone}{currentUser.email ? ` • ${currentUser.email}` : ''}</div>
+          <div className="p-4 rounded-xl bg-canvas border border-line/40 text-xs space-y-1">
+            <div className="font-bold text-sm text-ink">{currentUser.name}</div>
+            <div className="text-ink-soft">{AuthService.getRoleLabel(currentUser.role)}</div>
+            <div className="font-mono text-muted">{currentUser.phone}{currentUser.email ? ` • ${currentUser.email}` : ''}</div>
           </div>
 
           <form onSubmit={handleChangePassword} className="space-y-3">
-            <h4 className="font-bold text-xs text-[#0d1c2e]">تغيير كلمة المرور</h4>
-            <label className="block text-[11px] text-[#3e4947]">
+            <h4 className="font-bold text-xs text-ink">تغيير كلمة المرور</h4>
+            <label className="block text-xs text-ink-soft">
               كلمة المرور الحالية
               <input type="password" required autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={input} />
             </label>
-            <label className="block text-[11px] text-[#3e4947]">
+            <label className="block text-xs text-ink-soft">
               كلمة المرور الجديدة (8 أحرف على الأقل، حروف وأرقام)
               <input type="password" required minLength={8} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={input} />
             </label>
-            <label className="block text-[11px] text-[#3e4947]">
+            <label className="block text-xs text-ink-soft">
               تأكيد كلمة المرور الجديدة
               <input type="password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={input} />
             </label>
@@ -91,7 +91,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUs
                 {error}
               </div>
             )}
-            <button type="submit" disabled={isSaving} className="w-full py-2.5 rounded-xl bg-[#005c55] text-white font-bold text-xs cursor-pointer disabled:opacity-60">
+            <button type="submit" disabled={isSaving} className="w-full py-2.5 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer disabled:opacity-60">
               {isSaving ? 'جاري الحفظ...' : 'حفظ كلمة المرور الجديدة'}
             </button>
           </form>

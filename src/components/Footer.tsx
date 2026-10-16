@@ -5,35 +5,35 @@ export const Footer: React.FC = () => {
 
   return (
     <>
-      <footer className="mt-12 bg-white border-t border-[#bdc9c6]/30 py-6 text-center text-right">
+      <footer className="mt-12 bg-white border-t border-line/30 py-6 text-center text-right">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-[#005c55] text-[16px] font-bold">
+          <div className="flex items-center gap-2 text-brand text-[16px] font-bold">
             <span className="material-symbols-outlined">mosque</span>
             <span>مسابقات مسجد البخاري العلمية</span>
           </div>
 
-          <p className="text-[12px] sm:text-[13px] text-[#3e4947]">
+          <p className="text-[12px] sm:text-[13px] text-ink-soft">
             نظام إدارة لجان الاختبار والتصحيح لمتون العقيدة والكتب الشرعية © 1445هـ — جميع الحقوق محفوظة
           </p>
 
-          <div className="flex items-center gap-3 sm:gap-4 text-[#3e4947] text-[11px] sm:text-[12px] font-medium">
+          <div className="flex items-center gap-3 sm:gap-4 text-ink-soft text-xs sm:text-[12px] font-medium">
             <button
               onClick={() => setModalContent('guide')}
-              className="hover:text-[#005c55] transition-colors cursor-pointer"
+              className="hover:text-brand transition-colors cursor-pointer"
             >
               دليل لجان مسجد البخاري
             </button>
             <span>•</span>
             <button
               onClick={() => setModalContent('standards')}
-              className="hover:text-[#005c55] transition-colors cursor-pointer"
+              className="hover:text-brand transition-colors cursor-pointer"
             >
               ضوابط الاختبار والتصحيح
             </button>
             <span>•</span>
             <button
               onClick={() => setModalContent('sheets')}
-              className="hover:text-[#005c55] transition-colors cursor-pointer"
+              className="hover:text-brand transition-colors cursor-pointer"
             >
               التصدير إلى Excel و Google Sheets
             </button>
@@ -44,9 +44,9 @@ export const Footer: React.FC = () => {
       {/* Info Modals */}
       {modalContent && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-[#bdc9c6]/40 text-right animate-in fade-in">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#bdc9c6]/30">
-              <h3 className="font-bold text-base text-[#005c55]">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-line/40 text-right animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-line/30">
+              <h3 className="font-bold text-base text-brand">
                 {modalContent === 'guide'
                   ? 'دليل لجان مسابقات مسجد البخاري'
                   : modalContent === 'standards'
@@ -61,7 +61,7 @@ export const Footer: React.FC = () => {
               </button>
             </div>
 
-            <div className="text-xs text-[#3e4947] space-y-3 leading-relaxed">
+            <div className="text-xs text-ink-soft space-y-3 leading-relaxed">
               {modalContent === 'guide' && (
                 <>
                   <p>
@@ -100,10 +100,10 @@ export const Footer: React.FC = () => {
               )}
             </div>
 
-            <div className="mt-5 pt-3 border-t border-[#bdc9c6]/30 flex justify-end">
+            <div className="mt-5 pt-3 border-t border-line/30 flex justify-end">
               <button
                 onClick={() => setModalContent(null)}
-                className="px-4 py-1.5 rounded-xl bg-[#005c55] text-white text-xs font-semibold"
+                className="px-4 py-1.5 rounded-xl bg-brand text-white text-xs font-semibold"
               >
                 إغلاق
               </button>

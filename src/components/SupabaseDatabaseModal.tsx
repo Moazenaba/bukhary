@@ -70,7 +70,7 @@ export const SupabaseDatabaseModal: React.FC<SupabaseDatabaseModalProps> = ({ is
             {row('مدة تشغيل الخادم', `${Math.round(status.uptimeSeconds / 60)} دقيقة`)}
             <div className="pt-2">
               <h4 className="font-bold text-xs text-slate-800 mb-2">الجداول ({status.tablesCount}) — عدد الصفوف تقديري</h4>
-              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
                 {status.tables.map((t) => (
                   <div key={t.name} className="flex justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border">
                     <span className="font-mono">{t.name}</span>
@@ -87,7 +87,7 @@ export const SupabaseDatabaseModal: React.FC<SupabaseDatabaseModalProps> = ({ is
             إعادة الفحص
           </button>
           {onRefreshData && (
-            <button type="button" onClick={onRefreshData} className="px-4 py-2 rounded-xl bg-[#005c55] text-white font-bold text-xs cursor-pointer">
+            <button type="button" onClick={onRefreshData} className="px-4 py-2 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer">
               إعادة تحميل بيانات التطبيق
             </button>
           )}

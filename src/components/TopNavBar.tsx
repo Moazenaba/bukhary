@@ -41,13 +41,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <header className="bg-white border-b border-[#bdc9c6]/50 shadow-xs sticky top-0 z-30">
+    <header className="bg-white border-b border-line/50 shadow-xs sticky top-0 z-30">
       <div className="w-full px-4 sm:px-6 py-2.5 flex items-center justify-between mx-auto">
         {/* Right: Toggle button for sidebar (desktop & mobile) + Title */}
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleSidebar}
-            className="p-2 sm:px-3 rounded-xl text-[#005c55] bg-[#005c55]/10 hover:bg-[#005c55]/20 cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
+            className="p-2 sm:px-3 rounded-xl text-brand bg-brand/10 hover:bg-brand/20 cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
             title={isSidebarOpen ? "إغلاق القائمة الجانبية (Slide bar)" : "فتح القائمة الجانبية (Slide bar)"}
             aria-label="القائمة الجانبية"
           >
@@ -60,14 +60,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#005c55]/10 flex items-center justify-center text-[#005c55] shrink-0 hidden sm:flex">
+            <div className="w-9 h-9 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0 hidden sm:flex">
               <span className="material-symbols-outlined text-xl">mosque</span>
             </div>
             <div>
-              <span className="text-[16px] sm:text-[18px] font-extrabold text-[#005c55] block leading-tight">
+              <span className="text-[16px] sm:text-[18px] font-extrabold text-brand block leading-tight">
                 مسجد الإمام البخاري
               </span>
-              <span className="text-[11px] text-[#0f766e] block font-bold">
+              <span className="text-xs text-[#0f766e] block font-bold">
                 متابعة الدورة العلمية الصيفية - المتون العلمية
               </span>
             </div>
@@ -81,7 +81,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={onOpenDatabaseModal}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 text-emerald-800 text-[11px] font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 text-emerald-800 text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
               title="حالة قاعدة البيانات"
             >
               <span className="material-symbols-outlined text-sm">database</span>
@@ -92,14 +92,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           {/* User Profile / Switcher Button */}
           <button
             onClick={onOpenAuthModal}
-            className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-[#bdc9c6]/60 bg-[#f8f9ff] hover:bg-[#eff4ff] text-[#0d1c2e] text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-line/60 bg-canvas hover:bg-tint text-ink text-xs font-semibold transition-all cursor-pointer shadow-2xs"
             title="تبديل الصلاحية أو استعراض بيانات الحساب"
           >
             <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
               currentUser.role === 'super_admin' ? 'bg-emerald-700 text-white' :
               currentUser.role === 'committee_head' ? 'bg-blue-700 text-white' :
-              currentUser.role === 'teacher' ? 'bg-indigo-700 text-white' :
-              currentUser.role === 'auditor' ? 'bg-purple-700 text-white' :
+              currentUser.role === 'teacher' ? 'bg-teal-700 text-white' :
+              currentUser.role === 'auditor' ? 'bg-teal-700 text-white' :
               'bg-amber-600 text-white'
             }`}>
               {currentUser.role === 'super_admin' ? '👑' :
@@ -108,14 +108,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                currentUser.role === 'auditor' ? '🔍' : '👤'}
             </span>
             <div className="text-right hidden sm:block">
-              <span className="text-[11px] font-bold block leading-none truncate max-w-[130px]">
+              <span className="text-xs font-bold block leading-none truncate max-w-[130px]">
                 {currentUser.name.split(' ')[0]} {currentUser.name.split(' ')[1] || ''}
               </span>
-              <span className={`text-[10px] font-semibold leading-none ${
+              <span className={`text-xs font-semibold leading-none ${
                 currentUser.role === 'super_admin' ? 'text-emerald-700 font-bold' :
                 currentUser.role === 'committee_head' ? 'text-blue-700 font-bold' :
-                currentUser.role === 'teacher' ? 'text-indigo-700 font-bold' :
-                currentUser.role === 'auditor' ? 'text-purple-700 font-bold' :
+                currentUser.role === 'teacher' ? 'text-teal-700 font-bold' :
+                currentUser.role === 'auditor' ? 'text-teal-700 font-bold' :
                 'text-amber-700 font-bold'
               }`}>
                 {currentUser.role === 'super_admin' ? 'مدير النظام' :
@@ -124,7 +124,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                  currentUser.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
               </span>
             </div>
-            <span className="material-symbols-outlined text-xs text-[#6e7977]">expand_more</span>
+            <span className="material-symbols-outlined text-xs text-muted">expand_more</span>
           </button>
 
           {/* Sign Out Button (Central Service Exit) */}
@@ -143,7 +143,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           {(currentUser.role === 'super_admin' || currentUser.permissions.includes('add_new_committee')) && (
             <button
               onClick={onOpenNewCommittee}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-[#005c55] shadow-xs active:scale-[0.98] transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">add_circle</span>
               <span>إضافة لجنة</span>
@@ -155,7 +155,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               onClick={onOpenExport}
               title="تصدير الكشوف"
-              className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer hidden sm:flex"
+              className="p-2 rounded-xl text-ink-soft hover:bg-tint border border-line/50 transition-colors cursor-pointer hidden sm:flex"
             >
               <span className="material-symbols-outlined text-lg">file_download</span>
             </button>
@@ -169,8 +169,8 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
               title={`يوجد ${todaysTasksCount} أعمال وتنبيهات مجدولة اليوم - اضغط لفتح شاشة التنبيهات والمهام اليومية`}
             >
-              <span className="material-symbols-outlined text-sm text-amber-700 animate-bounce">notifications_active</span>
-              <span className="font-mono text-[11px] font-black">{todaysTasksCount} مهام اليوم</span>
+              <span className="material-symbols-outlined text-sm text-amber-700">notifications_active</span>
+              <span className="font-mono text-xs font-black">{todaysTasksCount} مهام اليوم</span>
             </button>
           )}
 
@@ -184,7 +184,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                 }
               }}
               aria-label="الإشعارات"
-              className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors relative cursor-pointer"
+              className="p-2 rounded-xl text-ink-soft hover:bg-tint border border-line/50 transition-colors relative cursor-pointer"
             >
               <span className="material-symbols-outlined text-lg">notifications</span>
               {unreadCount > 0 && (
@@ -193,12 +193,12 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             </button>
 
             {showNotifications && (
-              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-[#bdc9c6]/50 py-3 px-4 z-50 animate-in fade-in duration-150 text-right">
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#bdc9c6]/30">
-                  <span className="font-bold text-[13px] text-[#0d1c2e]">
+              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-line/50 py-3 px-4 z-50 animate-in fade-in duration-150 text-right">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-line/30">
+                  <span className="font-bold text-[13px] text-ink">
                     إشعارات مسابقات مسجد البخاري
                   </span>
-                  <span className="text-[11px] text-[#005c55] bg-[#9cf2e8]/30 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-xs text-brand bg-brand-light/30 px-2 py-0.5 rounded-full font-medium">
                     {notifications.length} إشعار
                   </span>
                 </div>
@@ -212,13 +212,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                           setShowNotifications(false);
                         }
                       }}
-                      className="p-2 rounded-xl border border-gray-100 hover:bg-[#eff4ff] cursor-pointer"
+                      className="p-2 rounded-xl border border-gray-100 hover:bg-tint cursor-pointer"
                     >
-                      <div className="flex items-center justify-between font-bold text-[#0d1c2e] mb-1">
+                      <div className="flex items-center justify-between font-bold text-ink mb-1">
                         <span>{notif.title}</span>
-                        <span className="text-[10px] text-gray-400 font-normal">{notif.time}</span>
+                        <span className="text-xs text-gray-400 font-normal">{notif.time}</span>
                       </div>
-                      <p className="text-[#6e7977] text-[11px]">{notif.description}</p>
+                      <p className="text-muted text-xs">{notif.description}</p>
                     </div>
                   ))}
                 </div>

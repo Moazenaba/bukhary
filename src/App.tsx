@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DATA_ROOT_KEY, useCacheSetter, useServerData } from './data/queries';
 import {
@@ -30,18 +30,18 @@ import { CommitteeDetailModal } from './components/CommitteeDetailModal';
 import { AddCommitteeModal } from './components/AddCommitteeModal';
 import { AddExamModal } from './components/AddExamModal';
 import { AddBookModal } from './components/AddBookModal';
-import { ExamsView } from './components/ExamsView';
-import { CoursesView } from './components/CoursesView';
-import { CalendarScheduleView } from './components/CalendarScheduleView';
-import { AssistantsView } from './components/AssistantsView';
+const ExamsView = lazy(() => import('./components/ExamsView').then((m) => ({ default: m.ExamsView })));
+const CoursesView = lazy(() => import('./components/CoursesView').then((m) => ({ default: m.CoursesView })));
+const CalendarScheduleView = lazy(() => import('./components/CalendarScheduleView').then((m) => ({ default: m.CalendarScheduleView })));
+const AssistantsView = lazy(() => import('./components/AssistantsView').then((m) => ({ default: m.AssistantsView })));
 import { AuthModal } from './components/AuthModal';
 import { ExportModal } from './components/ExportModal';
 import { HomeOverviewView } from './components/HomeOverviewView';
-import { StatisticsView } from './components/StatisticsView';
-import { SummerCourseTrackerView } from './components/SummerCourseTrackerView';
+const StatisticsView = lazy(() => import('./components/StatisticsView').then((m) => ({ default: m.StatisticsView })));
+const SummerCourseTrackerView = lazy(() => import('./components/SummerCourseTrackerView').then((m) => ({ default: m.SummerCourseTrackerView })));
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { DailyAlertsView } from './components/DailyAlertsView';
-import { CeremoniesView } from './components/CeremoniesView';
+const DailyAlertsView = lazy(() => import('./components/DailyAlertsView').then((m) => ({ default: m.DailyAlertsView })));
+const CeremoniesView = lazy(() => import('./components/CeremoniesView').then((m) => ({ default: m.CeremoniesView })));
 import { Footer } from './components/Footer';
 import { CentralLoginPortal } from './components/CentralLoginPortal';
 import { SupabaseDatabaseModal } from './components/SupabaseDatabaseModal';
@@ -580,7 +580,7 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff] text-[#3e4947] font-['IBM_Plex_Sans_Arabic']" role="status">
+      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink-soft font-['IBM_Plex_Sans_Arabic']" role="status">
         جارٍ التحقق من الجلسة...
       </div>
     );
@@ -597,7 +597,7 @@ export default function App() {
   }
 
   return (
-    <div className="bg-[#f8f9ff] text-[#0d1c2e] min-h-screen flex font-['IBM_Plex_Sans_Arabic'] text-right selection:bg-[#9cf2e8] selection:text-[#00201d]">
+    <div className="bg-canvas text-ink min-h-screen flex font-['IBM_Plex_Sans_Arabic'] text-right selection:bg-brand-light selection:text-[#00201d]">
       {/* 1. Sidebar Navigation (التابات في الجنب) */}
       <Sidebar
         activeTab={activeTab}
@@ -643,8 +643,9 @@ export default function App() {
 
         {/* Tab Views */}
         <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24 lg:pb-8">
+          <Suspense fallback={<div role="status" aria-live="polite" className="py-16 text-center text-sm text-muted">جاري التحميل…</div>}>
           {isLoadingDatabase && (
-            <div role="status" className="mb-4 rounded-xl bg-[#dce9ff]/60 text-[#0d1c2e] text-sm px-4 py-3">
+            <div role="status" className="mb-4 rounded-xl bg-[#dce9ff]/60 text-ink text-sm px-4 py-3">
               جارٍ تحميل البيانات من الخادم...
             </div>
           )}
@@ -800,11 +801,11 @@ export default function App() {
               {currentUser.role === 'assistant' && (
                 <div className="mb-6 p-4 rounded-2xl bg-gradient-to-l from-emerald-50 via-teal-50 to-white border border-teal-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
                   <div>
-                    <span className="font-bold text-[#005c55] text-sm block flex items-center gap-1.5 mb-1">
+                    <span className="font-bold text-brand text-sm block flex items-center gap-1.5 mb-1">
                       <span className="material-symbols-outlined text-lg">person_pin</span>
                       <span>مرحباً بك: {currentUser.name} (معاون ميداني)</span>
                     </span>
-                    <span className="text-[#3e4947] block leading-relaxed">
+                    <span className="text-ink-soft block leading-relaxed">
                       الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'متابعة اللجان الميدانية'}</strong> • اللجان المسندة: <strong>{currentUser.assignedCommittees.map(c => `#${c}`).join('، ') || 'كافة اللجان'}</strong>
                     </span>
                   </div>
@@ -819,8 +820,8 @@ export default function App() {
                       }}
                       className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 ${
                         assistantOnlyFilter
-                          ? 'bg-[#005c55] text-white'
-                          : 'bg-white border border-[#bdc9c6] text-[#0d1c2e] hover:bg-emerald-50'
+                          ? 'bg-brand text-white'
+                          : 'bg-white border border-line text-ink hover:bg-emerald-50'
                       }`}
                     >
                       <span className="material-symbols-outlined text-sm">filter_alt</span>
@@ -899,14 +900,14 @@ export default function App() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl p-12 text-center border border-[#bdc9c6]/40 shadow-xs">
-                  <span className="material-symbols-outlined text-4xl text-[#6e7977] mb-2 block">
+                <div className="bg-white rounded-2xl p-12 text-center border border-line/40 shadow-xs">
+                  <span className="material-symbols-outlined text-4xl text-muted mb-2 block">
                     search_off
                   </span>
-                  <h3 className="font-bold text-base text-[#0d1c2e] mb-1">
+                  <h3 className="font-bold text-base text-ink mb-1">
                     لا توجد لجان مطابقة لمعايير البحث
                   </h3>
-                  <p className="text-xs text-[#6e7977] mb-4">
+                  <p className="text-xs text-muted mb-4">
                     جرب تغيير كلمات البحث، أو إزالة التصفية لعرض اللجان الأخرى.
                   </p>
                   <button
@@ -914,7 +915,7 @@ export default function App() {
                       setSearchQuery('');
                       setSelectedStage('all');
                     }}
-                    className="px-4 py-2 rounded-xl bg-[#005c55] text-white text-xs font-semibold hover:bg-[#1b6b51] cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-brand text-white text-xs font-semibold hover:bg-success cursor-pointer"
                   >
                     إعادة ضبط البحث والتصفية
                   </button>
@@ -922,16 +923,16 @@ export default function App() {
               )}
 
               {/* Bottom Pagination */}
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-[#bdc9c6]/40">
-                <div className="text-[13px] text-[#3e4947]">
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-line/40">
+                <div className="text-[13px] text-ink-soft">
                   عرض{' '}
-                  <span className="font-semibold text-[#0d1c2e]">
+                  <span className="font-semibold text-ink">
                     {filteredCommittees.length > 0
                       ? `${startIndexDisplay} إلى ${endIndexDisplay}`
                       : '0'}
                   </span>{' '}
                   من إجمالي{' '}
-                  <span className="font-semibold text-[#0d1c2e]">
+                  <span className="font-semibold text-ink">
                     {filteredCommittees.length}
                   </span>{' '}
                   لجنة مسجلة
@@ -941,7 +942,7 @@ export default function App() {
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-[#bdc9c6]/60 text-[#6e7977] hover:text-[#0d1c2e] hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                    className="p-2 rounded-lg border border-line/60 text-muted hover:text-ink hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                     title="الصفحة السابقة"
                   >
                     <span className="material-symbols-outlined text-lg">chevron_right</span>
@@ -953,8 +954,8 @@ export default function App() {
                       onClick={() => setCurrentPage(pg)}
                       className={`w-9 h-9 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                         currentPage === pg
-                          ? 'bg-[#005c55] text-white'
-                          : 'border border-[#bdc9c6]/60 text-[#0d1c2e] hover:bg-[#dce9ff]/40'
+                          ? 'bg-brand text-white'
+                          : 'border border-line/60 text-ink hover:bg-[#dce9ff]/40'
                       }`}
                     >
                       {pg}
@@ -964,7 +965,7 @@ export default function App() {
                   <button
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-[#bdc9c6]/60 text-[#0d1c2e] hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                    className="p-2 rounded-lg border border-line/60 text-ink hover:bg-[#dce9ff]/40 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                     title="الصفحة التالية"
                   >
                     <span className="material-symbols-outlined text-lg">chevron_left</span>
@@ -973,6 +974,7 @@ export default function App() {
               </div>
             </>
           )}
+          </Suspense>
         </main>
 
         {/* Mobile App Bottom Navigation Bar (iOS / Android Native App feel) */}

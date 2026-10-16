@@ -170,7 +170,7 @@ export const CentralLoginPortal: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#022824] via-[#004d47] to-[#04332e] text-[#0d1c2e] font-sans flex flex-col justify-between selection:bg-[#9cf2e8] selection:text-[#00201d] relative overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#022824] via-[#004d47] to-[#04332e] text-ink font-sans flex flex-col justify-between selection:bg-brand-light selection:text-[#00201d] relative overflow-x-hidden">
       {/* Background Islamic Pattern Ambient Overlay */}
       <div
         className="absolute inset-0 opacity-10 pointer-events-none mix-blend-overlay"
@@ -192,7 +192,7 @@ export const CentralLoginPortal: React.FC = () => {
               <span className="font-black text-white text-sm sm:text-base tracking-wide block">
                 بوابة مسجد الإمام البخاري الرقمية
               </span>
-              <span className="text-[11px] text-emerald-300 font-medium">
+              <span className="text-xs text-emerald-300 font-medium">
                 منظومة إدارة لجان المسابقات القرآنية والدورات العلمية
               </span>
             </div>
@@ -230,7 +230,7 @@ export const CentralLoginPortal: React.FC = () => {
                 </span>
                 <div>
                   <h4 className="text-xs font-bold text-white">تقديم طلب الانضمام</h4>
-                  <p className="text-[11px] text-emerald-200/80">
+                  <p className="text-xs text-emerald-200/80">
                     تسجيل البيانات، مقدار الحفظ، المؤهل، واللجان المرغوبة.
                   </p>
                 </div>
@@ -242,7 +242,7 @@ export const CentralLoginPortal: React.FC = () => {
                 </span>
                 <div>
                   <h4 className="text-xs font-bold text-white">المراجعة والمقابلة والاعتماد</h4>
-                  <p className="text-[11px] text-emerald-200/80">
+                  <p className="text-xs text-emerald-200/80">
                     مراجعة المشرف العام وتحديد موعد المقابلة وإسناد اللجان.
                   </p>
                 </div>
@@ -254,7 +254,7 @@ export const CentralLoginPortal: React.FC = () => {
                 </span>
                 <div>
                   <h4 className="text-xs font-bold text-white">استلام اللجان وبدء المهام</h4>
-                  <p className="text-[11px] text-emerald-200/80">
+                  <p className="text-xs text-emerald-200/80">
                     تسجيل الدخول ومتابعة كشوفات الطلاب ورصد الدرجات.
                   </p>
                 </div>
@@ -262,7 +262,7 @@ export const CentralLoginPortal: React.FC = () => {
             </div>
 
             {/* Quote / Islamic Note */}
-            <div className="border-r-2 border-amber-400/60 pr-3 py-1 text-[11px] text-emerald-200/90 italic">
+            <div className="border-r-2 border-amber-400/60 pr-3 py-1 text-xs text-emerald-200/90 italic">
               «خيركم من تعلم القرآن وعلمه» - خدمة أهل القرآن شرف ومسؤولية.
             </div>
           </div>
@@ -296,7 +296,7 @@ export const CentralLoginPortal: React.FC = () => {
                     </p>
                   </div>
 
-                  <span className="text-[11px] bg-white/20 text-emerald-100 px-3 py-1 rounded-full font-mono shrink-0">
+                  <span className="text-xs bg-white/20 text-emerald-100 px-3 py-1 rounded-full font-mono shrink-0">
                     Bukhari Portal {new Date().getFullYear()}
                   </span>
                 </div>
@@ -386,36 +386,36 @@ export const CentralLoginPortal: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => copyCode(submittedReceipt.requestCode)}
-                            className="px-2.5 py-1 rounded-lg border border-amber-300 bg-white text-amber-900 text-[11px] font-bold cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg border border-amber-300 bg-white text-amber-900 text-xs font-bold cursor-pointer"
                           >
                             {codeCopied ? 'تم النسخ ✓' : 'نسخ الكود'}
                           </button>
                         </div>
                       </div>
-                      <p role="note" className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <p role="note" className="text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                         احتفظ بكود الطلب: هو الطريقة الوحيدة لمتابعة حالة طلبك، ولن يظهر مرة أخرى بعد مغادرة هذه الصفحة.
                       </p>
 
                       {/* Applicant Summary Card */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-white border border-emerald-200 text-xs">
                         <div>
-                          <span className="text-slate-500 block text-[11px]">اسم المتقدم:</span>
+                          <span className="text-slate-500 block text-xs">اسم المتقدم:</span>
                           <strong className="text-emerald-950 font-bold">{submittedReceipt.name}</strong>
                         </div>
                         <div>
-                          <span className="text-slate-500 block text-[11px]">رقم الجوال المسجل:</span>
+                          <span className="text-slate-500 block text-xs">رقم الجوال المسجل:</span>
                           <strong className="font-mono text-emerald-950 font-bold">{submittedReceipt.phone}</strong>
                         </div>
                         <div>
-                          <span className="text-slate-500 block text-[11px]">الدور والمهمة المطلوبة:</span>
-                          <strong className="text-[#005c55] font-bold">{AuthService.getRoleLabel(submittedReceipt.role)}</strong>
+                          <span className="text-slate-500 block text-xs">الدور والمهمة المطلوبة:</span>
+                          <strong className="text-brand font-bold">{AuthService.getRoleLabel(submittedReceipt.role)}</strong>
                         </div>
                         <div>
-                          <span className="text-slate-500 block text-[11px]">مقدار حفظ القرآن:</span>
+                          <span className="text-slate-500 block text-xs">مقدار حفظ القرآن:</span>
                           <strong className="text-slate-800 font-bold">{submittedReceipt.quranLevel || 'غير محدد'}</strong>
                         </div>
                         <div className="sm:col-span-2">
-                          <span className="text-slate-500 block text-[11px]">حالة الطلب الآن:</span>
+                          <span className="text-slate-500 block text-xs">حالة الطلب الآن:</span>
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs mt-1 border border-amber-300">
                             <span className="material-symbols-outlined text-sm animate-spin">sync</span>
                             <span>قيد مراجعة المشرف العام وتوزيع اللجان الميدانية</span>
@@ -429,7 +429,7 @@ export const CentralLoginPortal: React.FC = () => {
                           <span className="material-symbols-outlined text-sm">info</span>
                           <span>ماذا سيحدث بعد إرسال الطلب؟</span>
                         </strong>
-                        <p className="text-[11px] text-emerald-900 leading-relaxed">
+                        <p className="text-xs text-emerald-900 leading-relaxed">
                           1. سيقوم فضيلة المشرف العام بمراجعة مؤهلاتك وحفظك للقرآن الكريم.
                           <br />
                           2. سيتم إسناد اللجان الميدانية وتفعيل صلاحيات الدخول، أو جدولة مقابلة شخصية.
@@ -447,7 +447,7 @@ export const CentralLoginPortal: React.FC = () => {
                             setActiveTab('track');
                             lookUp(submittedReceipt.requestCode);
                           }}
-                          className="px-4 py-2.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
+                          className="px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-deep text-white font-bold text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
                         >
                           <span className="material-symbols-outlined text-sm">search</span>
                           <span>متابعة وتتبع حالة هذا الطلب الآن</span>
@@ -468,13 +468,13 @@ export const CentralLoginPortal: React.FC = () => {
                       {/* Section 1: Personal & Contact Details */}
                       <div className="p-4 rounded-2xl bg-[#f8fafc] border border-slate-200 space-y-3">
                         <h3 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b border-slate-200 pb-2">
-                          <span className="material-symbols-outlined text-sm text-[#005c55]">badge</span>
+                          <span className="material-symbols-outlined text-sm text-brand">badge</span>
                           <span>١. البيانات الشخصية ومعلومات التواصل:</span>
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               الاسم الرباعي الكامل <span className="text-rose-500">*</span>
                             </label>
                             <input
@@ -485,12 +485,12 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="مثال: معاذ بن سعد العتيبي"
                               value={regName}
                               onChange={(e) => setRegName(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] focus:ring-1 focus:ring-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               رقم الجوال (اسم الدخول) <span className="text-rose-500">*</span>
                             </label>
                             <input
@@ -502,12 +502,12 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="مثال: 0501234567"
                               value={regPhone}
                               onChange={(e) => setRegPhone(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] focus:ring-1 focus:ring-[#005c55] font-mono text-left"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand focus:ring-1 focus:ring-brand font-mono text-left"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               رقم الواتساب (للتواصل السريع)
                             </label>
                             <input
@@ -515,12 +515,12 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="نفس رقم الجوال أو رقم آخر..."
                               value={regWhatsapp}
                               onChange={(e) => setRegWhatsapp(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               رقم الهوية الوطنية / الإقامة (اختياري)
                             </label>
                             <input
@@ -528,7 +528,7 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="رقم الهوية..."
                               value={regNationalId}
                               onChange={(e) => setRegNationalId(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                             />
                           </div>
                         </div>
@@ -537,19 +537,19 @@ export const CentralLoginPortal: React.FC = () => {
                       {/* Section 2: Qualifications & Quran Level */}
                       <div className="p-4 rounded-2xl bg-[#f8fafc] border border-slate-200 space-y-3">
                         <h3 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b border-slate-200 pb-2">
-                          <span className="material-symbols-outlined text-sm text-[#005c55]">menu_book</span>
+                          <span className="material-symbols-outlined text-sm text-brand">menu_book</span>
                           <span>٢. المؤهل العلمي ومقدار حفظ القرآن الكريم والخبرات:</span>
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               مقدار حفظ القرآن الكريم والإجازات
                             </label>
                             <select
                               value={regQuranLevel}
                               onChange={(e) => setRegQuranLevel(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                             >
                               <option value="">اختر مقدار الحفظ...</option>
                               <option value="حفظ القرآن كاملاً مع إجازة بالقراءات">حفظ القرآن كاملاً مع إجازة بالقراءات</option>
@@ -564,7 +564,7 @@ export const CentralLoginPortal: React.FC = () => {
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               المؤهل العلمي والتخصص
                             </label>
                             <input
@@ -572,12 +572,12 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="مثال: بكالوريوس شريعة / أصول دين / حاسب..."
                               value={regQualification}
                               onChange={(e) => setRegQualification(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                             />
                           </div>
 
                           <div className="sm:col-span-2">
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               الخبرات السابقة في لجان المساجد والمسابقات القرآنية
                             </label>
                             <input
@@ -585,7 +585,7 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="اذكر خبراتك السابقة في التنظيم، الاختبارات، أو التحكيم..."
                               value={regExperience}
                               onChange={(e) => setRegExperience(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                             />
                           </div>
                         </div>
@@ -594,38 +594,38 @@ export const CentralLoginPortal: React.FC = () => {
                       {/* Section 3: Role, Shifts, Committees & Password */}
                       <div className="p-4 rounded-2xl bg-[#f8fafc] border border-slate-200 space-y-3">
                         <h3 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b border-slate-200 pb-2">
-                          <span className="material-symbols-outlined text-sm text-[#005c55]">tune</span>
+                          <span className="material-symbols-outlined text-sm text-brand">tune</span>
                           <span>٣. الدور المطلوب، أوقات التفرغ، وكلمة المرور:</span>
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               الدور المطلوب
                             </label>
                             <select
                               value={regRole}
                               onChange={(e) => setRegRole(e.target.value as UserRole)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-bold text-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-bold text-brand"
                             >
                               <option value="assistant">معاون ميداني معتمد (استلام اللجان ومتابعة الطلاب)</option>
                               <option value="teacher">معلم ومقرئ (اختبار الطلاب والتحكيم)</option>
                               <option value="committee_head">رئيس لجنة ومقرئ (إدارة الاختبارات والاعتماد)</option>
                               <option value="auditor">مراجع ومدقق جودة (رقابة ورصد الدرجات)</option>
                             </select>
-                            <span className="text-[10px] text-slate-500 block mt-0.5">
+                            <span className="text-xs text-slate-500 block mt-0.5">
                               هذا طلب فقط؛ الدور النهائي يحدده المشرف العام عند الاعتماد.
                             </span>
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               أوقات التفرغ المتاحة
                             </label>
                             <select
                               value={regAvailability}
                               onChange={(e) => setRegAvailability(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                             >
                               <option value="">اختر أوقات التفرغ...</option>
                               <option value="طوال فترة المسابقة (الفترة المسائية)">طوال فترة المسابقة (الفترة المسائية)</option>
@@ -638,7 +638,7 @@ export const CentralLoginPortal: React.FC = () => {
 
                           {/* Preferred Committees */}
                           <div className="sm:col-span-2">
-                            <label htmlFor="reg-preferred" className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label htmlFor="reg-preferred" className="block text-xs font-bold text-slate-700 mb-1">
                               أرقام اللجان المفضلة للعمل بها (اختياري، افصل بينها بفاصلة)
                             </label>
                             <input
@@ -648,13 +648,13 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="مثال: 3، 7"
                               value={regPreferredCommitteesText}
                               onChange={(e) => setRegPreferredCommitteesText(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                             />
                           </div>
 
                           {/* Password */}
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               كلمة المرور للحساب <span className="text-rose-500">*</span>
                             </label>
                             <div className="relative">
@@ -667,7 +667,7 @@ export const CentralLoginPortal: React.FC = () => {
                                 placeholder="اختر كلمة مرور للحساب..."
                                 value={regPassword}
                                 onChange={(e) => setRegPassword(e.target.value)}
-                                className="w-full bg-white border border-slate-300 rounded-xl pr-3 pl-9 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                                className="w-full bg-white border border-slate-300 rounded-xl pr-3 pl-9 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                               />
                               <button
                                 type="button"
@@ -680,14 +680,14 @@ export const CentralLoginPortal: React.FC = () => {
                                 </span>
                               </button>
                             </div>
-                            <span className="text-[10px] text-slate-500 block mt-0.5">
+                            <span className="text-xs text-slate-500 block mt-0.5">
                               8 أحرف على الأقل، وتحتوي على حروف وأرقام. ستستخدمها مع رقم جوالك للدخول بعد الاعتماد.
                             </span>
                           </div>
 
                           {/* Notes */}
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
                               ملاحظات وتزكيات المشايخ (اختياري)
                             </label>
                             <input
@@ -695,7 +695,7 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="تزكيات أو ملاحظات خاصة..."
                               value={regNotes}
                               onChange={(e) => setRegNotes(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                             />
                           </div>
                         </div>
@@ -712,7 +712,7 @@ export const CentralLoginPortal: React.FC = () => {
                         <button
                           type="submit"
                           disabled={isRegistering}
-                          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#005c55] via-emerald-700 to-[#004742] hover:opacity-95 text-white font-black text-sm cursor-pointer shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-brand via-emerald-700 to-brand-deep hover:opacity-95 text-white font-black text-sm cursor-pointer shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-2"
                         >
                           <span className="material-symbols-outlined text-lg">
                             {isRegistering ? 'sync' : 'send'}
@@ -730,12 +730,12 @@ export const CentralLoginPortal: React.FC = () => {
               {/* TAB 2: TRACK JOIN REQUEST (تتبع حالة طلب الانضمام) */}
               {activeTab === 'track' && (
                 <div className="p-5 sm:p-7 space-y-5">
-                  <div className="p-4 rounded-2xl bg-[#eff4ff] border border-blue-200 text-xs text-blue-950 space-y-2">
+                  <div className="p-4 rounded-2xl bg-tint border border-blue-200 text-xs text-blue-950 space-y-2">
                     <strong className="font-bold flex items-center gap-1.5 text-blue-900 text-xs">
                       <span className="material-symbols-outlined text-base">travel_explore</span>
                       <span>منظومة تتبع طلبات الانضمام الفورية:</span>
                     </strong>
-                    <p className="text-[11px] leading-relaxed text-blue-900">
+                    <p className="text-xs leading-relaxed text-blue-900">
                       أدخل كود الطلب الذي ظهر لك عند التسجيل (مثل <code>REQ-2026-XXXXXXXX</code>) للاستعلام عن حالة طلبك.
                     </p>
                   </div>
@@ -755,12 +755,12 @@ export const CentralLoginPortal: React.FC = () => {
                         placeholder="كود الطلب REQ-XXXX..."
                         value={trackQuery}
                         onChange={(e) => setTrackQuery(e.target.value)}
-                        className="w-full bg-white border-2 border-emerald-300 rounded-2xl pr-11 pl-4 py-3 text-xs sm:text-sm font-mono outline-none focus:border-[#005c55]"
+                        className="w-full bg-white border-2 border-emerald-300 rounded-2xl pr-11 pl-4 py-3 text-xs sm:text-sm font-mono outline-none focus:border-brand"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs sm:text-sm cursor-pointer shadow-md transition-all shrink-0 flex items-center justify-center gap-1.5"
+                      className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-brand hover:bg-brand-deep text-white font-bold text-xs sm:text-sm cursor-pointer shadow-md transition-all shrink-0 flex items-center justify-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-sm">search_check</span>
                       <span>استعلام عن الطلب</span>
@@ -776,7 +776,7 @@ export const CentralLoginPortal: React.FC = () => {
                         <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">{trackError}</div>
                       ) : trackResult ? (
                         <div className="p-5 rounded-2xl bg-white border border-emerald-200 space-y-2 text-right">
-                          <span className="text-slate-500 text-[11px] block">حالة الطلب:</span>
+                          <span className="text-slate-500 text-xs block">حالة الطلب:</span>
                           <strong className="text-sm text-emerald-950 block">{STATUS_LABEL[trackResult.status] ?? trackResult.status}</strong>
                           {trackResult.status === 'interview' && trackResult.interviewDate && (
                             <p className="text-xs text-slate-700">موعد المقابلة: {trackResult.interviewDate}</p>
@@ -785,7 +785,7 @@ export const CentralLoginPortal: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setActiveTab('login')}
-                              className="mt-2 px-4 py-2 rounded-xl bg-[#005c55] text-white font-bold text-xs cursor-pointer"
+                              className="mt-2 px-4 py-2 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer"
                             >
                               الانتقال لتسجيل الدخول
                             </button>
@@ -828,7 +828,7 @@ export const CentralLoginPortal: React.FC = () => {
                         placeholder="البريد الإلكتروني أو رقم الهاتف..."
                         value={emailOrPhone}
                         onChange={(e) => setEmailOrPhone(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm outline-none focus:border-[#005c55] focus:bg-white transition-all font-mono text-left"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm outline-none focus:border-brand focus:bg-white transition-all font-mono text-left"
                       />
                     </div>
 
@@ -838,7 +838,7 @@ export const CentralLoginPortal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setShowForgotPassword(true)}
-                          className="text-[11px] text-[#005c55] hover:underline cursor-pointer"
+                          className="text-xs text-brand hover:underline cursor-pointer"
                         >
                           نسيت كلمة المرور؟
                         </button>
@@ -855,7 +855,7 @@ export const CentralLoginPortal: React.FC = () => {
                           placeholder="كلمة المرور..."
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-300 rounded-xl pr-3.5 pl-10 py-2.5 text-xs sm:text-sm outline-none focus:border-[#005c55] focus:bg-white transition-all font-mono text-left"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl pr-3.5 pl-10 py-2.5 text-xs sm:text-sm outline-none focus:border-brand focus:bg-white transition-all font-mono text-left"
                         />
                         <button
                           type="button"
@@ -875,7 +875,7 @@ export const CentralLoginPortal: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-3.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-sm cursor-pointer shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="w-full py-3.5 rounded-xl bg-brand hover:bg-brand-deep text-white font-bold text-sm cursor-pointer shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {isSubmitting ? (
                         <>
@@ -924,7 +924,7 @@ export const CentralLoginPortal: React.FC = () => {
               وغيّرها من إعدادات حسابك.
             </p>
             <div className="flex justify-end">
-              <button type="button" onClick={() => setShowForgotPassword(false)} className="px-4 py-2 rounded-xl bg-[#005c55] text-white font-bold text-xs cursor-pointer">
+              <button type="button" onClick={() => setShowForgotPassword(false)} className="px-4 py-2 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer">
                 حسناً
               </button>
             </div>

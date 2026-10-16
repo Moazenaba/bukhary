@@ -331,7 +331,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
   return (
     <div className="space-y-6 text-right">
       {/* Header Banner */}
-      <div className="bg-gradient-to-l from-[#005c55] to-emerald-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-l from-brand to-emerald-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
@@ -350,7 +350,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => handleOpenAddModal(selectedDateStr)}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-xl text-emerald-600">add_task</span>
             <span>+ إضافة عمل / تسليم جديد</span>
@@ -367,22 +367,22 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       </div>
 
       {/* Quick Upcoming Days Strip (الوصول السريع للأيام ومواعيد الجمعة) */}
-      <div className="bg-white rounded-2xl border border-[#bdc9c6]/60 p-4 shadow-xs">
+      <div className="bg-white rounded-2xl border border-line/60 p-4 shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
               <span className="material-symbols-outlined text-lg">event_upcoming</span>
             </span>
             <div>
-              <span className="font-bold text-xs sm:text-sm text-[#0d1c2e] block">
+              <span className="font-bold text-xs sm:text-sm text-ink block">
                 مواعيد الجمعة والأيام القادمة (اضغط على أي يوم لعرض تسليماته فوراً):
               </span>
-              <span className="text-[11px] text-[#6e7977]">
+              <span className="text-xs text-muted">
                 الجمعة 10/2 هي الموعد الأبرز للاختبارات وتسليم الدفاتر والكشوف
               </span>
             </div>
           </div>
-          <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+          <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
             اليوم المحدد: {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})
           </span>
         </div>
@@ -404,17 +404,17 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 }}
                 className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-2 border cursor-pointer active:scale-95 ${
                   isSelected
-                    ? 'bg-[#005c55] text-white border-[#005c55] shadow-sm ring-2 ring-[#005c55]/30'
+                    ? 'bg-brand text-white border-brand shadow-sm ring-2 ring-brand/30'
                     : q.isFriday
                     ? 'bg-emerald-50 border-emerald-300 text-emerald-950 hover:bg-emerald-100'
-                    : 'bg-[#f8f9ff] border-gray-200 text-[#0d1c2e] hover:bg-gray-100'
+                    : 'bg-canvas border-gray-200 text-ink hover:bg-gray-100'
                 }`}
               >
                 <span>{q.label}</span>
                 {dayTasksCount > 0 && (
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
-                      isSelected ? 'bg-white text-[#005c55]' : 'bg-red-500 text-white'
+                    className={`text-xs font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                      isSelected ? 'bg-white text-brand' : 'bg-red-500 text-white'
                     }`}
                   >
                     {dayTasksCount}
@@ -429,14 +429,14 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       {/* Main Grid: Calendar on Right / Day Details on Left */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* RIGHT COLUMN: CALENDAR GRID (7 Cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-[#bdc9c6]/60 p-5 shadow-xs space-y-4">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-line/60 p-5 shadow-xs space-y-4">
           {/* Calendar Header with Navigation */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#bdc9c6]/30">
+          <div className="flex items-center justify-between pb-3 border-b border-line/30">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-base sm:text-lg text-[#0d1c2e]">
+              <h3 className="font-bold text-base sm:text-lg text-ink">
                 {monthNamesArabic[month]} {year}
               </h3>
-              <span className="text-xs text-[#6e7977] font-semibold">
+              <span className="text-xs text-muted font-semibold">
                 ({new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { month: 'long', year: 'numeric' }).format(new Date(year, month, 15))})
               </span>
             </div>
@@ -445,7 +445,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               <button
                 type="button"
                 onClick={prevMonth}
-                className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-ink-soft hover:bg-tint border border-line/50 transition-colors cursor-pointer"
                 title="الشهر السابق"
               >
                 <span className="material-symbols-outlined text-lg">chevron_right</span>
@@ -453,7 +453,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               <button
                 type="button"
                 onClick={nextMonth}
-                className="p-2 rounded-xl text-[#3e4947] hover:bg-[#eff4ff] border border-[#bdc9c6]/50 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-ink-soft hover:bg-tint border border-line/50 transition-colors cursor-pointer"
                 title="الشهر التالي"
               >
                 <span className="material-symbols-outlined text-lg">chevron_left</span>
@@ -462,7 +462,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           </div>
 
           {/* Weekday Labels (Saturday to Friday) */}
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-[#6e7977] py-1">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted py-1">
             {arabicDayNames.map((d, i) => (
               <div
                 key={d.name}
@@ -498,7 +498,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   onClick={() => setSelectedDateStr(dateStr)}
                   className={`h-20 sm:h-24 p-1.5 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between relative group ${
                     isSelected
-                      ? 'border-[#005c55] bg-[#005c55]/10 ring-2 ring-[#005c55]/40 shadow-xs'
+                      ? 'border-brand bg-brand/10 ring-2 ring-brand/40 shadow-xs'
                       : isFriday
                       ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-400'
                       : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50'
@@ -509,10 +509,10 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     <span
                       className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs font-mono ${
                         isSelected
-                          ? 'bg-[#005c55] text-white'
+                          ? 'bg-brand text-white'
                           : isFriday
                           ? 'bg-emerald-200/80 text-emerald-900 font-extrabold'
-                          : 'text-[#0d1c2e]'
+                          : 'text-ink'
                       }`}
                     >
                       {dayNum}
@@ -521,7 +521,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     {/* Badge for tasks count */}
                     {dayTasks.length > 0 && (
                       <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full font-mono ${
+                        className={`text-xs font-bold px-1.5 py-0.2 rounded-full font-mono ${
                           hasUrgent
                             ? 'bg-red-500 text-white animate-pulse'
                             : 'bg-emerald-600 text-white'
@@ -538,7 +538,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     {dayTasks.slice(0, 2).map((t) => (
                       <div
                         key={t.id}
-                        className={`text-[9px] font-semibold truncate rounded px-1 py-0.5 leading-tight ${
+                        className={`text-xs font-semibold truncate rounded px-1 py-0.5 leading-tight ${
                           t.completed
                             ? 'line-through text-gray-400 bg-gray-100'
                             : t.priority === 'urgent'
@@ -550,7 +550,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       </div>
                     ))}
                     {dayTasks.length > 2 && (
-                      <span className="text-[9px] text-gray-500 block font-mono">
+                      <span className="text-xs text-gray-500 block font-mono">
                         +{dayTasks.length - 2} أخرى...
                       </span>
                     )}
@@ -561,7 +561,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           </div>
 
           {/* Calendar Legend */}
-          <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-between text-[11px] text-[#6e7977] flex-wrap gap-2">
+          <div className="pt-3 border-t border-line/30 flex items-center justify-between text-xs text-muted flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
@@ -581,20 +581,20 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
         </div>
 
         {/* LEFT COLUMN: SELECTED DAY DETAILS & TASKS (5 Cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-[#bdc9c6]/60 p-5 shadow-xs flex flex-col justify-between space-y-4">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-line/60 p-5 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             {/* Selected Date Header */}
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#bdc9c6]/30">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-line/30">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold text-sm">
+                  <span className="w-8 h-8 rounded-xl bg-brand text-white flex items-center justify-center font-bold text-sm">
                     <span className="material-symbols-outlined text-lg">event</span>
                   </span>
                   <div>
-                    <h3 className="font-bold text-base text-[#0d1c2e] leading-snug">
+                    <h3 className="font-bold text-base text-ink leading-snug">
                       {selectedDayInfo.dayName}، {selectedDayInfo.formatted}
                     </h3>
-                    <span className="text-[11px] text-[#6e7977]">
+                    <span className="text-xs text-muted">
                       (الموافق: {selectedDayInfo.shortDate})
                     </span>
                   </div>
@@ -615,7 +615,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal(selectedDateStr)}
-                  className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  className="px-3 py-1.5 rounded-xl bg-brand hover:bg-success text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
                   <span>إضافة تسليم</span>
@@ -642,7 +642,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       : 'لا توجد تسليمات مسجلة لهذا اليوم حتى الآن'}
                   </span>
                   {selectedDayInfo.isFriday && (
-                    <span className="text-[11px] text-emerald-800">
+                    <span className="text-xs text-emerald-800">
                       يوم الجمعة هو الموعد الرسمي لانعقاد اللجان الميدانية بمسجد البخاري.
                     </span>
                   )}
@@ -657,13 +657,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             </div>
 
             {/* Task Filter Tabs */}
-            <div className="mt-3 flex items-center gap-1.5 border-b border-[#bdc9c6]/30 pb-2 text-xs">
+            <div className="mt-3 flex items-center gap-1.5 border-b border-line/30 pb-2 text-xs">
               <button
                 type="button"
                 onClick={() => setTaskFilter('all')}
                 className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                   taskFilter === 'all'
-                    ? 'bg-[#005c55] text-white shadow-2xs'
+                    ? 'bg-brand text-white shadow-2xs'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -674,7 +674,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 onClick={() => setTaskFilter('mine')}
                 className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                   taskFilter === 'mine'
-                    ? 'bg-[#005c55] text-white shadow-2xs'
+                    ? 'bg-brand text-white shadow-2xs'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -708,7 +708,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         ? 'bg-gray-50/80 border-gray-200 opacity-75'
                         : task.priority === 'urgent'
                         ? 'bg-red-50/40 border-red-200 hover:border-red-400'
-                        : 'bg-white border-[#bdc9c6]/60 hover:border-[#005c55]/50 shadow-2xs'
+                        : 'bg-white border-line/60 hover:border-brand/50 shadow-2xs'
                     }`}
                   >
                     {/* Task Title & Status Toggle */}
@@ -720,7 +720,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-colors cursor-pointer mt-0.5 shrink-0 ${
                             task.completed
                               ? 'bg-emerald-600 text-white'
-                              : 'border-2 border-gray-300 hover:border-[#005c55]'
+                              : 'border-2 border-gray-300 hover:border-brand'
                           }`}
                           title={task.completed ? 'إلغاء التأشير كمكتمل' : 'تأشير كتم التسليم والإنجاز'}
                         >
@@ -729,13 +729,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
                         <div>
                           <h4
-                            className={`font-bold text-xs sm:text-sm text-[#0d1c2e] leading-snug ${
+                            className={`font-bold text-xs sm:text-sm text-ink leading-snug ${
                               task.completed ? 'line-through text-gray-500' : ''
                             }`}
                           >
                             {task.title}
                           </h4>
-                          <div className="flex items-center gap-2 text-[11px] text-[#6e7977] mt-0.5">
+                          <div className="flex items-center gap-2 text-xs text-muted mt-0.5">
                             <span className="font-mono">⏰ {task.time || 'صباحاً'}</span>
                             {task.assignedAssistantName && (
                               <>
@@ -748,7 +748,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       </div>
 
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+                        className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
                           task.completed
                             ? 'bg-emerald-100 text-emerald-800'
                             : task.priority === 'urgent'
@@ -762,11 +762,11 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
                     {/* Deliverable Box ("واللي محتاج أسلمها وكده") */}
                     {task.deliverable && (
-                      <div className="bg-[#f8f9ff] p-2.5 rounded-lg border border-[#bdc9c6]/40 text-xs">
-                        <span className="font-bold text-[#0d1c2e] block text-[11px] mb-0.5 flex items-center gap-1">
+                      <div className="bg-canvas p-2.5 rounded-lg border border-line/40 text-xs">
+                        <span className="font-bold text-ink block text-xs mb-0.5 flex items-center gap-1">
                           <span>📦 المطلوب تسليمه:</span>
                         </span>
-                        <p className="text-[11px] text-[#3e4947] leading-relaxed">
+                        <p className="text-xs text-ink-soft leading-relaxed">
                           {task.deliverable}
                         </p>
                       </div>
@@ -778,24 +778,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onOpenCommitteeDetails && onOpenCommitteeDetails(linkedCommittee)}
-                          className="text-[11px] text-[#005c55] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                          className="text-xs text-brand font-bold flex items-center gap-1 hover:underline cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-sm">groups</span>
                           <span>لجنة #{linkedCommittee.committeeNumber}: {linkedCommittee.committeeName} &larr;</span>
                         </button>
                       ) : task.committeeNumber ? (
-                        <span className="text-[11px] text-[#005c55] font-bold flex items-center gap-1">
+                        <span className="text-xs text-brand font-bold flex items-center gap-1">
                           <span className="material-symbols-outlined text-sm">groups</span>
                           <span>مرتبط بلجنة #{task.committeeNumber}</span>
                         </span>
                       ) : (
-                        <span className="text-[11px] text-gray-400">عمل عام للمسابقات</span>
+                        <span className="text-xs text-gray-400">عمل عام للمسابقات</span>
                       )}
 
                       <button
                         type="button"
                         onClick={() => onDeleteTask(task.id)}
-                        className="text-red-500 hover:text-red-700 text-[11px] font-semibold cursor-pointer"
+                        className="text-red-500 hover:text-red-700 text-xs font-semibold cursor-pointer"
                       >
                         حذف
                       </button>
@@ -805,14 +805,14 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               })}
 
               {selectedDayTasks.length === 0 && (
-                <div className="p-8 text-center bg-[#f8f9ff] rounded-xl border border-dashed border-[#bdc9c6]/60">
+                <div className="p-8 text-center bg-canvas rounded-xl border border-dashed border-line/60">
                   <span className="material-symbols-outlined text-3xl text-gray-400 mb-1 block">
                     event_available
                   </span>
                   <p className="text-xs font-bold text-gray-600">
                     لا توجد أعمال مجدولة في هذا التاريخ
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-1">
+                  <p className="text-xs text-gray-400 mt-1">
                     يمكنك إضافة تسليمات جديدة لهذا اليوم باستخدام الزر أعلاه.
                   </p>
                 </div>
@@ -821,11 +821,11 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           </div>
 
           {/* Quick Footer Action */}
-          <div className="pt-3 border-t border-[#bdc9c6]/30">
+          <div className="pt-3 border-t border-line/30">
             <button
               type="button"
               onClick={() => handleOpenAddModal(selectedDateStr)}
-              className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-[#005c55]/40 text-[#005c55] hover:bg-[#eff4ff] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-brand/40 text-brand hover:bg-tint font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
             >
               <span className="material-symbols-outlined text-sm">add_circle</span>
               <span>+ إضافة مهمة أو تسليم ليوم {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})</span>
@@ -837,17 +837,17 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       {/* ADD TASK MODAL */}
       {isAddModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
-            <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150">
+            <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-tint border-b border-line/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                <span className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
                   <span className="material-symbols-outlined text-xl">add_task</span>
                 </span>
                 <div>
-                  <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
+                  <h3 className="font-bold text-sm sm:text-base text-ink">
                     إضافة عمل أو تسليم مجدول في التقويم
                   </h3>
-                  <p className="text-[11px] text-[#6e7977]">
+                  <p className="text-xs text-muted">
                     جدولة أعمال اللجان وتحديد ما يلزم تسليمه والشخص المسؤول
                   </p>
                 </div>
@@ -861,13 +861,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
             </div>
 
             {/* Delivery / Task Type Selector */}
-            <div className="p-3 bg-slate-50 border-b border-[#bdc9c6]/40 flex items-center justify-center gap-2">
+            <div className="p-3 bg-slate-50 border-b border-line/40 flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => setDeliveryMode('manual')}
                 className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
                   deliveryMode === 'manual'
-                    ? 'bg-[#005c55] text-white border-[#005c55] shadow-xs'
+                    ? 'bg-brand text-white border-brand shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
@@ -895,14 +895,14 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 <div className="space-y-4">
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 flex items-start gap-2">
                     <span className="text-lg">🎉</span>
-                    <p className="text-[11px] leading-relaxed">
+                    <p className="text-xs leading-relaxed">
                       <strong>جدولة حفل تكريم:</strong> ستسجل في قاعدة بيانات اللجنة الميدانية وتظهر تلقائياً في شاشة الحفلات والتنبيهات اليومية والتقويم.
                     </p>
                   </div>
 
                   {/* Select Committee */}
                   <div>
-                    <label className="block font-bold text-[#0d1c2e] mb-1">
+                    <label className="block font-bold text-ink mb-1">
                       اللجنة المراد إقامة وتوثيق الحفل لها <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -930,7 +930,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           );
                         }
                       }}
-                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
+                      className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
                       required
                     >
                       {committees.map((c) => (
@@ -944,7 +944,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
                   {/* 1. عدد الطلاب الذين سيتم تكريمهم */}
                   <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-200 space-y-1">
-                    <label className="block font-bold text-[#0d1c2e]">
+                    <label className="block font-bold text-ink">
                       🏆 عدد الطلاب الذين سيتم تكريمهم (الناجحين فقط) <span className="text-red-500">*</span>:
                     </label>
                     <input
@@ -955,10 +955,10 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         setCeremonyHonoredCount(e.target.value === '' ? '' : Number(e.target.value))
                       }
                       placeholder="اكتب عدد الطلاب الذين سيتم تكريمهم..."
-                      className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
+                      className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
                       required
                     />
-                    <span className="text-[10px] text-slate-500 block leading-tight">
+                    <span className="text-xs text-slate-500 block leading-tight">
                       * يحدد عدد المكرمين يدوياً نظراً لاحتمالية رسوب أو غياب بعض الطلاب وعدم تكريمهم جميعاً.
                     </span>
                   </div>
@@ -966,20 +966,20 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   {/* 2. موعد الحفل بالتاريخ والوقت (يكتبه بيده) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                      <label className="block font-bold text-ink mb-1">
                         📅 موعد الحفل بالتاريخ <span className="text-red-500">*</span>:
                       </label>
                       <input
                         type="date"
                         value={ceremonyDate}
                         onChange={(e) => setCeremonyDate(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-mono font-bold"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-mono font-bold"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                      <label className="block font-bold text-ink mb-1">
                         ⏰ موعد الحفل بالوقت (اكتبه بيدك) <span className="text-red-500">*</span>:
                       </label>
                       <input
@@ -987,7 +987,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         placeholder="مثال: 4 العصر، 4 المغرب، 08:30 م..."
                         value={ceremonyTime}
                         onChange={(e) => setCeremonyTime(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 font-bold"
                         required
                       />
                     </div>
@@ -996,11 +996,11 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   {/* 3. أسماء المشايخ الذين سيحضرون الحفل (إضافة أكثر من شيخ) */}
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm text-[#005c55]">person_add</span>
+                      <label className="font-bold text-xs text-ink flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-brand">person_add</span>
                         <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
                       </label>
-                      <span className="text-[11px] font-bold text-slate-500 font-mono">
+                      <span className="text-xs font-bold text-slate-500 font-mono">
                         ({ceremonySheikhs.length}) مشايخ مضافين
                       </span>
                     </div>
@@ -1038,12 +1038,12 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                           }
                         }}
                         placeholder="اكتب اسم الشيخ واضغط إضافة عضو آخر..."
-                        className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                        className="flex-1 bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-brand font-semibold"
                       />
                       <button
                         type="button"
                         onClick={handleAddCeremonySheikh}
-                        className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                        className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                       >
                         <span className="material-symbols-outlined text-sm">add</span>
                         <span>+ إضافة عضو آخر</span>
@@ -1054,24 +1054,24 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   {/* 4. مكان إقامة الحفل وملاحظات */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">📍 مكان إقامة الحفل:</label>
+                      <label className="block font-bold text-ink mb-1">📍 مكان إقامة الحفل:</label>
                       <input
                         type="text"
                         placeholder="مثال: القاعة الكبرى بمسجد البخاري..."
                         value={ceremonyPlace}
                         onChange={(e) => setCeremonyPlace(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600"
                       />
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">📝 ملاحظات وترتيبات:</label>
+                      <label className="block font-bold text-ink mb-1">📝 ملاحظات وترتيبات:</label>
                       <input
                         type="text"
                         placeholder="مثال: تجهيز أجهزة الصوت والدروع والشهادات..."
                         value={ceremonyNotes}
                         onChange={(e) => setCeremonyNotes(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600"
                       />
                     </div>
                   </div>
@@ -1080,7 +1080,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                 /* MANUAL DELIVERY FORM FIELDS */
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-bold text-[#0d1c2e] mb-1">
+                    <label className="block font-bold text-ink mb-1">
                       اسم العمل أو المهمة <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1088,27 +1088,27 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       placeholder="مثال: تسليم أوراق أسئلة لجنة 1، استلام دفاتر التصحيح..."
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
-                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                      className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-brand font-semibold"
                       required
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                      <label className="block font-bold text-ink mb-1">
                         تاريخ اليوم <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="date"
                         value={newTaskDate}
                         onChange={(e) => setNewTaskDate(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">
+                      <label className="block font-bold text-ink mb-1">
                         وقت التسليم أو التنفيذ
                       </label>
                       <input
@@ -1116,13 +1116,13 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         placeholder="مثال: 09:30 ص، قبل صلاة العصر..."
                         value={newTaskTime}
                         onChange={(e) => setNewTaskTime(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block font-bold text-[#0d1c2e] mb-1">
+                    <label className="block font-bold text-ink mb-1">
                       ما يلزم تسليمه أو استلامه بالتحديد ("واللي محتاج أسلمها وكده")
                     </label>
                     <textarea
@@ -1130,19 +1130,19 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       placeholder="مثال: كراسات أسئلة الامتحان، كشوف درجات موقعة، تقرير الغياب، أوراق الإجابة..."
                       value={newTaskDeliverable}
                       onChange={(e) => setNewTaskDeliverable(e.target.value)}
-                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                      className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs outline-none focus:border-brand"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">اللجنة المرتبطة</label>
+                      <label className="block font-bold text-ink mb-1">اللجنة المرتبطة</label>
                       <select
                         value={newTaskCommitteeNumber}
                         onChange={(e) =>
                           setNewTaskCommitteeNumber(e.target.value ? Number(e.target.value) : '')
                         }
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                       >
                         <option value="">بدون لجنة (عام)</option>
                         {committees.map((c) => (
@@ -1154,11 +1154,11 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">الأولوية</label>
+                      <label className="block font-bold text-ink mb-1">الأولوية</label>
                       <select
                         value={newTaskPriority}
                         onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                       >
                         <option value="urgent">🔴 عاجل وضروري</option>
                         <option value="high">🟠 مرتفع</option>
@@ -1167,30 +1167,30 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block font-bold text-[#0d1c2e] mb-1">المكلف / المعاون</label>
+                      <label className="block font-bold text-ink mb-1">المكلف / المعاون</label>
                       <input
                         type="text"
                         value={newTaskAssistantName}
                         onChange={(e) => setNewTaskAssistantName(e.target.value)}
-                        className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                        className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block font-bold text-[#0d1c2e] mb-1">ملاحظات إضافية</label>
+                    <label className="block font-bold text-ink mb-1">ملاحظات إضافية</label>
                     <textarea
                       rows={2}
                       placeholder="تعليمات القاعة، مكان التسليم، أرقام التواصل..."
                       value={newTaskNotes}
                       onChange={(e) => setNewTaskNotes(e.target.value)}
-                      className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                      className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs outline-none focus:border-brand"
                     />
                   </div>
                 </div>
               )}
 
-              <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
@@ -1203,7 +1203,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                   className={`px-5 py-2 rounded-xl text-white font-bold cursor-pointer shadow-xs active:scale-[0.98] ${
                     deliveryMode === 'ceremony'
                       ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700'
-                      : 'bg-[#005c55] hover:bg-[#1b6b51]'
+                      : 'bg-brand hover:bg-success'
                   }`}
                 >
                   {deliveryMode === 'ceremony' ? 'حفظ وتثبيت الحفل في المنظومة' : 'حفظ العمل في التقويم'}

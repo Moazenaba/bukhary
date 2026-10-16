@@ -44,7 +44,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   return (
     <div className="space-y-6 text-right">
       {/* Welcome Banner tailored to User Role */}
-      <div className="bg-gradient-to-l from-[#005c55] via-[#0f766e] to-[#005c55] rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-l from-brand via-[#0f766e] to-brand rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-3">
             <span className="material-symbols-outlined text-sm">verified</span>
@@ -62,13 +62,13 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => onNavigateCommittees()}
-                  className="px-4 py-2 rounded-xl bg-white text-[#005c55] font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-white text-brand font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer"
                 >
                   عرض قائمة اللجان ({total})
                 </button>
                 <button
                   onClick={onOpenNewCommittee}
-                  className="px-4 py-2 rounded-xl bg-[#9cf2e8]/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1"
+                  className="px-4 py-2 rounded-xl bg-brand-light/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-sm">add_circle</span>
                   <span>تسجيل لجنة جديدة</span>
@@ -96,14 +96,14 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => onNavigateCommittees()}
-                  className="px-4 py-2 rounded-xl bg-white text-[#005c55] font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-white text-brand font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-sm">groups</span>
                   <span>عرض لجاني المسندة ({myAssignedCommittees.length})</span>
                 </button>
                 <button
                   onClick={() => onNavigateTab('calendar')}
-                  className="px-4 py-2 rounded-xl bg-[#9cf2e8]/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-brand-light/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-sm">calendar_month</span>
                   <span>جدول أعمالي وتسليماتي في التقويم</span>
@@ -123,19 +123,19 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       <div className="bg-white rounded-2xl p-5 border border-emerald-300 bg-gradient-to-l from-emerald-50/50 via-teal-50/30 to-white shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
           <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold">
+            <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold">
               <span className="material-symbols-outlined text-xl">calendar_today</span>
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
+                <h3 className="font-bold text-sm sm:text-base text-ink">
                   تسليمات وأعمال اليوم بمسجد البخاري:
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
                   {todayTasks.length} أعمال مقررة
                 </span>
               </div>
-              <p className="text-[11px] text-[#6e7977]">
+              <p className="text-xs text-muted">
                 مواعيد انعقاد اللجان الميدانية، تسليم كراسات الأسئلة، واستلام دفاتر التصحيح
               </p>
             </div>
@@ -144,7 +144,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateTab('calendar')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-success text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
           >
             <span>فتح التقويم والكاليندر بالكامل</span>
             <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -165,9 +165,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] text-gray-500 font-bold">⏰ {task.time || 'صباحاً'}</span>
+                <span className="font-mono text-xs text-gray-500 font-bold">⏰ {task.time || 'صباحاً'}</span>
                 <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                  className={`text-xs px-1.5 py-0.2 rounded font-bold ${
                     task.completed
                       ? 'bg-emerald-200 text-emerald-900'
                       : task.priority === 'urgent'
@@ -178,9 +178,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                   {task.completed ? '✓ تم' : 'عاجل'}
                 </span>
               </div>
-              <h4 className="font-bold text-xs text-[#0d1c2e] line-clamp-1">{task.title}</h4>
+              <h4 className="font-bold text-xs text-ink line-clamp-1">{task.title}</h4>
               {task.deliverable && (
-                <p className="text-[11px] text-[#005c55] font-semibold truncate">
+                <p className="text-xs text-brand font-semibold truncate">
                   📦 {task.deliverable}
                 </p>
               )}
@@ -191,17 +191,17 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
       {/* Courses & Rounds Summary Bar */}
       {courses.length > 0 && (
-        <div className="bg-white rounded-2xl p-5 border border-[#bdc9c6]/50 shadow-xs">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#bdc9c6]/30">
+        <div className="bg-white rounded-2xl p-5 border border-line/50 shadow-xs">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-line/30">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-xl text-[#005c55]">event_repeat</span>
-              <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
+              <span className="material-symbols-outlined text-xl text-brand">event_repeat</span>
+              <h3 className="font-bold text-sm sm:text-base text-ink">
                 الدورات والمسابقات الموسمية واللجان المربوطة بها:
               </h3>
             </div>
             <button
               onClick={() => onNavigateTab('courses')}
-              className="text-xs text-[#005c55] font-bold hover:underline cursor-pointer"
+              className="text-xs text-brand font-bold hover:underline cursor-pointer"
             >
               إدارة الدورات وإضافة دورة جديدة &larr;
             </button>
@@ -214,16 +214,16 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                 <div
                   key={c.id}
                   onClick={() => onNavigateTab('courses')}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer hover:border-[#005c55] ${
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer hover:border-brand ${
                     c.status === 'active'
                       ? 'bg-emerald-50/40 border-emerald-300'
-                      : 'bg-[#f8f9ff] border-gray-200'
+                      : 'bg-canvas border-gray-200'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-bold text-[#0d1c2e] text-xs truncate max-w-[180px]">{c.name}</span>
+                    <span className="font-bold text-ink text-xs truncate max-w-[180px]">{c.name}</span>
                     <span
-                      className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                      className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                         c.status === 'active'
                           ? 'bg-emerald-600 text-white'
                           : 'bg-gray-200 text-gray-700'
@@ -232,8 +232,8 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                       {c.status === 'active' ? '⚡ نشطة' : 'مؤرشفة'}
                     </span>
                   </div>
-                  <span className="text-[11px] text-[#6e7977] block">
-                    عدد اللجان المربوطة: <strong className="text-[#005c55] font-mono">{count} لجنة</strong>
+                  <span className="text-xs text-muted block">
+                    عدد اللجان المربوطة: <strong className="text-brand font-mono">{count} لجنة</strong>
                   </span>
                 </div>
               );
@@ -246,7 +246,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
           onClick={() => onNavigateCommittees('exam')}
-          className="bg-white p-4 rounded-xl border border-[#bdc9c6]/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
@@ -254,15 +254,15 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             </span>
             <span className="text-2xl font-bold font-mono text-blue-700">{examCount}</span>
           </div>
-          <h3 className="font-bold text-sm text-[#0d1c2e] group-hover:text-blue-700 transition-colors">
+          <h3 className="font-bold text-sm text-ink group-hover:text-blue-700 transition-colors">
             جاري الامتحان الآن
           </h3>
-          <p className="text-xs text-[#6e7977] mt-1">لجان الطلاب فيها قيد أداء الاختبار</p>
+          <p className="text-xs text-muted mt-1">لجان الطلاب فيها قيد أداء الاختبار</p>
         </div>
 
         <div
           onClick={() => onNavigateCommittees('scoring')}
-          className="bg-white p-4 rounded-xl border border-[#bdc9c6]/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-4 rounded-xl border border-line/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
@@ -270,15 +270,15 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             </span>
             <span className="text-2xl font-bold font-mono text-amber-700">{scoringCount}</span>
           </div>
-          <h3 className="font-bold text-sm text-[#0d1c2e] group-hover:text-amber-700 transition-colors">
+          <h3 className="font-bold text-sm text-ink group-hover:text-amber-700 transition-colors">
             في مرحلة التصحيح
           </h3>
-          <p className="text-xs text-[#6e7977] mt-1">لجان يجري تصحيح أوراقها حالياً</p>
+          <p className="text-xs text-muted mt-1">لجان يجري تصحيح أوراقها حالياً</p>
         </div>
 
         <div
           onClick={() => onNavigateCommittees('ceremony')}
-          className="bg-white p-4 rounded-xl border border-[#bdc9c6]/50 hover:border-emerald-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-4 rounded-xl border border-line/50 hover:border-emerald-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
@@ -286,41 +286,41 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             </span>
             <span className="text-2xl font-bold font-mono text-emerald-700">{ceremonyCount}</span>
           </div>
-          <h3 className="font-bold text-sm text-[#0d1c2e] group-hover:text-emerald-700 transition-colors">
+          <h3 className="font-bold text-sm text-ink group-hover:text-emerald-700 transition-colors">
             تم الحفل والتكريم
           </h3>
-          <p className="text-xs text-[#6e7977] mt-1">لجان اختتمت مراحلها بالكامل</p>
+          <p className="text-xs text-muted mt-1">لجان اختتمت مراحلها بالكامل</p>
         </div>
 
         <div
           onClick={() => onNavigateCommittees()}
-          className="bg-white p-4 rounded-xl border border-[#bdc9c6]/50 hover:border-[#005c55] shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-4 rounded-xl border border-line/50 hover:border-brand shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#005c55] flex items-center justify-center font-bold">
+            <span className="w-10 h-10 rounded-xl bg-tint text-brand flex items-center justify-center font-bold">
               <span className="material-symbols-outlined">menu_book</span>
             </span>
-            <span className="text-2xl font-bold font-mono text-[#005c55]">{total}</span>
+            <span className="text-2xl font-bold font-mono text-brand">{total}</span>
           </div>
-          <h3 className="font-bold text-sm text-[#0d1c2e] group-hover:text-[#005c55] transition-colors">
+          <h3 className="font-bold text-sm text-ink group-hover:text-brand transition-colors">
             إجمالي اللجان المسجلة
           </h3>
-          <p className="text-xs text-[#6e7977] mt-1">موزعة على كافة قاعات مسجد البخاري</p>
+          <p className="text-xs text-muted mt-1">موزعة على كافة قاعات مسجد البخاري</p>
         </div>
       </div>
 
       {/* Live spotlight */}
-      <div className="bg-white rounded-2xl p-5 border border-[#bdc9c6]/50 shadow-xs">
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#bdc9c6]/30">
+      <div className="bg-white rounded-2xl p-5 border border-line/50 shadow-xs">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-line/30">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <h3 className="font-bold text-base text-[#0d1c2e]">
+            <h3 className="font-bold text-base text-ink">
               أحدث اللجان في المنظومة
             </h3>
           </div>
           <button
             onClick={() => onNavigateCommittees()}
-            className="text-xs text-[#005c55] font-semibold hover:underline"
+            className="text-xs text-brand font-semibold hover:underline"
           >
             عرض كافة اللجان &larr;
           </button>
@@ -333,27 +333,27 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
               <div
                 key={comm.id}
                 onClick={() => onOpenDetails(comm)}
-                className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 hover:border-[#005c55] transition-all cursor-pointer"
+                className="bg-canvas p-4 rounded-xl border border-line/40 hover:border-brand transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold text-xs font-mono text-[#005c55]">
+                  <span className="font-bold text-xs font-mono text-brand">
                     لجنة #{comm.committeeNumber}
                   </span>
                   <span
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.badgeClass}`}
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${status.badgeClass}`}
                   >
                     {status.emoji} {status.label}
                   </span>
                 </div>
-                <h4 className="font-bold text-xs text-[#0d1c2e] mb-1 truncate">
+                <h4 className="font-bold text-xs text-ink mb-1 truncate">
                   {comm.committeeName}
                 </h4>
-                <p className="text-[11px] text-[#005c55] font-semibold mb-2 truncate">
+                <p className="text-xs text-brand font-semibold mb-2 truncate">
                   {comm.competitionBook}
                 </p>
-                <div className="flex items-center justify-between pt-2 border-t border-[#bdc9c6]/20 text-[11px] text-[#6e7977]">
+                <div className="flex items-center justify-between pt-2 border-t border-line/20 text-xs text-muted">
                   <span>{comm.branch}</span>
-                  <span className="text-[#005c55] font-bold">عرض التفاصيل &larr;</span>
+                  <span className="text-brand font-bold">عرض التفاصيل &larr;</span>
                 </div>
               </div>
             );

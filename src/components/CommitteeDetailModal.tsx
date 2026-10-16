@@ -348,16 +348,16 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
   return (
     <div role="dialog" aria-modal="true" aria-label="تفاصيل اللجنة" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-[#bdc9c6]/50 flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in duration-150 text-right">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-line/50 flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in duration-150 text-right">
         {/* Header */}
-        <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+        <div className="px-5 py-4 bg-canvas border-b border-line/40 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-[#005c55]/10 text-[#005c55] flex items-center justify-center font-bold text-base">
+            <span className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold text-base">
               #{committee.committeeNumber}
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-[#0d1c2e]">
+                <h2 className="text-lg font-bold text-ink">
                   {committee.committeeName}
                 </h2>
                 <span
@@ -378,7 +378,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[#3e4947] mt-0.5">
+              <p className="text-xs text-ink-soft mt-0.5">
                 {committee.competitionBook} • {committee.branch}
               </p>
             </div>
@@ -387,7 +387,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
           <button
             aria-label="إغلاق"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl border border-[#bdc9c6]/40 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-xl border border-line/40 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
@@ -396,28 +396,28 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
         {/* Content Body */}
         <div className="p-5 overflow-y-auto flex-1 space-y-6">
           {/* Quick Info Grid */}
-          <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="bg-canvas p-4 rounded-xl border border-line/40 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">مسار المسابقة / الكتاب:</span>
-              <span className="font-bold text-[#005c55]">{committee.competitionBook}</span>
+              <span className="text-muted block font-semibold mb-0.5">مسار المسابقة / الكتاب:</span>
+              <span className="font-bold text-brand">{committee.competitionBook}</span>
             </div>
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">الفرع:</span>
-              <span className="font-bold text-[#0d1c2e]">{committee.branch}</span>
+              <span className="text-muted block font-semibold mb-0.5">الفرع:</span>
+              <span className="font-bold text-ink">{committee.branch}</span>
             </div>
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">الجمعية:</span>
-              <span className="font-bold text-[#0d1c2e]">
+              <span className="text-muted block font-semibold mb-0.5">الجمعية:</span>
+              <span className="font-bold text-ink">
                 {committee.associationName || '—'}
               </span>
             </div>
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">الدورة التابعة لها:</span>
+              <span className="text-muted block font-semibold mb-0.5">الدورة التابعة لها:</span>
               {currentUser?.role === 'super_admin' && courses && courses.length > 0 ? (
                 <select
                   value={courseId}
                   onChange={(e) => setCourseId(e.target.value)}
-                  className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2 py-1 text-xs font-bold text-[#005c55] outline-none"
+                  className="w-full bg-white border border-line rounded-lg px-2 py-1 text-xs font-bold text-brand outline-none"
                 >
                   {courses.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -426,7 +426,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                   ))}
                 </select>
               ) : (
-                <span className="font-bold text-[#005c55]">
+                <span className="font-bold text-brand">
                   {committee.courseName || courses.find((c) => c.id === committee.courseId)?.name || '—'}
                 </span>
               )}
@@ -434,8 +434,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
             {/* عدد الطلاب باللجنة */}
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">عدد الطلاب باللجنة:</span>
-              <span className="font-bold font-mono text-[#0d1c2e]">
+              <span className="text-muted block font-semibold mb-0.5">عدد الطلاب باللجنة:</span>
+              <span className="font-bold font-mono text-ink">
                 {studentsCount ? `${studentsCount} ${isWomenCommittee ? 'طالبة' : 'طالباً'}` : 'غير محدد'}
               </span>
             </div>
@@ -443,7 +443,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             {/* تصنيف اللجنة في حال كانت نسائية فقط */}
             {isWomenCommittee && (
               <div>
-                <span className="text-[#6e7977] block font-semibold mb-0.5">التصنيف:</span>
+                <span className="text-muted block font-semibold mb-0.5">التصنيف:</span>
                 <span className="font-bold text-rose-700 inline-flex items-center gap-1">
                   <span>🧕</span>
                   <span>لجنة نسائية</span>
@@ -453,18 +453,18 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
             {/* بيانات الشيخ المرسل إليه */}
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">الشيخ المرسل إليه:</span>
-              <span className="font-bold text-[#005c55]">
+              <span className="text-muted block font-semibold mb-0.5">الشيخ المرسل إليه:</span>
+              <span className="font-bold text-brand">
                 {sheikhName || 'لم يُحدد'}
               </span>
             </div>
 
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">رقم هاتف الشيخ:</span>
+              <span className="text-muted block font-semibold mb-0.5">رقم هاتف الشيخ:</span>
               {sheikhPhone ? (
                 <a
                   href={`tel:${sheikhPhone}`}
-                  className="font-bold font-mono text-[#005c55] hover:underline inline-flex items-center gap-1"
+                  className="font-bold font-mono text-brand hover:underline inline-flex items-center gap-1"
                   dir="ltr"
                 >
                   <span>📞</span>
@@ -476,15 +476,15 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             </div>
 
             <div>
-              <span className="text-[#6e7977] block font-semibold mb-0.5">البلد التي منها الشيخ:</span>
-              <span className="font-bold text-[#0d1c2e]">
+              <span className="text-muted block font-semibold mb-0.5">البلد التي منها الشيخ:</span>
+              <span className="font-bold text-ink">
                 {sheikhCountry || 'غير محدد'}
               </span>
             </div>
 
-            <div className="sm:col-span-3 pt-2 border-t border-[#bdc9c6]/20">
-              <span className="text-[#6e7977] font-semibold">أعضاء اللجنة: </span>
-              <span className="font-bold text-[#0d1c2e]">{committee.members.join(' — ')}</span>
+            <div className="sm:col-span-3 pt-2 border-t border-line/20">
+              <span className="text-muted font-semibold">أعضاء اللجنة: </span>
+              <span className="font-bold text-ink">{committee.members.join(' — ')}</span>
             </div>
           </div>
 
@@ -495,7 +495,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                 <span className="material-symbols-outlined text-blue-700">verified</span>
                 <span>جاهزية وتوزيع الامتحان معتمدة بواسطة: <strong>{committee.examApprovedBy.assistantName}</strong></span>
               </span>
-              <span className="text-[11px] text-blue-700 font-mono">
+              <span className="text-xs text-blue-700 font-mono">
                 {committee.examApprovedBy.approvedAt}
               </span>
             </div>
@@ -504,11 +504,11 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
           {/* Section: Stages Progression with Special Scoring & Aggregation Details */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-[#0d1c2e] flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[#005c55]">timeline</span>
+              <h3 className="font-bold text-sm text-ink flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-brand">timeline</span>
                 <span>مراحل عمل اللجنة (تبديل الحالة وتوثيق الوقت):</span>
               </h3>
-              <span className="text-xs text-[#6e7977]">
+              <span className="text-xs text-muted">
                 التأشير بـ "تم" يسجل الوقت والتاريخ تلقائياً
               </span>
             </div>
@@ -538,7 +538,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 حالة التصحيح (تفصيل تصحيح الأسئلة)
                               </span>
                               <span
-                                className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                                className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
                                   isCompleted
                                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                     : scoringProgress.completed > 0
@@ -553,7 +553,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             </div>
 
                             {stageData?.completedAt && (
-                              <div className="flex items-center gap-1 text-[11px] text-amber-800 mt-1">
+                              <div className="flex items-center gap-1 text-xs text-amber-800 mt-1">
                                 <span className="material-symbols-outlined text-xs">schedule</span>
                                 <span>تاريخ إتمام التصحيح: {stageData.completedAt}</span>
                               </div>
@@ -594,7 +594,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           {/* 1. Scorer & Reviewer Inputs */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-amber-50/50 p-3 rounded-xl border border-amber-200/50">
                             <div>
-                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                              <label className="block font-bold text-ink mb-1">
                                 ✍️ اسم المصحح:
                               </label>
                               <input
@@ -607,12 +607,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     scorerName: e.target.value,
                                   })
                                 }
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-amber-600 font-semibold"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-amber-600 font-semibold"
                               />
                             </div>
 
                             <div>
-                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                              <label className="block font-bold text-ink mb-1">
                                 🔍 اسم مراجع التصحيح:
                               </label>
                               <input
@@ -625,7 +625,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     scoringReviewerName: e.target.value,
                                   })
                                 }
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-amber-600 font-semibold"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-amber-600 font-semibold"
                               />
                             </div>
                           </div>
@@ -633,7 +633,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           {/* 2. Questions Step-by-Step Checklist */}
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1">
+                              <span className="font-bold text-xs text-ink flex items-center gap-1">
                                 <span className="material-symbols-outlined text-amber-600 text-sm">
                                   checklist
                                 </span>
@@ -642,7 +642,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               <button
                                 type="button"
                                 onClick={handleAddQuestion}
-                                className="text-[11px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                className="text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                               >
                                 <span className="material-symbols-outlined text-xs">add</span>
                                 <span>إضافة سؤال</span>
@@ -668,11 +668,11 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     className={`p-3.5 rounded-xl border transition-all ${
                                       q.completed
                                         ? 'bg-emerald-50/60 border-emerald-300 shadow-2xs'
-                                        : 'bg-[#f8f9ff] border-[#bdc9c6]/60 hover:bg-amber-50/40'
+                                        : 'bg-canvas border-line/60 hover:bg-amber-50/40'
                                     }`}
                                   >
                                     {/* Top Row: Checkbox, Label, Timestamp, Delete */}
-                                    <div className="flex items-center justify-between pb-2 border-b border-[#bdc9c6]/30">
+                                    <div className="flex items-center justify-between pb-2 border-b border-line/30">
                                       <div
                                         onClick={() => handleToggleQuestion(q.id)}
                                         className="flex items-center gap-2.5 cursor-pointer select-none"
@@ -690,7 +690,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                           className={`text-xs ${
                                             q.completed
                                               ? 'text-emerald-950 font-bold'
-                                              : 'text-[#0d1c2e] font-semibold'
+                                              : 'text-ink font-semibold'
                                           }`}
                                         >
                                           {q.completed ? `تم تصحيح ${q.label}` : `تصحيح ${q.label}`}
@@ -699,14 +699,14 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
                                       <div className="flex items-center gap-2">
                                         {q.completed && q.completedAt ? (
-                                          <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-100/70 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                          <span className="text-xs text-emerald-800 font-semibold bg-emerald-100/70 px-2 py-0.5 rounded-md flex items-center gap-1">
                                             <span className="material-symbols-outlined text-xs">
                                               schedule
                                             </span>
                                             <span>{q.completedAt.split(' - ')[1] || q.completedAt}</span>
                                           </span>
                                         ) : (
-                                          <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md font-medium">
+                                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md font-medium">
                                             قيد التصحيح
                                           </span>
                                         )}
@@ -729,13 +729,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     {/* Scorers Section for this Question (مصححو هذا السؤال - يدعم أكثر من مصحح) */}
                                     <div className="mt-2.5 space-y-2">
                                       <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-bold text-[#0d1c2e] flex items-center gap-1">
+                                        <span className="text-xs font-bold text-ink flex items-center gap-1">
                                           <span className="material-symbols-outlined text-xs text-amber-700">
                                             edit_note
                                           </span>
                                           <span>مصحح (أو مصححو) هذا السؤال:</span>
                                         </span>
-                                        <span className="text-[10px] text-[#6e7977]">
+                                        <span className="text-xs text-muted">
                                           (يمكن إضافة أكثر من مصحح شاركوا في تصحيح السؤال)
                                         </span>
                                       </div>
@@ -765,7 +765,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                             </span>
                                           ))
                                         ) : (
-                                          <span className="text-[11px] text-gray-400 italic">
+                                          <span className="text-xs text-gray-400 italic">
                                             لم يُحدد مصحح لهذا السؤال بعد (اضغط لإضافة مصحح)
                                           </span>
                                         )}
@@ -784,7 +784,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                               onClick={() =>
                                                 handleAddScorerToQuestion(q.id, member)
                                               }
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-[#bdc9c6] text-[#3e4947] hover:bg-amber-50 hover:text-amber-900 text-[11px] font-semibold transition-colors cursor-pointer"
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-line text-ink-soft hover:bg-amber-50 hover:text-amber-900 text-xs font-semibold transition-colors cursor-pointer"
                                               title={`تعيين ${member} كمصحح لهذا السؤال`}
                                             >
                                               <span className="text-amber-600 text-xs">+</span>
@@ -811,7 +811,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                                 handleAddScorerToQuestion(q.id, currentInput);
                                               }
                                             }}
-                                            className="bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1 text-xs outline-none focus:border-amber-600 w-36 sm:w-44 text-[#0d1c2e]"
+                                            className="bg-white border border-line rounded-lg px-2.5 py-1 text-xs outline-none focus:border-amber-600 w-36 sm:w-44 text-ink"
                                           />
                                           <button
                                             type="button"
@@ -842,18 +842,18 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                   return (
                     <div
                       key={stageItem.key}
-                      className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/20 overflow-hidden shadow-xs"
+                      className="rounded-2xl border-2 border-teal-200 bg-teal-50/20 overflow-hidden shadow-xs"
                     >
-                      <div className="p-4 bg-gradient-to-l from-indigo-100/60 to-indigo-50/30 flex items-center justify-between">
+                      <div className="p-4 bg-gradient-to-l from-teal-100/60 to-teal-50/30 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="text-2xl shrink-0">🔵</span>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-indigo-950">
+                              <span className="font-bold text-sm text-teal-950">
                                 تجميع الدرجات وتدقيق المجموع
                               </span>
                               <span
-                                className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                                className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
                                   isCompleted
                                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                     : 'bg-gray-100 text-gray-700 border-gray-300'
@@ -864,7 +864,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             </div>
 
                             {stageData?.completedAt && (
-                              <div className="flex items-center gap-1 text-[11px] text-indigo-800 mt-1">
+                              <div className="flex items-center gap-1 text-xs text-teal-800 mt-1">
                                 <span className="material-symbols-outlined text-xs">schedule</span>
                                 <span>تاريخ إتمام التجميع: {stageData.completedAt}</span>
                               </div>
@@ -880,13 +880,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               onChange={() => handleToggleStage('aggregation')}
                               className="sr-only peer"
                             />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-700"></div>
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-700"></div>
                           </label>
 
                           <button
                             type="button"
                             onClick={() => setIsAggregationExpanded(!isAggregationExpanded)}
-                            className="p-1.5 text-indigo-900 hover:bg-indigo-200/50 rounded-lg cursor-pointer"
+                            className="p-1.5 text-teal-900 hover:bg-teal-200/50 rounded-lg cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-lg">
                               {isAggregationExpanded ? 'expand_less' : 'expand_more'}
@@ -897,10 +897,10 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
                       {/* Expandable Aggregation Details */}
                       {isAggregationExpanded && (
-                        <div className="p-4 space-y-3 border-t border-indigo-200/70 bg-white">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-indigo-50/40 p-3 rounded-xl border border-indigo-200/40">
+                        <div className="p-4 space-y-3 border-t border-teal-200/70 bg-white">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-teal-50/40 p-3 rounded-xl border border-teal-200/40">
                             <div>
-                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                              <label className="block font-bold text-ink mb-1">
                                 📊 مراجع ومجمع الدرجات في التجميع:
                               </label>
                               <input
@@ -913,12 +913,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     aggregatorName: e.target.value,
                                   })
                                 }
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-600 font-semibold"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-teal-600 font-semibold"
                               />
                             </div>
 
                             <div>
-                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                              <label className="block font-bold text-ink mb-1">
                                 🔍 مراجع الدرجات ومطابقتها في التصحيح:
                               </label>
                               <input
@@ -931,7 +931,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     scoringReviewerName: e.target.value,
                                   })
                                 }
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-600 font-semibold"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-teal-600 font-semibold"
                               />
                             </div>
                           </div>
@@ -960,11 +960,11 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           </span>
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-black text-sm text-[#0d1c2e]">
+                              <span className="font-black text-sm text-ink">
                                 مرحلة الحفل والتكريم وتوزيع الجوائز
                               </span>
                               <span
-                                className={`text-[11px] px-2.5 py-0.5 rounded-full font-black ${
+                                className={`text-xs px-2.5 py-0.5 rounded-full font-black ${
                                   isCompleted
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                     : 'bg-amber-100 text-amber-900 border border-amber-300'
@@ -975,7 +975,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             </div>
 
                             {isCompleted && stageData?.completedAt && (
-                              <div className="flex items-center gap-1 text-[11px] text-emerald-800 mt-1 font-mono">
+                              <div className="flex items-center gap-1 text-xs text-emerald-800 mt-1 font-mono">
                                 <span className="material-symbols-outlined text-xs">schedule</span>
                                 <span>تاريخ التمام: {stageData.completedAt}</span>
                               </div>
@@ -990,7 +990,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               isCompleted
                                 ? 'bg-emerald-700 text-white shadow-2xs'
-                                : 'bg-[#005c55] text-white hover:bg-[#004742] shadow-2xs'
+                                : 'bg-brand text-white hover:bg-brand-deep shadow-2xs'
                             }`}
                           >
                             {isCompleted ? '✓ تم اعتماد الحفل' : 'إتمام الحفل الآن'}
@@ -1015,7 +1015,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             {/* 1. عدد الطلاب الذين سيتم تكريمهم */}
                             <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-200/50 space-y-1">
-                              <label className="block font-bold text-[#0d1c2e]">
+                              <label className="block font-bold text-ink">
                                 🏆 عدد الطلاب الذين سيتم تكريمهم:
                               </label>
                               <input
@@ -1035,9 +1035,9 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                   });
                                 }}
                                 placeholder="اكتب عدد الطلاب المكرمين..."
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-amber-600"
                               />
-                              <span className="text-[10px] text-slate-500 block leading-tight">
+                              <span className="text-xs text-slate-500 block leading-tight">
                                 * يحدد يدوياً لتوثيق الناجحين فقط (إجمالي طلاب اللجنة: {studentsCount || 0} طالب)
                               </span>
                             </div>
@@ -1045,7 +1045,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                             {/* 2. موعد الحفل بالتاريخ والوقت */}
                             <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-200/50 space-y-2">
                               <div>
-                                <label className="block font-bold text-[#0d1c2e] mb-1">
+                                <label className="block font-bold text-ink mb-1">
                                   📅 موعد الحفل بالتاريخ:
                                 </label>
                                 <input
@@ -1062,12 +1062,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                       ceremonyDetails: updated,
                                     });
                                   }}
-                                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-amber-600"
+                                  className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-amber-600"
                                 />
                               </div>
 
                               <div>
-                                <label className="block font-bold text-[#0d1c2e] mb-1">
+                                <label className="block font-bold text-ink mb-1">
                                   ⏰ موعد الحفل بالوقت (اكتبه بيدك):
                                 </label>
                                 <input
@@ -1085,7 +1085,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                       ceremonyDetails: updated,
                                     });
                                   }}
-                                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
+                                  className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                                 />
                               </div>
                             </div>
@@ -1094,13 +1094,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           {/* 3. أسماء المشايخ الذين سيحضرون الحفل (إضافة أكثر من شيخ) */}
                           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                             <div className="flex items-center justify-between">
-                              <label className="font-bold text-xs text-[#0d1c2e] flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-sm text-[#005c55]">
+                              <label className="font-bold text-xs text-ink flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm text-brand">
                                   person_add
                                 </span>
                                 <span>أسماء المشايخ والضيوف الحاضرين للحفل:</span>
                               </label>
-                              <span className="text-[11px] font-bold text-slate-500 font-mono">
+                              <span className="text-xs font-bold text-slate-500 font-mono">
                                 ({ceremonyDetails.attendingSheikhs.length}) مشايخ مضافين
                               </span>
                             </div>
@@ -1138,12 +1138,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                   }
                                 }}
                                 placeholder="اكتب اسم الشيخ واضغط إضافة عضو آخر..."
-                                className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                                className="flex-1 bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-brand font-semibold"
                               />
                               <button
                                 type="button"
                                 onClick={handleAddSheikh}
-                                className="px-3 py-1.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                               >
                                 <span className="material-symbols-outlined text-sm">add</span>
                                 <span>+ إضافة عضو آخر</span>
@@ -1154,7 +1154,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           {/* 4. مكان الحفل وملاحظات */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                              <label className="block font-bold text-ink mb-1">
                                 📍 مكان إقامة الحفل:
                               </label>
                               <input
@@ -1172,12 +1172,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     ceremonyDetails: updated,
                                   });
                                 }}
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                               />
                             </div>
 
                             <div>
-                              <label className="block font-bold text-[#0d1c2e] mb-1">
+                              <label className="block font-bold text-ink mb-1">
                                 📝 ملاحظات وترتيبات وتجهيزات:
                               </label>
                               <input
@@ -1195,7 +1195,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     ceremonyDetails: updated,
                                   });
                                 }}
-                                className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
+                                className="w-full bg-white border border-line rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-amber-600"
                               />
                             </div>
                           </div>
@@ -1212,7 +1212,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
                       isCompleted
                         ? 'bg-emerald-50/50 border-emerald-200'
-                        : 'bg-white border-[#bdc9c6]/40 hover:bg-[#f8f9ff]'
+                        : 'bg-white border-line/40 hover:bg-canvas'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1221,13 +1221,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                         <div className="flex items-center gap-2">
                           <span
                             className={`font-bold text-xs ${
-                              isCompleted ? 'text-emerald-900' : 'text-[#0d1c2e]'
+                              isCompleted ? 'text-emerald-900' : 'text-ink'
                             }`}
                           >
                             {stageItem.label}
                           </span>
                           <span
-                            className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                            className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                               isCompleted
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : 'bg-gray-100 text-gray-600'
@@ -1239,24 +1239,24 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
                         {/* Helper descriptions for review, sheet, and accreditation */}
                         {stageItem.key === 'review' && (
-                          <span className="text-[10px] text-[#6e7977] block mt-0.5">
+                          <span className="text-xs text-muted block mt-0.5">
                             مراجعة وتدقيق الدرجات (قبل كتابة الكشف)
                           </span>
                         )}
                         {stageItem.key === 'sheet' && (
-                          <span className="text-[10px] text-[#6e7977] block mt-0.5">
+                          <span className="text-xs text-muted block mt-0.5">
                             كتابة كشف الدرجات الرسمي والمسودة
                           </span>
                         )}
                         {stageItem.key === 'accreditation' && (
-                          <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">
+                          <span className="text-xs text-emerald-700 font-semibold block mt-0.5">
                             الاعتمادية الرسمية وتوقيع النتيجة بعد كتابة الكشف
                           </span>
                         )}
 
                         {/* Exact timestamp if completed */}
                         {isCompleted && stageData?.completedAt && (
-                          <div className="flex items-center gap-1 text-[11px] text-emerald-700 mt-0.5">
+                          <div className="flex items-center gap-1 text-xs text-emerald-700 mt-0.5">
                             <span className="material-symbols-outlined text-xs">schedule</span>
                             <span>تاريخ الإتمام: {stageData.completedAt}</span>
                           </div>
@@ -1274,7 +1274,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                           onChange={() => handleToggleStage(stageItem.key)}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#005c55]"></div>
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
                       </label>
                     </div>
                   </div>
@@ -1285,20 +1285,20 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
           {/* Section: Sheikh, Students & Committee Type Edit */}
           {currentUser?.role === 'super_admin' && (
-            <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 space-y-3">
+            <div className="bg-canvas p-4 rounded-xl border border-line/40 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
+                <span className="text-xs font-bold text-brand flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-base">person_pin</span>
                   <span>تعديل بيانات الشيخ المرسل إليه، عدد الطلاب، ونوع اللجنة:</span>
                 </span>
-                <span className="text-[11px] text-[#6e7977]">
+                <span className="text-xs text-muted">
                   (اضغط حفظ بالأسفل لاعتماد التعديلات)
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  <label className="block text-xs font-bold text-ink mb-1">
                     عدد الطلاب في اللجنة
                   </label>
                   <input
@@ -1308,19 +1308,19 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     onChange={(e) =>
                       setStudentsCount(e.target.value === '' ? '' : parseInt(e.target.value) || 0)
                     }
-                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono outline-none focus:border-brand"
                   />
                 </div>
 
                 <div className="flex flex-col justify-end">
-                  <label className="flex items-center gap-2 p-1.5 rounded-lg border border-[#bdc9c6] bg-white hover:bg-gray-50 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 p-1.5 rounded-lg border border-line bg-white hover:bg-gray-50 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={isWomenCommittee}
                       onChange={(e) => setIsWomenCommittee(e.target.checked)}
                       className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 accent-rose-700 cursor-pointer"
                     />
-                    <span className="text-xs font-bold text-[#0d1c2e] flex items-center gap-1">
+                    <span className="text-xs font-bold text-ink flex items-center gap-1">
                       <span>🧕</span>
                       <span>لجنة نسائية (اختياري)</span>
                     </span>
@@ -1328,7 +1328,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  <label className="block text-xs font-bold text-ink mb-1">
                     اسم الشيخ المرسل إليه
                   </label>
                   <input
@@ -1336,12 +1336,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     value={sheikhName}
                     onChange={(e) => setSheikhName(e.target.value)}
                     placeholder=""
-                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  <label className="block text-xs font-bold text-ink mb-1">
                     رقم هاتف الشيخ
                   </label>
                   <input
@@ -1350,12 +1350,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     value={sheikhPhone}
                     onChange={(e) => setSheikhPhone(e.target.value)}
                     placeholder=""
-                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:border-[#005c55] text-right"
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:border-brand text-right"
                   />
                 </div>
 
                 <div className="sm:col-span-2 lg:col-span-4">
-                  <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                  <label className="block text-xs font-bold text-ink mb-1">
                     البلد التي منها الشيخ
                   </label>
                   <input
@@ -1363,7 +1363,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     value={sheikhCountry}
                     onChange={(e) => setSheikhCountry(e.target.value)}
                     placeholder=""
-                    className="w-full bg-white border border-[#bdc9c6] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
                   />
                 </div>
               </div>
@@ -1371,12 +1371,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
           )}
 
           {/* Section: General Notes for the Committee */}
-          <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bdc9c6]/40 space-y-2">
+          <div className="bg-canvas p-4 rounded-xl border border-line/40 space-y-2">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-[#0d1c2e]">
+              <label className="block text-xs font-bold text-ink">
                 الملاحظات العامة على اللجنة
               </label>
-              <span className="text-[11px] text-[#6e7977]">
+              <span className="text-xs text-muted">
                 (خانة نصية حرة خاصة بكل لجنة يتم حفظها ومزامنتها فورياً)
               </span>
             </div>
@@ -1385,13 +1385,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
               value={generalNotes}
               onChange={(e) => setGeneralNotes(e.target.value)}
               placeholder=""
-              className="w-full bg-white border border-[#bdc9c6] rounded-xl p-3 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] leading-relaxed"
+              className="w-full bg-white border border-line rounded-xl p-3 text-xs text-ink outline-none focus:border-brand leading-relaxed"
             />
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3.5 bg-[#f8f9ff] border-t border-[#bdc9c6]/40 flex items-center justify-between gap-3">
+        <div className="px-5 py-3.5 bg-canvas border-t border-line/40 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {isSavedToast && (
               <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 animate-in fade-in">
@@ -1405,14 +1405,14 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             <button
               aria-label="إغلاق"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#3e4947] border border-[#bdc9c6] hover:bg-white cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-ink-soft border border-line hover:bg-white cursor-pointer"
             >
               إغلاق
             </button>
 
             <button
               onClick={handleSave}
-              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#005c55] hover:bg-[#1b6b51] shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-brand hover:bg-success shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">save</span>
               <span>حفظ الملاحظات والتعديلات</span>

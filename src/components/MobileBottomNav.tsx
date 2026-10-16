@@ -67,24 +67,24 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             type="button"
             onClick={() => setActiveTab(item.id)}
             className={`flex-1 py-1 px-1 flex flex-col items-center justify-center transition-all cursor-pointer relative active:scale-90 ${
-              isActive ? 'text-[#005c55]' : 'text-slate-500 hover:text-slate-800'
+              isActive ? 'text-brand' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             {/* Active Top Bar Indicator */}
             {isActive && (
-              <span className="absolute -top-1.5 w-6 h-1 bg-[#005c55] rounded-full animate-fadeIn" />
+              <span className="absolute -top-1.5 w-6 h-1 bg-brand rounded-full animate-fadeIn" />
             )}
             
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-              isActive ? 'bg-emerald-50 text-[#005c55]' : 'text-slate-500'
+              isActive ? 'bg-emerald-50 text-brand' : 'text-slate-500'
             }`}>
               <span className="material-symbols-outlined text-xl">
                 {item.icon}
               </span>
             </div>
             
-            <span className={`text-[10px] tracking-tight mt-0.5 block truncate max-w-full ${
-              isActive ? 'font-black text-[#005c55]' : 'font-semibold text-slate-500'
+            <span className={`text-xs tracking-tight mt-0.5 block truncate max-w-full ${
+              isActive ? 'font-black text-brand' : 'font-semibold text-slate-500'
             }`}>
               {item.label}
             </span>
@@ -108,7 +108,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           </span>
         </div>
         
-        <span className="text-[10px] font-semibold text-slate-500 tracking-tight mt-0.5 block truncate">
+        <span className="text-xs font-semibold text-slate-500 tracking-tight mt-0.5 block truncate">
           القائمة
         </span>
       </button>

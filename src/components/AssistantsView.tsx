@@ -421,7 +421,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   return (
     <div className="space-y-6 text-right font-sans">
       {/* Header Banner */}
-      <div className="bg-gradient-to-l from-[#005c55] via-emerald-800 to-[#004742] rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-l from-brand via-emerald-800 to-brand-deep rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 mb-1.5">
             <span className="p-2 rounded-2xl bg-white/20 text-white shadow-inner">
@@ -483,7 +483,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         <div
           onClick={() => setActiveTab('approved')}
           className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
-            activeTab === 'approved' ? 'border-[#005c55] ring-2 ring-emerald-200' : 'border-slate-200'
+            activeTab === 'approved' ? 'border-brand ring-2 ring-emerald-200' : 'border-slate-200'
           }`}
         >
           <div>
@@ -498,14 +498,14 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         <div
           onClick={() => setActiveTab('profiles')}
           className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
-            activeTab === 'profiles' ? 'border-purple-600 ring-2 ring-purple-200 bg-purple-50/20' : 'border-slate-200'
+            activeTab === 'profiles' ? 'border-teal-600 ring-2 ring-teal-200 bg-teal-50/20' : 'border-slate-200'
           }`}
         >
           <div>
-            <span className="text-xs text-purple-900 block font-bold">أنظمة الصلاحيات المخصصة</span>
-            <span className="text-2xl font-black text-purple-700 font-mono">{effectiveProfiles.length}</span>
+            <span className="text-xs text-teal-900 block font-bold">أنظمة الصلاحيات المخصصة</span>
+            <span className="text-2xl font-black text-teal-700 font-mono">{effectiveProfiles.length}</span>
           </div>
-          <span className="w-11 h-11 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
+          <span className="w-11 h-11 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center">
             <span className="material-symbols-outlined text-2xl">tune</span>
           </span>
         </div>
@@ -533,7 +533,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <span className="text-xs text-slate-500 block font-bold">المشرفون العامون (سوبر أدمن)</span>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-2xl font-black text-slate-900 font-mono">{superAdminsCount}</span>
-              <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">
+              <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">
                 أقصى حد (2)
               </span>
             </div>
@@ -551,13 +551,13 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             onClick={() => setActiveTab('approved')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'approved'
-                ? 'bg-[#005c55] text-white shadow-sm'
+                ? 'bg-brand text-white shadow-sm'
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
             }`}
           >
             <span className="material-symbols-outlined text-base">manage_accounts</span>
             <span>المستخدمون وتعيين الأدوار</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
+            <span className="px-2 py-0.5 rounded-full text-xs bg-white/20 text-white font-mono">
               {approvedUsers.length}
             </span>
           </button>
@@ -566,13 +566,13 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             onClick={() => setActiveTab('profiles')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'profiles'
-                ? 'bg-purple-700 text-white shadow-sm'
-                : 'bg-white text-slate-700 border border-slate-300 hover:bg-purple-50'
+                ? 'bg-teal-700 text-white shadow-sm'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-teal-50'
             }`}
           >
             <span className="material-symbols-outlined text-base">tune</span>
             <span>مركز بناء وتصميم أنظمة الصلاحيات</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-200 text-purple-950 font-mono font-bold">
+            <span className="px-2 py-0.5 rounded-full text-xs bg-teal-200 text-teal-950 font-mono font-bold">
               {effectiveProfiles.length} نظام
             </span>
           </button>
@@ -588,7 +588,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <span className="material-symbols-outlined text-base">how_to_reg</span>
             <span>طلبات الانضمام والمقابلات</span>
             {pendingRequests.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200 text-amber-950 font-mono font-black animate-pulse">
+              <span className="px-2 py-0.5 rounded-full text-xs bg-amber-200 text-amber-950 font-mono font-black animate-pulse">
                 {pendingRequests.length} جديد
               </span>
             )}
@@ -605,7 +605,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             placeholder="بحث بالاسم أو الهاتف..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-xl pr-9 pl-3 py-2 text-xs outline-none focus:border-[#005c55]"
+            className="w-full bg-white border border-slate-300 rounded-xl pr-9 pl-3 py-2 text-xs outline-none focus:border-brand"
           />
         </div>
       </div>
@@ -631,7 +631,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-base shadow-xs ${
                           user.role === 'super_admin'
                             ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : 'bg-emerald-100 text-[#005c55]'
+                            : 'bg-emerald-100 text-brand'
                         }`}
                       >
                         <span className="material-symbols-outlined text-2xl">
@@ -642,7 +642,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-sm sm:text-base text-slate-900">{user.name}</h4>
                           {user.role === 'super_admin' && (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300">
                               👑 سوبر أدمن
                             </span>
                           )}
@@ -678,8 +678,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   {/* Active Permission Profile Badge */}
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div>
-                      <span className="text-slate-500 text-[11px] block">نظام الصلاحية المطبق:</span>
-                      <strong className="text-purple-900 font-bold">
+                      <span className="text-slate-500 text-xs block">نظام الصلاحية المطبق:</span>
+                      <strong className="text-teal-900 font-bold">
                         {userProfile ? userProfile.name : user.role === 'super_admin' ? 'كامل الصلاحيات (سوبر أدمن)' : 'صلاحيات مخصصة يدوياً'}
                       </strong>
                     </div>
@@ -687,7 +687,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     {isSuperAdmin && (
                       <button
                         onClick={() => setAssigningProfileUser(user)}
-                        className="px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-950 font-bold text-xs cursor-pointer flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-950 font-bold text-xs cursor-pointer flex items-center gap-1"
                       >
                         <span className="material-symbols-outlined text-sm">swap_horiz</span>
                         <span>تغيير نظام الصلاحية</span>
@@ -698,7 +698,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   {/* Scopes Summary (Committees & Exams) */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                      <span className="text-[11px] text-slate-500 block font-bold">اللجان المسموح بها:</span>
+                      <span className="text-xs text-slate-500 block font-bold">اللجان المسموح بها:</span>
                       <span className="text-emerald-950 font-semibold mt-0.5 block">
                         {user.role === 'super_admin' || user.allCommitteesAllowed
                           ? 'كافة اللجان العامة ✓'
@@ -709,7 +709,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                      <span className="text-[11px] text-slate-500 block font-bold">الامتحانات المصرح بها:</span>
+                      <span className="text-xs text-slate-500 block font-bold">الامتحانات المصرح بها:</span>
                       <span className="text-blue-950 font-semibold mt-0.5 block">
                         {user.role === 'super_admin' || user.allExamsAllowed
                           ? 'كافة الامتحانات ✓'
@@ -723,7 +723,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   {/* Super Admin Promotion / Demotion Action (Only Super Admin can do this) */}
                   {isSuperAdmin && currentUser.id !== user.id && (
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-[11px] text-slate-500">التحكم في رتبة السوبر أدمن:</span>
+                      <span className="text-xs text-slate-500">التحكم في رتبة السوبر أدمن:</span>
                       <button
                         type="button"
                         onClick={() => handleToggleSuperAdmin(user)}
@@ -750,14 +750,14 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* VIEW 2: PERMISSION PROFILES BUILDER (مركز بناء وتصميم أنظمة الصلاحيات) */}
       {activeTab === 'profiles' && (
         <div className="space-y-5">
-          <div className="bg-gradient-to-l from-purple-50 to-indigo-50 border-2 border-purple-300 p-5 rounded-3xl space-y-3">
+          <div className="bg-gradient-to-l from-teal-50 to-teal-50 border-2 border-teal-300 p-5 rounded-3xl space-y-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-black text-base text-purple-950 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-purple-700">tune</span>
+                <h3 className="font-black text-base text-teal-950 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-teal-700">tune</span>
                   <span>أنظمة الصلاحيات المخصصة (Permission Profiles Builder)</span>
                 </h3>
-                <p className="text-xs text-purple-900 mt-1 max-w-2xl leading-relaxed">
+                <p className="text-xs text-teal-900 mt-1 max-w-2xl leading-relaxed">
                   يمكن للسوبر أدمن إنشاء أي بروفايل صلاحية جديد، وتحديد التابات المفتوحة، اللجان المسموح بها، والامتحانات التي يستطيع المستخدم الدخول على تفاصيلها وتصحيحها فقط.
                 </p>
               </div>
@@ -765,7 +765,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {isSuperAdmin && (
                 <button
                   onClick={handleOpenCreateProfile}
-                  className="px-5 py-2.5 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs sm:text-sm cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 transition-all shrink-0"
+                  className="px-5 py-2.5 rounded-2xl bg-teal-700 hover:bg-teal-800 text-white font-black text-xs sm:text-sm cursor-pointer shadow-md flex items-center gap-1.5 active:scale-95 transition-all shrink-0"
                 >
                   <span className="material-symbols-outlined text-base">add_circle</span>
                   <span>+ إنشاء نظام صلاحية جديد</span>
@@ -782,7 +782,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               return (
                 <div
                   key={prof.id}
-                  className="bg-white rounded-3xl border-2 border-slate-200 hover:border-purple-300 p-6 shadow-xs hover:shadow-md transition-all space-y-4 text-right flex flex-col justify-between"
+                  className="bg-white rounded-3xl border-2 border-slate-200 hover:border-teal-300 p-6 shadow-xs hover:shadow-md transition-all space-y-4 text-right flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
@@ -790,7 +790,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         <div className="flex items-center gap-2">
                           <h4 className="font-black text-base text-slate-900">{prof.name}</h4>
                           {prof.isDefault && (
-                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">
                               نظام أساسي
                             </span>
                           )}
@@ -798,7 +798,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         <p className="text-xs text-slate-500 mt-1 leading-relaxed">{prof.description}</p>
                       </div>
 
-                      <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200 shrink-0">
+                      <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-teal-100 text-teal-900 border border-teal-200 shrink-0">
                         {assignedCount} مستخدم
                       </span>
                     </div>
@@ -807,8 +807,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     <div className="py-3 space-y-2.5 text-xs">
                       {/* Allowed Pages / Tabs */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm text-purple-700">visibility</span>
+                        <span className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm text-teal-700">visibility</span>
                           <span>الصفحات والتابات المفتوحة للمستخدم:</span>
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -817,7 +817,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                             return (
                               <span
                                 key={tId}
-                                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-[11px] font-bold"
+                                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-bold"
                               >
                                 {tabMeta?.label || tId}
                               </span>
@@ -828,7 +828,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
                       {/* Allowed Committees Scope */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                        <span className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
                           <span className="material-symbols-outlined text-sm text-emerald-700">groups</span>
                           <span>نطاق اللجان الميدانية:</span>
                         </span>
@@ -843,7 +843,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
                       {/* Allowed Exams Scope */}
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                        <span className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
                           <span className="material-symbols-outlined text-sm text-blue-700">description</span>
                           <span>نطاق الامتحانات وبنك الأسئلة:</span>
                         </span>
@@ -862,7 +862,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <button
                       onClick={() => handleOpenEditProfile(prof)}
-                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-purple-100 text-slate-800 hover:text-purple-950 font-bold text-xs cursor-pointer flex items-center gap-1 transition-all"
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-teal-100 text-slate-800 hover:text-teal-950 font-bold text-xs cursor-pointer flex items-center gap-1 transition-all"
                     >
                       <span className="material-symbols-outlined text-sm">edit_note</span>
                       <span>تعديل هذا النظام</span>
@@ -972,7 +972,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                           <span className="font-mono text-emerald-900 font-bold">📞 {user.phone}</span>
                           {user.requestCode && (
-                            <span className="font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
+                            <span className="font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-xs">
                               {user.requestCode}
                             </span>
                           )}
@@ -981,17 +981,17 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     </div>
 
                     {user.status === 'pending' && (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0 animate-pulse">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0 animate-pulse">
                         قيد دراسة المشرف
                       </span>
                     )}
                     {user.status === 'interview' && (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300 shrink-0">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-900 border border-blue-300 shrink-0">
                         مقابلة مجدولة
                       </span>
                     )}
                     {user.status === 'rejected' && (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300 shrink-0">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-900 border border-rose-300 shrink-0">
                         معتذر عنه
                       </span>
                     )}
@@ -1000,12 +1000,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   <div className="py-3 space-y-2 text-xs">
                     <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
                       <div>
-                        <span className="text-slate-500 text-[11px]">مقدار حفظ القرآن: </span>
+                        <span className="text-slate-500 text-xs">مقدار حفظ القرآن: </span>
                         <strong className="text-emerald-950 font-bold">{user.quranLevel || 'حافظ لكامل القرآن'}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 text-[11px]">الدور المرغوب: </span>
-                        <strong className="text-[#005c55] font-bold">{AuthService.getRoleLabel(user.role)}</strong>
+                        <span className="text-slate-500 text-xs">الدور المرغوب: </span>
+                        <strong className="text-brand font-bold">{AuthService.getRoleLabel(user.role)}</strong>
                       </div>
                     </div>
                   </div>
@@ -1014,7 +1014,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleOpenApproveModal(user)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
+                    className="flex-1 py-2 px-3 rounded-xl bg-brand hover:bg-brand-deep text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
                   >
                     <span className="material-symbols-outlined text-sm">how_to_reg</span>
                     <span>✓ قبول واعتماد</span>
@@ -1053,8 +1053,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* CREATE / EDIT PERMISSION PROFILE MODAL (بناء وتصميم الصلاحية المخصصة) */}
       {isProfileModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl border border-purple-200 overflow-hidden animate-in fade-in">
-            <div className="p-5 bg-gradient-to-l from-purple-700 to-indigo-800 text-white flex items-center justify-between">
+          <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl border border-teal-200 overflow-hidden animate-in fade-in">
+            <div className="p-5 bg-gradient-to-l from-teal-700 to-teal-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold">
                   <span className="material-symbols-outlined text-2xl">tune</span>
@@ -1063,7 +1063,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   <h3 className="font-black text-base sm:text-lg">
                     {editingProfile ? `تعديل نظام الصلاحية: ${editingProfile.name}` : 'إنشاء وتصميم نظام صلاحية مخصص جديد'}
                   </h3>
-                  <p className="text-xs text-purple-200">
+                  <p className="text-xs text-teal-200">
                     حدد التابات واللجان والامتحانات المصرح بها بدقة متناهية
                   </p>
                 </div>
@@ -1080,7 +1080,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Profile Name & Description */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700">badge</span>
+                  <span className="material-symbols-outlined text-sm text-teal-700">badge</span>
                   <span>١. اسم نظام الصلاحية ووصفه:</span>
                 </h4>
 
@@ -1095,7 +1095,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       placeholder="مثال: مصحح متن الجزرية ولجان #1 و #2"
                       value={profileName}
                       onChange={(e) => setProfileName(e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-purple-600 font-bold"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-teal-600 font-bold"
                     />
                   </div>
 
@@ -1104,7 +1104,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     <select
                       value={profileBadgeColor}
                       onChange={(e) => setProfileBadgeColor(e.target.value as any)}
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-purple-600 font-bold"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-teal-600 font-bold"
                     >
                       <option value="emerald">أخضر زمردي (Emerald)</option>
                       <option value="blue">أزرق ملكي (Blue)</option>
@@ -1122,7 +1122,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       placeholder="وصف مختصر لما يفتحه هذا النظام..."
                       value={profileDescription}
                       onChange={(e) => setProfileDescription(e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-purple-600"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-teal-600"
                     />
                   </div>
                 </div>
@@ -1131,7 +1131,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Allowed View Tabs Checklist (الصفحات والتابات المفتوحة) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700">visibility</span>
+                  <span className="material-symbols-outlined text-sm text-teal-700">visibility</span>
                   <span>٢. الصفحات والتابات المصرح للمستخدم برؤيتها والدخول عليها:</span>
                 </h4>
 
@@ -1143,7 +1143,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         key={tab.id}
                         className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2.5 transition-all ${
                           isChecked
-                            ? 'bg-purple-50 border-purple-300 text-purple-950 font-bold'
+                            ? 'bg-teal-50 border-teal-300 text-teal-950 font-bold'
                             : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
                         }`}
                       >
@@ -1155,11 +1155,11 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                               e.target.checked ? [...prev, tab.id] : prev.filter((id) => id !== tab.id)
                             );
                           }}
-                          className="rounded text-purple-600 focus:ring-purple-600"
+                          className="rounded text-teal-600 focus:ring-teal-600"
                         />
                         <div>
                           <span className="block text-xs">{tab.label}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">{tab.desc}</span>
+                          <span className="text-xs text-slate-400 font-normal">{tab.desc}</span>
                         </div>
                       </label>
                     );
@@ -1170,7 +1170,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Allowed Committees Scope (نطاق اللجان الميدانية) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700">groups</span>
+                  <span className="material-symbols-outlined text-sm text-teal-700">groups</span>
                   <span>٣. نطاق اللجان الميدانية المصرح بها:</span>
                 </h4>
 
@@ -1213,7 +1213,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                           }}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
                             isSelected
-                              ? 'bg-purple-700 text-white border-purple-700'
+                              ? 'bg-teal-700 text-white border-teal-700'
                               : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                           }`}
                         >
@@ -1228,7 +1228,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
               {/* Allowed Exams Scope (نطاق الامتحانات المصرح بها) */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b pb-2">
-                  <span className="material-symbols-outlined text-sm text-purple-700">description</span>
+                  <span className="material-symbols-outlined text-sm text-teal-700">description</span>
                   <span>٤. نطاق الامتحانات وبنك الأسئلة المصرح بالدخول عليها وتصحيحها:</span>
                 </h4>
 
@@ -1281,7 +1281,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                               />
                               <div>
                                 <span className="block text-xs">{ex.title}</span>
-                                <span className="text-[10px] text-slate-400 font-normal">الكتاب: {ex.book}</span>
+                                <span className="text-xs text-slate-400 font-normal">الكتاب: {ex.book}</span>
                               </div>
                             </label>
                           );
@@ -1305,7 +1305,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black shadow-md cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black shadow-md cursor-pointer"
                 >
                   حفظ وتثبيت نظام الصلاحية
                 </button>
@@ -1318,7 +1318,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* ASSIGN PROFILE QUICK MODAL */}
       {assigningProfileUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
-          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-purple-200 p-6 space-y-4 animate-in fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-teal-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
                 <h3 className="font-black text-base text-slate-900">
@@ -1344,15 +1344,15 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     onClick={() => handleAssignProfileToUser(assigningProfileUser, prof.id)}
                     className={`w-full p-3 rounded-2xl border text-right cursor-pointer transition-all flex items-center justify-between ${
                       isSelected
-                        ? 'bg-purple-50 border-purple-500 text-purple-950 font-bold ring-2 ring-purple-200'
+                        ? 'bg-teal-50 border-teal-500 text-teal-950 font-bold ring-2 ring-teal-200'
                         : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-800'
                     }`}
                   >
                     <div>
                       <span className="block font-bold text-xs">{prof.name}</span>
-                      <span className="text-[10px] text-slate-500">{prof.description}</span>
+                      <span className="text-xs text-slate-500">{prof.description}</span>
                     </div>
-                    {isSelected && <span className="text-purple-700 font-bold">✓ المطبق حالياً</span>}
+                    {isSelected && <span className="text-teal-700 font-bold">✓ المطبق حالياً</span>}
                   </button>
                 );
               })}
@@ -1367,14 +1367,14 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
           <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
                   <span className="material-symbols-outlined text-xl">how_to_reg</span>
                 </span>
                 <div>
                   <h3 className="font-black text-sm sm:text-base text-slate-900">
                     اعتماد وتفعيل المتقدم: {approvingUser.name}
                   </h3>
-                  <p className="text-[11px] text-slate-500">اختر نظام الصلاحية أو حدد الصلاحيات الميدانية</p>
+                  <p className="text-xs text-slate-500">اختر نظام الصلاحية أو حدد الصلاحيات الميدانية</p>
                 </div>
               </div>
               <button
@@ -1391,7 +1391,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <select
                   value={approvalRole}
                   onChange={(e) => setApprovalRole(e.target.value as UserRole)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-[#005c55] outline-none"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
                 >
                   <option value="assistant">معاون ميداني معتمد</option>
                   <option value="teacher">معلم ومقرئ معتمد</option>
@@ -1405,7 +1405,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <select
                   value={approvalProfileId}
                   onChange={(e) => setApprovalProfileId(e.target.value)}
-                  className="w-full bg-purple-50 border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-purple-950 outline-none"
+                  className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
                 >
                   <option value="">صلاحيات مخصصة يدوياً (حسب الاختيارات أدناه)</option>
                   {effectiveProfiles.map((p) => (
@@ -1436,7 +1436,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                             }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
                               isSelected
-                                ? 'bg-[#005c55] text-white border-[#005c55]'
+                                ? 'bg-brand text-white border-brand'
                                 : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                             }`}
                           >
@@ -1460,7 +1460,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                                 e.target.checked ? [...prev, perm.id] : prev.filter((p) => p !== perm.id)
                               );
                             }}
-                            className="rounded text-[#005c55] focus:ring-[#005c55]"
+                            className="rounded text-brand focus:ring-brand"
                           />
                           <span>{perm.label}</span>
                         </label>
@@ -1480,7 +1480,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer"
                 >
                   اعتماد وتفعيل الصلاحيات فوراً
                 </button>
@@ -1620,23 +1620,23 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <div className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                 <div>
-                  <span className="text-slate-500 block text-[11px]">رقم الجوال:</span>
+                  <span className="text-slate-500 block text-xs">رقم الجوال:</span>
                   <strong className="font-mono text-slate-900 font-bold">{dossierUser.phone}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[11px]">الواتساب:</span>
+                  <span className="text-slate-500 block text-xs">الواتساب:</span>
                   <strong className="font-mono text-slate-900 font-bold">{dossierUser.whatsapp || dossierUser.phone}</strong>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                  <span className="font-bold text-emerald-950 block text-[11px]">مقدار حفظ القرآن الكريم والإجازات:</span>
+                  <span className="font-bold text-emerald-950 block text-xs">مقدار حفظ القرآن الكريم والإجازات:</span>
                   <p className="text-emerald-900 font-semibold mt-0.5">{dossierUser.quranLevel || 'حافظ لكامل القرآن'}</p>
                 </div>
 
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="font-bold text-slate-700 block text-[11px]">المؤهل العلمي والتخصص:</span>
+                  <span className="font-bold text-slate-700 block text-xs">المؤهل العلمي والتخصص:</span>
                   <p className="text-slate-900 mt-0.5">{dossierUser.qualification || 'شريعة / دراسات إسلامية'}</p>
                 </div>
               </div>
@@ -1657,7 +1657,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     setDossierUser(null);
                     handleOpenApproveModal(dossierUser);
                   }}
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer"
                 >
                   قبول واعتماد الآن
                 </button>
@@ -1673,12 +1673,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
           <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-10 h-10 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
                   <span className="material-symbols-outlined text-xl">person_add</span>
                 </span>
                 <div>
                   <h3 className="font-black text-sm sm:text-base text-slate-900">إضافة وتفعيل مستخدم مباشر</h3>
-                  <p className="text-[11px] text-slate-500">تفعيل فوري وتطبيق نظام الصلاحيات</p>
+                  <p className="text-xs text-slate-500">تفعيل فوري وتطبيق نظام الصلاحيات</p>
                 </div>
               </div>
               <button
@@ -1698,7 +1698,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   placeholder="الاسم الكامل..."
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                 />
               </div>
 
@@ -1714,7 +1714,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                 />
               </div>
 
@@ -1727,7 +1727,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     placeholder="05xxxxxxxx"
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                   />
                 </div>
 
@@ -1736,7 +1736,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                   <select
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-[#005c55] outline-none"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
                   >
                     <option value="assistant">معاون ميداني</option>
                     <option value="teacher">معلم ومقرئ</option>
@@ -1751,7 +1751,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <select
                   value={newProfileId}
                   onChange={(e) => setNewProfileId(e.target.value)}
-                  className="w-full bg-purple-50 border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-purple-950 outline-none"
+                  className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
                 >
                   <option value="">صلاحيات يدوية (افتراضية)</option>
                   {effectiveProfiles.map((p) => (
@@ -1772,7 +1772,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer"
                 >
                   حفظ وتفعيل الحساب فوراً
                 </button>
@@ -1805,7 +1805,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     required
                     value={editingUser.name}
                     onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   />
                 </div>
 
@@ -1816,7 +1816,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     required
                     value={editingUser.phone}
                     onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono text-left"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                   />
                 </div>
               </div>
@@ -1826,7 +1826,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <select
                   value={editingUser.role}
                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-[#005c55] outline-none"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
                 >
                   <option value="super_admin">المشرف العام (سوبر أدمن)</option>
                   <option value="assistant">معاون ميداني</option>
@@ -1841,7 +1841,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <select
                   value={editingUser.profileId || ''}
                   onChange={(e) => setEditingUser({ ...editingUser, profileId: e.target.value || undefined })}
-                  className="w-full bg-purple-50 border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-purple-950 outline-none"
+                  className="w-full bg-teal-50 border border-teal-300 rounded-xl px-3 py-2 text-xs font-bold text-teal-950 outline-none"
                 >
                   <option value="">صلاحيات مخصصة يدوياً</option>
                   {effectiveProfiles.map((p) => (
@@ -1862,7 +1862,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-black shadow-md cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-black shadow-md cursor-pointer"
                 >
                   حفظ التعديلات
                 </button>

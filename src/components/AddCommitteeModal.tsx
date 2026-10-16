@@ -235,12 +235,12 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="إضافة لجنة جديدة" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150 max-h-[92vh] flex flex-col">
+      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150 max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#005c55]">
+        <div className="px-5 py-4 bg-canvas border-b border-line/40 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-brand">
             <span className="material-symbols-outlined text-2xl">add_circle</span>
-            <h3 className="font-bold text-base text-[#0d1c2e]">إضافة لجنة جديدة</h3>
+            <h3 className="font-bold text-base text-ink">إضافة لجنة جديدة</h3>
           </div>
           <button
             aria-label="إغلاق"
@@ -256,7 +256,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           {/* 1. اسم اللجنة والدورة التابعة لها */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+              <label className="block text-xs font-bold text-ink mb-1">
                 اسم اللجنة <span className="text-red-500">*</span>
               </label>
               <input
@@ -264,13 +264,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 placeholder=""
                 value={committeeName}
                 onChange={(e) => setCommitteeName(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
+                className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs text-ink outline-none focus:border-brand focus:bg-white"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+              <label className="block text-xs font-bold text-ink mb-1">
                 الدورة المسابقاتية التابعة لها <span className="text-red-500">*</span>
               </label>
 
@@ -285,7 +285,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     setSelectedCourseId(e.target.value);
                   }
                 }}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2.5 text-xs font-bold text-[#005c55] outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2.5 text-xs font-bold text-brand outline-none focus:border-brand"
               >
                 {courses.length > 0 ? (
                   courses.map((course) => (
@@ -316,13 +316,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                         handleQuickCreateCourse();
                       }
                     }}
-                    className="flex-1 bg-white border border-emerald-300 rounded-lg px-2.5 py-1.5 text-xs text-[#0d1c2e] outline-none font-semibold focus:border-[#005c55]"
+                    className="flex-1 bg-white border border-emerald-300 rounded-lg px-2.5 py-1.5 text-xs text-ink outline-none font-semibold focus:border-brand"
                   />
                   <button
                     type="button"
                     onClick={() => handleQuickCreateCourse()}
                     disabled={!quickCourseName.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-[#005c55] hover:bg-[#1b6b51] text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-40 shrink-0 shadow-2xs"
+                    className="px-3 py-1.5 rounded-lg bg-brand hover:bg-success text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-40 shrink-0 shadow-2xs"
                   >
                     حفظ وإسناد
                   </button>
@@ -342,7 +342,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
               {/* Course confirmation badge */}
               {!isCreatingInline && selectedCourse && (
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-[#3e4947] bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-200">
+                <div className="mt-1.5 flex items-center justify-between text-xs text-ink-soft bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-200">
                   <span className="font-semibold text-emerald-900 truncate">
                     ✓ ربط تلقائي بـ: <strong>{selectedCourse.name}</strong>
                   </span>
@@ -355,10 +355,10 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           </div>
 
           {/* عدد الطلاب في اللجنة + خيار لجنة نسائية (اختياري) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gradient-to-l from-slate-50 to-emerald-50/40 rounded-xl border border-[#bdc9c6]/50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gradient-to-l from-slate-50 to-emerald-50/40 rounded-xl border border-line/50">
             {/* عدد الطلاب في اللجنة */}
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
+              <label className="block text-xs font-bold text-ink mb-1.5">
                 عدد الطلاب في اللجنة
               </label>
               <div className="flex items-center gap-2">
@@ -371,7 +371,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                   onChange={(e) =>
                     setStudentsCount(e.target.value === '' ? '' : parseInt(e.target.value) || 0)
                   }
-                  className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                  className="flex-1 bg-white border border-line rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-brand"
                 />
                 <div className="flex items-center gap-1 shrink-0">
                   <button
@@ -379,7 +379,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     onClick={() =>
                       setStudentsCount((prev) => Math.max(1, (Number(prev) || 0) - 1))
                     }
-                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer text-[#0d1c2e]"
+                    className="w-8 h-8 rounded-lg bg-white border border-line hover:bg-gray-100 text-xs font-bold cursor-pointer text-ink"
                     title="إنقاص طالب"
                   >
                     -1
@@ -389,7 +389,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     onClick={() =>
                       setStudentsCount((prev) => (Number(prev) || 0) + 1)
                     }
-                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer text-[#0d1c2e]"
+                    className="w-8 h-8 rounded-lg bg-white border border-line hover:bg-gray-100 text-xs font-bold cursor-pointer text-ink"
                     title="زيادة طالب"
                   >
                     +1
@@ -399,21 +399,21 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     onClick={() =>
                       setStudentsCount((prev) => (Number(prev) || 0) + 5)
                     }
-                    className="px-2 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-[11px] font-bold cursor-pointer text-[#005c55]"
+                    className="px-2 h-8 rounded-lg bg-white border border-line hover:bg-gray-100 text-xs font-bold cursor-pointer text-brand"
                     title="زيادة 5 طلاب"
                   >
                     +5
                   </button>
                 </div>
               </div>
-              <span className="text-[10px] text-[#6e7977] mt-1 block">
+              <span className="text-xs text-muted mt-1 block">
                 {studentsCount ? `${studentsCount} ${isWomenCommittee ? 'طالبة مسجلة' : 'طالباً مسجلاً'}` : 'لم يُحدد'}
               </span>
             </div>
 
             {/* عدد الأسئلة في الاختبار */}
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1.5">
+              <label className="block text-xs font-bold text-ink mb-1.5">
                 عدد الأسئلة في الاختبار المقرر
               </label>
               <div className="flex items-center gap-2">
@@ -423,20 +423,20 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                   max={50}
                   value={questionsCount}
                   onChange={(e) => setQuestionsCount(parseInt(e.target.value) || 5)}
-                  className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                  className="flex-1 bg-white border border-line rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-brand"
                 />
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => setQuestionsCount((prev) => Math.max(1, prev - 1))}
-                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer"
+                    className="w-8 h-8 rounded-lg bg-white border border-line hover:bg-gray-100 text-xs font-bold cursor-pointer"
                   >
                     -
                   </button>
                   <button
                     type="button"
                     onClick={() => setQuestionsCount((prev) => Math.min(50, prev + 1))}
-                    className="w-8 h-8 rounded-lg bg-white border border-[#bdc9c6] hover:bg-gray-100 text-xs font-bold cursor-pointer"
+                    className="w-8 h-8 rounded-lg bg-white border border-line hover:bg-gray-100 text-xs font-bold cursor-pointer"
                   >
                     +
                   </button>
@@ -446,14 +446,14 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
             {/* خيار: لجنة نسائية (اختياري) */}
             <div className="flex flex-col justify-center">
-              <label className="text-xs font-bold text-[#0d1c2e] mb-1.5 block">
+              <label className="text-xs font-bold text-ink mb-1.5 block">
                 تخصيص نسائي (اختياري)
               </label>
               <label
                 className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
                   isWomenCommittee
                     ? 'bg-rose-50/80 border-rose-300 ring-2 ring-rose-200'
-                    : 'bg-white border-[#bdc9c6] hover:bg-gray-50'
+                    : 'bg-white border-line hover:bg-gray-50'
                 }`}
               >
                 <input
@@ -465,10 +465,10 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 <div className="flex items-center gap-1.5 select-none">
                   <span className="text-base">🧕</span>
                   <div>
-                    <span className="text-xs font-bold text-[#0d1c2e] block leading-tight">
+                    <span className="text-xs font-bold text-ink block leading-tight">
                       لجنة نسائية
                     </span>
-                    <span className="text-[10px] text-[#6e7977] block">
+                    <span className="text-xs text-muted block">
                       (تفعيل في حال كانت اللجنة مخصصة للطالبات / الأخوات)
                     </span>
                   </div>
@@ -478,13 +478,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           </div>
 
           {/* بيانات الشيخ المرسل إليه */}
-          <div className="bg-[#f8f9ff] border border-[#bdc9c6]/60 p-3.5 rounded-xl space-y-3">
+          <div className="bg-canvas border border-line/60 p-3.5 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#005c55] flex items-center gap-1.5">
+              <span className="text-xs font-bold text-brand flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-base">person_pin</span>
                 <span>بيانات الشيخ المرسل إليه:</span>
               </span>
-              <span className="text-[10px] text-[#6e7977]">
+              <span className="text-xs text-muted">
                 (المسؤول عن تسليم واستلام الاختبارات)
               </span>
             </div>
@@ -492,7 +492,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* اسم الشيخ المرسل إليه */}
               <div>
-                <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                <label className="block text-xs font-bold text-ink mb-1">
                   اسم الشيخ المرسل إليه
                 </label>
                 <div className="relative">
@@ -501,14 +501,14 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     placeholder=""
                     value={sheikhName}
                     onChange={(e) => setSheikhName(e.target.value)}
-                    className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55]"
+                    className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs text-ink outline-none focus:border-brand"
                   />
                 </div>
               </div>
 
               {/* رقم هاتف الشيخ */}
               <div>
-                <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                <label className="block text-xs font-bold text-ink mb-1">
                   رقم هاتف الشيخ
                 </label>
                 <input
@@ -517,13 +517,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                   placeholder=""
                   value={sheikhPhone}
                   onChange={(e) => setSheikhPhone(e.target.value)}
-                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] text-right font-mono"
+                  className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs text-ink outline-none focus:border-brand text-right font-mono"
                 />
               </div>
 
               {/* البلد التي منها الشيخ */}
               <div>
-                <label className="block text-[11px] font-bold text-[#0d1c2e] mb-1">
+                <label className="block text-xs font-bold text-ink mb-1">
                   البلد التي منها الشيخ
                 </label>
                 <input
@@ -531,7 +531,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                   placeholder=""
                   value={sheikhCountry}
                   onChange={(e) => setSheikhCountry(e.target.value)}
-                  className="w-full bg-white border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55]"
+                  className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs text-ink outline-none focus:border-brand"
                 />
               </div>
             </div>
@@ -540,7 +540,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           {/* 2. رقم اللجنة + المرحلة الأولية */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+              <label className="block text-xs font-bold text-ink mb-1">
                 رقم اللجنة (تسلسلي تلقائي)
               </label>
               <input
@@ -549,19 +549,19 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 onChange={(e) =>
                   setCommitteeNumber(parseInt(e.target.value) || nextCommitteeNumber)
                 }
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-bold font-mono outline-none focus:border-brand"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+              <label className="block text-xs font-bold text-ink mb-1">
                 المرحلة الأولية
               </label>
               <select
                 value={initialStage}
                 onChange={(e) => setInitialStage(e.target.value as StageKey)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
               >
                 <option value="exam">🟦 جاري الامتحان الآن</option>
                 <option value="scoring">🟠 في التصحيح</option>
@@ -575,15 +575,15 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           </div>
 
           {/* 3. أعضاء اللجنة (أكثر من خانة ديناميكية) */}
-          <div className="bg-[#f8f9ff] border border-[#bdc9c6]/40 p-3.5 rounded-xl space-y-2">
+          <div className="bg-canvas border border-line/40 p-3.5 rounded-xl space-y-2">
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-[#0d1c2e]">
+              <label className="block text-xs font-bold text-ink">
                 أعضاء اللجنة
               </label>
               <button
                 type="button"
                 onClick={handleAddMemberField}
-                className="text-xs text-[#005c55] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs text-brand font-bold hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
                 <span>+ إضافة عضو آخر</span>
@@ -593,7 +593,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
             <div className="space-y-2">
               {members.map((member, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-[#6e7977] w-14 shrink-0">
+                  <span className="text-xs font-bold text-muted w-14 shrink-0">
                     {idx === 0 ? 'الرئيس:' : `عضو ${idx + 1}:`}
                   </span>
                   <input
@@ -601,7 +601,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                     placeholder=""
                     value={member}
                     onChange={(e) => handleMemberChange(idx, e.target.value)}
-                    className="flex-1 bg-white border border-[#bdc9c6] rounded-xl px-3 py-1.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55]"
+                    className="flex-1 bg-white border border-line rounded-xl px-3 py-1.5 text-xs text-ink outline-none focus:border-brand"
                   />
                   {members.length > 1 && (
                     <button
@@ -621,7 +621,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           {/* 4. اسم الجمعية (إن وُجد) + الفرع (يكتبه بيده) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+              <label className="block text-xs font-bold text-ink mb-1">
                 اسم الجمعية (إن وُجد)
               </label>
               <input
@@ -629,12 +629,12 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 placeholder=""
                 value={associationName}
                 onChange={(e) => setAssociationName(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+              <label className="block text-xs font-bold text-ink mb-1">
                 الفرع (يكتبه بيده)
               </label>
               <input
@@ -642,7 +642,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 placeholder=""
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
               />
             </div>
           </div>
@@ -650,10 +650,10 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           {/* 5. مسار المسابقة / كتاب المسابقة (يكتبه بنفسه ومحفوظ كاقتراحات) */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-[#0d1c2e]">
+              <label className="block text-xs font-bold text-ink">
                 مسار المسابقة / الكتاب المقرر
               </label>
-              <span className="text-[10px] text-[#6e7977]">
+              <span className="text-xs text-muted">
                 (يتم حفظ أي كتاب جديد تلقائياً في النظام)
               </span>
             </div>
@@ -664,7 +664,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 placeholder=""
                 value={competitionBook}
                 onChange={(e) => setCompetitionBook(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
+                className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs text-ink outline-none focus:border-brand focus:bg-white"
               />
               <datalist id="competition-books-list">
                 {savedBooks.map((b, i) => (
@@ -675,13 +675,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
             {/* Quick suggested chips */}
             <div className="flex flex-wrap gap-1.5 mt-2">
-              <span className="text-[10px] text-[#6e7977] self-center">اقتراحات سريعة:</span>
+              <span className="text-xs text-muted self-center">اقتراحات سريعة:</span>
               {savedBooks.slice(0, 4).map((b, i) => (
                 <button
                   type="button"
                   key={i}
                   onClick={() => setCompetitionBook(b)}
-                  className="px-2 py-0.5 rounded-lg text-[10px] bg-[#eff4ff] text-[#005c55] hover:bg-[#9cf2e8]/40 border border-[#bdc9c6]/40 transition-colors"
+                  className="px-2 py-0.5 rounded-lg text-xs bg-tint text-brand hover:bg-brand-light/40 border border-line/40 transition-colors"
                 >
                   {b}
                 </button>
@@ -691,7 +691,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
           {/* 6. ملاحظات عامة نصية حرة خاصة باللجنة */}
           <div>
-            <label className="block text-xs font-bold text-[#0d1c2e] mb-1">
+            <label className="block text-xs font-bold text-ink mb-1">
               ملاحظات عامة على اللجنة
             </label>
             <textarea
@@ -699,22 +699,22 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               placeholder=""
               value={generalNotes}
               onChange={(e) => setGeneralNotes(e.target.value)}
-              className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
+              className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs text-ink outline-none focus:border-brand focus:bg-white"
             />
           </div>
 
           {/* Submit Buttons */}
-          <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#3e4947] border border-[#bdc9c6] hover:bg-gray-50"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-ink-soft border border-line hover:bg-gray-50"
             >
               إلغاء
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-[#005c55] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-sm">check</span>
               <span>تسجيل اللجنة واعتمادها</span>

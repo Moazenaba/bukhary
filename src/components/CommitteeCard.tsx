@@ -42,10 +42,10 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
               #{committee.committeeNumber}
             </span>
             <div className="min-w-0">
-              <h3 className="text-base font-extrabold text-slate-900 block leading-snug truncate group-hover:text-[#005c55] transition-colors">
+              <h3 className="text-base font-extrabold text-slate-900 block leading-snug truncate group-hover:text-brand transition-colors">
                 {committee.committeeName}
               </h3>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 flex-wrap">
                 <span className="font-semibold text-slate-600">لجنة #{committee.committeeNumber}</span>
                 {committee.courseName && (
                   <>
@@ -62,7 +62,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           {/* Status & Women Tag */}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
             {committee.isWomenCommittee && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs">
                 <span>🧕</span>
                 <span>لجنة نسائية</span>
               </span>
@@ -79,7 +79,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
 
         {/* Competition Book & Student Count Badges */}
         <div className="flex items-center justify-between gap-2 mb-3.5 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50/80 text-[#005c55] border border-emerald-200/80 max-w-full truncate shadow-2xs">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50/80 text-brand border border-emerald-200/80 max-w-full truncate shadow-2xs">
             <span className="material-symbols-outlined text-sm text-emerald-700">menu_book</span>
             <span className="truncate">{committee.competitionBook}</span>
           </span>
@@ -119,7 +119,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                 <span className="material-symbols-outlined text-sm text-slate-400">apartment</span>
                 <span>الجمعية:</span>
               </span>
-              <span className="font-bold text-[#005c55]">{committee.associationName}</span>
+              <span className="font-bold text-brand">{committee.associationName}</span>
             </div>
           )}
 
@@ -131,10 +131,10 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                 <span>الشيخ الميداني:</span>
               </span>
               <div className="flex items-center gap-1.5 text-left truncate max-w-[210px]">
-                <span className="font-bold text-[#005c55] truncate">
+                <span className="font-bold text-brand truncate">
                   {committee.sheikhName}
                   {committee.sheikhCountry && (
-                    <span className="text-slate-400 font-normal text-[11px] mr-1">
+                    <span className="text-slate-400 font-normal text-xs mr-1">
                       ({committee.sheikhCountry})
                     </span>
                   )}
@@ -143,7 +143,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                   <a
                     href={`tel:${committee.sheikhPhone}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-md font-mono font-bold shrink-0 shadow-2xs transition-colors"
+                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-md font-mono font-bold shrink-0 shadow-2xs transition-colors"
                     title={`اتصال: ${committee.sheikhPhone}`}
                   >
                     📞 اتصال
@@ -155,7 +155,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
 
           {/* General Notes if exists */}
           {committee.generalNotes && (
-            <div className="pt-1.5 border-t border-slate-200/50 text-[11px] text-slate-600 italic line-clamp-1">
+            <div className="pt-1.5 border-t border-slate-200/50 text-xs text-slate-600 italic line-clamp-1">
               <span className="font-bold text-slate-800 not-italic">ملاحظة: </span>
               {committee.generalNotes}
             </div>
@@ -169,7 +169,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
               <span className="material-symbols-outlined text-sm text-emerald-700">timeline</span>
               <span>سير المراحل:</span>
             </span>
-            <span className="font-mono font-extrabold text-[#005c55]">
+            <span className="font-mono font-extrabold text-brand">
               {completedStagesCount} من {totalStagesCount} مراحل ({completionPercent}%)
             </span>
           </div>
@@ -182,7 +182,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                   key={stg.key}
                   title={`${stg.label}: ${isDone ? 'مكتمل' : 'لم يتم'}`}
                   className={`flex-1 h-full rounded-xs transition-colors ${
-                    isDone ? 'bg-[#005c55]' : 'bg-slate-200'
+                    isDone ? 'bg-brand' : 'bg-slate-200'
                   }`}
                 />
               );
@@ -215,7 +215,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onViewDetails(committee)}
-                  className="px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] cursor-pointer shadow-2xs transition-colors"
+                  className="px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer shadow-2xs transition-colors"
                 >
                   تصحيح الآن ←
                 </button>
@@ -229,7 +229,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 relative">
         <button
           onClick={() => onViewDetails(committee)}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-l from-[#005c55] to-emerald-700 hover:from-[#004742] hover:to-emerald-800 text-white text-xs font-extrabold transition-all shadow-xs hover:shadow-md active:scale-[0.98] cursor-pointer"
+          className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-l from-brand to-emerald-700 hover:from-brand-deep hover:to-emerald-800 text-white text-xs font-extrabold transition-all shadow-xs hover:shadow-md active:scale-[0.98] cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">visibility</span>
           <span>عرض التفاصيل وسجل المراحل</span>

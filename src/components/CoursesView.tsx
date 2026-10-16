@@ -90,7 +90,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
   return (
     <div className="space-y-6 text-right">
       {/* Header Banner */}
-      <div className="bg-gradient-to-l from-[#005c55] to-teal-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-l from-brand to-teal-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-2 rounded-xl bg-white/20 text-white">
@@ -109,7 +109,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
         {canWriteCourses && (
           <button
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-[#005c55] hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-xl text-emerald-600">add_circle</span>
             <span>+ إضافة دورة جديدة</span>
@@ -118,14 +118,14 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
       </div>
 
       {/* Filter Tabs & Counter */}
-      <div className="flex items-center justify-between border-b border-[#bdc9c6]/40 pb-3 flex-wrap gap-2">
+      <div className="flex items-center justify-between border-b border-line/40 pb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setFilterStatus('all')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               filterStatus === 'all'
-                ? 'bg-[#005c55] text-white shadow-xs'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-[#eff4ff]'
+                ? 'bg-brand text-white shadow-xs'
+                : 'bg-white text-ink-soft border border-line/60 hover:bg-tint'
             }`}
           >
             جميع الدورات ({courses.length})
@@ -135,7 +135,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               filterStatus === 'active'
                 ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-emerald-50'
+                : 'bg-white text-ink-soft border border-line/60 hover:bg-emerald-50'
             }`}
           >
             الدورات النشطة ({courses.filter((c) => c.status === 'active').length})
@@ -145,7 +145,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               filterStatus === 'completed'
                 ? 'bg-slate-700 text-white shadow-xs'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-gray-100'
+                : 'bg-white text-ink-soft border border-line/60 hover:bg-gray-100'
             }`}
           >
             المكتملة والمؤرشفة ({courses.filter((c) => c.status === 'completed').length})
@@ -155,14 +155,14 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               filterStatus === 'upcoming'
                 ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-[#3e4947] border border-[#bdc9c6]/60 hover:bg-blue-50'
+                : 'bg-white text-ink-soft border border-line/60 hover:bg-blue-50'
             }`}
           >
             الدورات القادمة ({courses.filter((c) => c.status === 'upcoming').length})
           </button>
         </div>
 
-        <span className="text-[11px] text-[#6e7977]">
+        <span className="text-xs text-muted">
           إجمالي اللجان المسجلة بالمنظومة: <strong>{committees.length} لجنة</strong>
         </span>
       </div>
@@ -179,12 +179,12 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
               className={`bg-white rounded-2xl border p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative ${
                 course.isDefault
                   ? 'border-emerald-500 ring-2 ring-emerald-400/30'
-                  : 'border-[#bdc9c6]/60'
+                  : 'border-line/60'
               }`}
             >
               <div>
                 {/* Status Badges Header */}
-                <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-[#bdc9c6]/30">
+                <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-line/30">
                   <div className="flex items-center gap-2">
                     <span
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm ${
@@ -205,17 +205,17 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                     </span>
 
                     <div>
-                      <span className="text-[11px] font-bold text-[#6e7977] block">
+                      <span className="text-xs font-bold text-muted block">
                         {course.season} • {course.year}
                       </span>
-                      <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e] leading-snug">
+                      <h3 className="font-bold text-sm sm:text-base text-ink leading-snug">
                         {course.name}
                       </h3>
                     </div>
                   </div>
 
                   {course.isDefault && (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-2xs">
                       الدورة الحالية
                     </span>
                   )}
@@ -223,49 +223,49 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
 
                 {/* Description */}
                 {course.description && (
-                  <p className="text-xs text-[#3e4947] bg-[#f8f9ff] p-3 rounded-xl border border-[#bdc9c6]/30 mb-4 leading-relaxed">
+                  <p className="text-xs text-ink-soft bg-canvas p-3 rounded-xl border border-line/30 mb-4 leading-relaxed">
                     {course.description}
                   </p>
                 )}
 
                 {/* Statistics Grid */}
                 <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-                  <div className="bg-[#f8f9ff] p-2.5 rounded-xl border border-[#bdc9c6]/30">
-                    <span className="text-[10px] text-[#6e7977] block font-semibold">اللجان المرتبطة:</span>
-                    <span className="text-base font-bold text-[#005c55] font-mono">
+                  <div className="bg-canvas p-2.5 rounded-xl border border-line/30">
+                    <span className="text-xs text-muted block font-semibold">اللجان المرتبطة:</span>
+                    <span className="text-base font-bold text-brand font-mono">
                       {courseComms.length} لجنة
                     </span>
-                    <span className="text-[10px] text-gray-500 block">
+                    <span className="text-xs text-gray-500 block">
                       (الهدف: {course.targetCommitteesCount || 30})
                     </span>
                   </div>
 
-                  <div className="bg-[#f8f9ff] p-2.5 rounded-xl border border-[#bdc9c6]/30">
-                    <span className="text-[10px] text-[#6e7977] block font-semibold">المراحل المكتملة:</span>
+                  <div className="bg-canvas p-2.5 rounded-xl border border-line/30">
+                    <span className="text-xs text-muted block font-semibold">المراحل المكتملة:</span>
                     <span className="text-base font-bold text-emerald-700 font-mono">
                       {completedComms} من {courseComms.length}
                     </span>
-                    <span className="text-[10px] text-gray-500 block">
+                    <span className="text-xs text-gray-500 block">
                       {courseComms.length > 0 ? Math.round((completedComms / courseComms.length) * 100) : 0}% إنجاز
                     </span>
                   </div>
                 </div>
 
                 {/* Date range */}
-                <div className="text-[11px] text-[#6e7977] flex items-center justify-between mb-2">
+                <div className="text-xs text-muted flex items-center justify-between mb-2">
                   <span>الفترة الزمنية:</span>
-                  <span className="font-mono text-[#0d1c2e] font-semibold">
+                  <span className="font-mono text-ink font-semibold">
                     {course.startDate} {course.endDate ? `إلى ${course.endDate}` : '(مفتوحة)'}
                   </span>
                 </div>
               </div>
 
               {/* Actions Footer */}
-              <div className="pt-3 border-t border-[#bdc9c6]/30 space-y-2">
+              <div className="pt-3 border-t border-line/30 space-y-2">
                 <button
                   type="button"
                   onClick={() => onNavigateCommitteesByCourse(course.id)}
-                  className="w-full py-2 px-3 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] transition-all"
+                  className="w-full py-2 px-3 rounded-xl bg-brand hover:bg-success text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98] transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">groups</span>
                   <span>عرض لجان هذه الدورة ({courseComms.length})</span>
@@ -277,7 +277,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onSetDefaultCourse(course.id)}
-                        className="text-[#005c55] hover:underline font-bold text-[11px] cursor-pointer"
+                        className="text-brand hover:underline font-bold text-xs cursor-pointer"
                       >
                         ✓ تعيين كدورة نشطة
                       </button>
@@ -287,7 +287,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setEditingCourse(course)}
-                        className="text-amber-800 hover:text-amber-950 font-semibold text-[11px] cursor-pointer"
+                        className="text-amber-800 hover:text-amber-950 font-semibold text-xs cursor-pointer"
                       >
                         تعديل
                       </button>
@@ -296,7 +296,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteCourse(course.id)}
-                          className="text-red-500 hover:text-red-700 font-semibold text-[11px] cursor-pointer"
+                          className="text-red-500 hover:text-red-700 font-semibold text-xs cursor-pointer"
                         >
                           حذف
                         </button>
@@ -313,17 +313,17 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
       {/* ADD COURSE MODAL */}
       {isAddModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
-            <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150">
+            <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-tint border-b border-line/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-xl bg-[#005c55] text-white flex items-center justify-center font-bold shadow-xs">
+                <span className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
                   <span className="material-symbols-outlined text-xl">event_repeat</span>
                 </span>
                 <div>
-                  <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
+                  <h3 className="font-bold text-sm sm:text-base text-ink">
                     إضافة دورة مسابقات جديدة
                   </h3>
-                  <p className="text-[11px] text-[#6e7977]">
+                  <p className="text-xs text-muted">
                     تخصيص دورة جديدة وربط اللجان بها تلقائياً
                   </p>
                 </div>
@@ -338,7 +338,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
 
             <form onSubmit={handleAddSubmit} className="p-5 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
+                <label className="block font-bold text-ink mb-1">
                   اسم الدورة المسابقاتية <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -346,18 +346,18 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                   placeholder="مثال: دورة الشتاء 1448هـ، دورة المتون المكثفة..."
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                  className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-brand font-semibold"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">الموسم / النوع</label>
+                  <label className="block font-bold text-ink mb-1">الموسم / النوع</label>
                   <select
                     value={season}
                     onChange={(e) => setSeason(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   >
                     <option value="صيفية">دورة صيفية</option>
                     <option value="شتوية">دورة شتوية</option>
@@ -368,46 +368,46 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">العام / السنة</label>
+                  <label className="block font-bold text-ink mb-1">العام / السنة</label>
                   <input
                     type="text"
                     placeholder="1448هـ / 2026م"
                     value={year}
                     onChange={(e) => setYear(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">تاريخ البداية</label>
+                  <label className="block font-bold text-ink mb-1">تاريخ البداية</label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">تاريخ النهاية المتوقع</label>
+                  <label className="block font-bold text-ink mb-1">تاريخ النهاية المتوقع</label>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">حالة الدورة</label>
+                  <label className="block font-bold text-ink mb-1">حالة الدورة</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as any)}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   >
                     <option value="active">نشطة حالياً (جارية)</option>
                     <option value="upcoming">قادمة (مستقبلية)</option>
@@ -416,28 +416,28 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">عدد اللجان المتوقع</label>
+                  <label className="block font-bold text-ink mb-1">عدد اللجان المتوقع</label>
                   <input
                     type="number"
                     value={targetCommitteesCount}
                     onChange={(e) => setTargetCommitteesCount(Number(e.target.value))}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">وصف الدورة والأهداف</label>
+                <label className="block font-bold text-ink mb-1">وصف الدورة والأهداف</label>
                 <textarea
                   rows={3}
                   placeholder="وصف المسار، شروط الالتحاق، القاعات المخصصة..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                  className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs outline-none focus:border-brand"
                 />
               </div>
 
-              <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
@@ -447,7 +447,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#1b6b51] text-white font-bold cursor-pointer shadow-xs active:scale-[0.98]"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-success text-white font-bold cursor-pointer shadow-xs active:scale-[0.98]"
                 >
                   إنشاء الدورة وربط اللجان بها
                 </button>
@@ -460,17 +460,17 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
       {/* EDIT COURSE MODAL */}
       {editingCourse && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
-            <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-[#eff4ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150">
+            <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-tint border-b border-line/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-xs">
                   <span className="material-symbols-outlined text-xl">edit</span>
                 </span>
                 <div>
-                  <h3 className="font-bold text-sm sm:text-base text-[#0d1c2e]">
+                  <h3 className="font-bold text-sm sm:text-base text-ink">
                     تعديل بيانات: {editingCourse.name}
                   </h3>
-                  <p className="text-[11px] text-[#6e7977]">
+                  <p className="text-xs text-muted">
                     تحديث الحالة، التواريخ، أو إنهاء وأرشفة الدورة
                   </p>
                 </div>
@@ -485,47 +485,47 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
 
             <form onSubmit={handleEditSubmit} className="p-5 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">
+                <label className="block font-bold text-ink mb-1">
                   اسم الدورة <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={editingCourse.name}
                   onChange={(e) => setEditingCourse({ ...editingCourse, name: e.target.value })}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-[#005c55] font-semibold"
+                  className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-brand font-semibold"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">الموسم</label>
+                  <label className="block font-bold text-ink mb-1">الموسم</label>
                   <input
                     type="text"
                     value={editingCourse.season || ''}
                     onChange={(e) => setEditingCourse({ ...editingCourse, season: e.target.value })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">العام</label>
+                  <label className="block font-bold text-ink mb-1">العام</label>
                   <input
                     type="text"
                     value={editingCourse.year}
                     onChange={(e) => setEditingCourse({ ...editingCourse, year: e.target.value })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">حالة الدورة</label>
+                  <label className="block font-bold text-ink mb-1">حالة الدورة</label>
                   <select
                     value={editingCourse.status}
                     onChange={(e) => setEditingCourse({ ...editingCourse, status: e.target.value as any })}
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
                   >
                     <option value="active">نشطة حالياً</option>
                     <option value="completed">مكتملة ومؤرشفة (دورة سابقة)</option>
@@ -534,7 +534,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#0d1c2e] mb-1">عدد اللجان المستهدف</label>
+                  <label className="block font-bold text-ink mb-1">عدد اللجان المستهدف</label>
                   <input
                     type="number"
                     value={editingCourse.targetCommitteesCount || 30}
@@ -544,22 +544,22 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                         targetCommitteesCount: Number(e.target.value),
                       })
                     }
-                    className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55] font-mono"
+                    className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-[#0d1c2e] mb-1">الوصف</label>
+                <label className="block font-bold text-ink mb-1">الوصف</label>
                 <textarea
                   rows={3}
                   value={editingCourse.description || ''}
                   onChange={(e) => setEditingCourse({ ...editingCourse, description: e.target.value })}
-                  className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs outline-none focus:border-[#005c55]"
+                  className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs outline-none focus:border-brand"
                 />
               </div>
 
-              <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingCourse(null)}

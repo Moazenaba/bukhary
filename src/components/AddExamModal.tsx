@@ -78,12 +78,12 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="إضافة امتحان" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150 max-h-[92vh] flex flex-col">
+      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150 max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 bg-[#f8f9ff] border-b border-[#bdc9c6]/40 flex items-center justify-between">
+        <div className="px-5 py-4 bg-canvas border-b border-line/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-800">
             <span className="material-symbols-outlined text-2xl text-emerald-600">upload_file</span>
-            <h3 className="font-bold text-base text-[#0d1c2e]">
+            <h3 className="font-bold text-base text-ink">
               إضافة امتحان جديد ورفع ملف PDF
             </h3>
           </div>
@@ -100,7 +100,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
           {/* 1. Exam Title */}
           <div>
-            <label className="block font-bold text-[#0d1c2e] mb-1">
+            <label className="block font-bold text-ink mb-1">
               اسم الامتحان / عنوان النموذج <span className="text-red-500">*</span>
             </label>
             <input
@@ -108,7 +108,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               placeholder="مثال: امتحان كتاب الأصول الثلاثة وأدلتها — النموذج (أ)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
+              className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs text-ink outline-none focus:border-brand focus:bg-white"
               required
             />
           </div>
@@ -116,7 +116,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
           {/* 2. Book & Branch */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 الكتاب المقرر / المسار
               </label>
               <input
@@ -126,7 +126,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
                 placeholder="اختر أو اكتب اسم الكتاب..."
                 value={book}
                 onChange={(e) => setBook(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
               />
               <datalist id="books-datalist">
                 {savedBooks.map((b, i) => (
@@ -136,7 +136,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 الفرع أو الفئة المستهدفة
               </label>
               <input
@@ -144,7 +144,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
                 placeholder="مثال: فرع الكبار، فرع الناشئة..."
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#005c55]"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-brand"
               />
             </div>
           </div>
@@ -152,45 +152,45 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
           {/* 3. Duration, Total Marks, Number of Questions */}
           <div className="grid grid-cols-3 gap-2.5">
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 الدرجة الكلية
               </label>
               <input
                 type="number"
                 value={totalMarks}
                 onChange={(e) => setTotalMarks(parseInt(e.target.value) || 100)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-[#005c55] text-center"
+                className="w-full bg-canvas border border-line rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-brand text-center"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 المدة (بالدقائق)
               </label>
               <input
                 type="number"
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 60)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-[#005c55] text-center"
+                className="w-full bg-canvas border border-line rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-brand text-center"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 عدد الأسئلة
               </label>
               <input
                 type="number"
                 value={questionsCount}
                 onChange={(e) => setQuestionsCount(parseInt(e.target.value) || 5)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-[#005c55] text-center"
+                className="w-full bg-canvas border border-line rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-brand text-center"
               />
             </div>
           </div>
 
           {/* 4. PDF File Upload Area */}
           <div className="space-y-1.5">
-            <label className="block font-bold text-[#0d1c2e]">
+            <label className="block font-bold text-ink">
               رفع ملف ورقة الامتحان (PDF) <span className="text-red-500">*</span>
             </label>
 
@@ -210,7 +210,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
                 pdfFileName
                   ? 'border-emerald-500 bg-emerald-50/50'
-                  : 'border-[#bdc9c6] hover:border-[#005c55] bg-[#f8f9ff] hover:bg-[#eff4ff]'
+                  : 'border-line hover:border-brand bg-canvas hover:bg-tint'
               }`}
             >
               {pdfFileName ? (
@@ -222,20 +222,20 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
                     <span className="font-bold text-xs text-emerald-900 block truncate max-w-xs">
                       {pdfFileName}
                     </span>
-                    <span className="text-[11px] text-emerald-700">
+                    <span className="text-xs text-emerald-700">
                       تم اختيار الملف بنجاح ({pdfFileSize}) — انقر لتغييره
                     </span>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <span className="w-10 h-10 rounded-xl bg-white border border-[#bdc9c6]/50 text-[#005c55] inline-flex items-center justify-center font-bold shadow-2xs">
+                  <span className="w-10 h-10 rounded-xl bg-white border border-line/50 text-brand inline-flex items-center justify-center font-bold shadow-2xs">
                     <span className="material-symbols-outlined text-2xl">cloud_upload</span>
                   </span>
-                  <p className="font-bold text-xs text-[#0d1c2e]">
+                  <p className="font-bold text-xs text-ink">
                     اضغط هنا لرفع ملف الامتحان (PDF) من جهازك
                   </p>
-                  <p className="text-[11px] text-[#6e7977]">
+                  <p className="text-xs text-muted">
                     يدعم المستندات بصيغة PDF فقط (حجم أقصى 20 ميجابايت)
                   </p>
                 </div>
@@ -249,7 +249,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
 
           {/* 5. Notes / Instructions */}
           <div>
-            <label className="block font-bold text-[#0d1c2e] mb-1">
+            <label className="block font-bold text-ink mb-1">
               تعليمات الامتحان ونموذج الإجابة
             </label>
             <textarea
@@ -257,23 +257,23 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
               placeholder="اكتب تعليمات خاصة للمصححين أو توزيع الدرجات..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs text-[#0d1c2e] outline-none focus:border-[#005c55] focus:bg-white"
+              className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs text-ink outline-none focus:border-brand focus:bg-white"
             />
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl font-semibold text-[#3e4947] border border-[#bdc9c6] hover:bg-gray-50"
+              className="px-4 py-2 rounded-xl font-semibold text-ink-soft border border-line hover:bg-gray-50"
             >
               إلغاء
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="disabled:opacity-60 px-5 py-2 rounded-xl font-semibold text-white bg-[#005c55] hover:bg-[#1b6b51] shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
+              className="disabled:opacity-60 px-5 py-2 rounded-xl font-semibold text-white bg-brand hover:bg-success shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-sm">check</span>
               <span>{isSaving ? 'جاري الحفظ...' : 'حفظ الامتحان ورفع النموذج'}</span>

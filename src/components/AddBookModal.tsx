@@ -42,7 +42,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="إضافة كتاب" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-[#bdc9c6]/50 overflow-hidden animate-in fade-in duration-150">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150">
         {/* Header with warm Amber/Gold scholar styling */}
         <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-amber-100/60 border-b border-amber-200/60 flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-amber-900">
@@ -51,7 +51,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
             </span>
             <div>
               <h3 className="font-bold text-base text-amber-950">إضافة كتاب مقرر جديد</h3>
-              <p className="text-[11px] text-amber-800">
+              <p className="text-xs text-amber-800">
                 إدراج متن علمي أو كتاب شرعي معتمد في مسابقات مسجد البخاري
               </p>
             </div>
@@ -75,7 +75,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
           {/* Book Title */}
           <div>
-            <label className="block font-bold text-[#0d1c2e] mb-1">
+            <label className="block font-bold text-ink mb-1">
               اسم الكتاب أو المتن المقرر <span className="text-red-500">*</span>
             </label>
             <input
@@ -86,7 +86,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
                 setBookName(e.target.value);
                 setErrorMsg('');
               }}
-              className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3.5 py-2.5 text-xs text-[#0d1c2e] outline-none focus:border-amber-600 focus:bg-white"
+              className="w-full bg-canvas border border-line rounded-xl px-3.5 py-2.5 text-xs text-ink outline-none focus:border-amber-600 focus:bg-white"
               required
             />
           </div>
@@ -94,7 +94,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
           {/* Author / Scholar */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 المصنّف / المؤلف (اختياري)
               </label>
               <input
@@ -102,18 +102,18 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
                 placeholder="مثال: شيخ الإسلام محمد بن عبد الوهاب"
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 focus:bg-white"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-[#0d1c2e] mb-1">
+              <label className="block font-bold text-ink mb-1">
                 التصنيف العلمي
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 focus:bg-white font-semibold"
+                className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-600 focus:bg-white font-semibold"
               >
                 <option value="متون العقيدة والتوحيد">متون العقيدة والتوحيد</option>
                 <option value="متون الحديث والأثر">متون الحديث والأثر</option>
@@ -125,7 +125,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
           {/* Notes */}
           <div>
-            <label className="block font-bold text-[#0d1c2e] mb-1">
+            <label className="block font-bold text-ink mb-1">
               ملاحظات أو عدد الأبواب المقررة
             </label>
             <textarea
@@ -133,12 +133,12 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
               placeholder="مثال: يختبر الطالب في حفظ المتن كاملاً مع ضبط الألفاظ وأدلة الأصول الثلاثة..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full bg-[#f8f9ff] border border-[#bdc9c6] rounded-xl p-2.5 text-xs text-[#0d1c2e] outline-none focus:border-amber-600 focus:bg-white"
+              className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs text-ink outline-none focus:border-amber-600 focus:bg-white"
             />
           </div>
 
           {/* Quick Info Box */}
-          <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+          <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-xs text-amber-900 leading-relaxed flex items-start gap-2">
             <span className="material-symbols-outlined text-base text-amber-600 shrink-0">info</span>
             <span>
               عند إضافة الكتاب سيظهر فوراً كخيار معتمد في كافة نماذج تسجيل اللجان، وتصفية البيانات، ورفع نماذج الامتحانات.
@@ -146,11 +146,11 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-[#bdc9c6]/30 flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl font-semibold text-[#3e4947] border border-[#bdc9c6] hover:bg-gray-50 cursor-pointer"
+              className="px-4 py-2 rounded-xl font-semibold text-ink-soft border border-line hover:bg-gray-50 cursor-pointer"
             >
               إلغاء
             </button>

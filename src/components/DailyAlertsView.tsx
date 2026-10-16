@@ -243,7 +243,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
                 التنبيهات والمهام اليومية
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#005c55] border border-emerald-200 text-xs font-black font-mono">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-brand border border-emerald-200 text-xs font-black font-mono">
                 📅 {viewMode === 'selected_day' ? formattedSelectedDate : 'كافة المواعيد المجدولة'}
               </span>
             </div>
@@ -272,7 +272,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
               setNewTaskDate(selectedDate);
               setIsAddModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
           >
             <span className="material-symbols-outlined text-lg">add_task</span>
             <span>+ إضافة عمل / تنبيه لليوم</span>
@@ -294,7 +294,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-              <span className="material-symbols-outlined text-base text-[#005c55]">event</span>
+              <span className="material-symbols-outlined text-base text-brand">event</span>
               <span>عرض المواعيد والتنبيهات حسب:</span>
             </span>
             <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
@@ -302,7 +302,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 type="button"
                 onClick={() => setViewMode('selected_day')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'selected_day' ? 'bg-[#005c55] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  viewMode === 'selected_day' ? 'bg-brand text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 اليوم المحدد ({tasks.filter(t => t.date === selectedDate).length})
@@ -311,7 +311,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 type="button"
                 onClick={() => setViewMode('all_schedule')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'all_schedule' ? 'bg-[#005c55] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  viewMode === 'all_schedule' ? 'bg-brand text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 كافة المواعيد المجدولة ({tasks.length})
@@ -321,7 +321,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
 
           {/* Custom Date Picker */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-[11px] font-bold text-slate-500">اختر يوماً من التقويم:</span>
+            <span className="text-xs font-bold text-slate-500">اختر يوماً من التقويم:</span>
             <input
               type="date"
               value={selectedDate}
@@ -329,7 +329,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 setSelectedDate(e.target.value);
                 setViewMode('selected_day');
               }}
-              className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-mono font-bold text-slate-800 outline-none focus:border-[#005c55]"
+              className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-mono font-bold text-slate-800 outline-none focus:border-brand"
             />
           </div>
         </div>
@@ -349,14 +349,14 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSelected
-                    ? 'bg-[#005c55] text-white shadow-xs'
+                    ? 'bg-brand text-white shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
               >
                 <span>{q.label}</span>
                 {countOnDay > 0 && (
                   <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    className={`px-1.5 py-0.2 rounded-full text-xs font-mono ${
                       isSelected ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-200 text-slate-800'
                     }`}
                   >
@@ -419,7 +419,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </span>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-xs font-black uppercase tracking-wider">
                   تنبيه حفل وتكريم اليوم
                 </span>
                 <h3 className="text-base font-black">
@@ -431,7 +431,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   .map((c) => `لجنة #${c.committeeNumber || ''} (${c.title})`)
                   .join(' • ')}
               </p>
-              <div className="text-[11px] font-semibold text-slate-800 mt-0.5">
+              <div className="text-xs font-semibold text-slate-800 mt-0.5">
                 📍 يرجى تجهيز شهادات التقدير والدروع التذكارية وكشوف التكريم للطلاب والشيخ المشرف.
               </div>
             </div>
@@ -463,7 +463,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="بحث في المهام، المكلف، التاريخ، اللجنة..."
-            className="w-full pr-9 pl-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:bg-white focus:border-[#005c55] outline-none"
+            className="w-full pr-9 pl-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:bg-white focus:border-brand outline-none"
           />
         </div>
 
@@ -474,7 +474,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             onClick={() => setStatusFilter('all')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               statusFilter === 'all'
-                ? 'bg-[#005c55] text-white shadow-2xs'
+                ? 'bg-brand text-white shadow-2xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
@@ -526,7 +526,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 setNewTaskDate(selectedDate);
                 setIsAddModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold cursor-pointer transition-all shadow-2xs"
             >
               <span className="material-symbols-outlined text-sm">add</span>
               <span>+ إضافة عمل ليوم {formattedSelectedDate.split(' ')[0]}</span>
@@ -569,7 +569,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <div>
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                        className={`px-2 py-0.5 rounded-md text-xs font-black border ${
                           task.type === 'ceremony'
                             ? 'bg-amber-100 text-amber-950 border-amber-300 shadow-2xs'
                             : task.type === 'delivery'
@@ -579,7 +579,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                             : task.type === 'scoring'
                             ? 'bg-teal-50 text-teal-900 border-teal-300'
                             : task.type === 'review'
-                            ? 'bg-purple-50 text-purple-900 border-purple-300'
+                            ? 'bg-teal-50 text-teal-900 border-teal-300'
                             : 'bg-slate-100 text-slate-800 border-slate-300'
                         }`}
                       >
@@ -597,23 +597,23 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                       </span>
 
                       {/* Date Badge */}
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[10px] font-bold border border-slate-300">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold border border-slate-300">
                         📅 {task.date}
                       </span>
 
                       {task.committeeNumber && (
-                        <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 font-mono text-[10px] font-bold border border-teal-200">
+                        <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 font-mono text-xs font-bold border border-teal-200">
                           لجنة #{task.committeeNumber}
                         </span>
                       )}
 
-                      <span className="text-[11px] font-bold text-slate-500 font-mono flex items-center gap-0.5">
+                      <span className="text-xs font-bold text-slate-500 font-mono flex items-center gap-0.5">
                         <span className="material-symbols-outlined text-xs text-slate-400">schedule</span>
                         <span>{task.time || 'بدون وقت محدد'}</span>
                       </span>
 
                       {isUrgent && !task.completed && (
-                        <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-black border border-rose-200 animate-pulse">
+                        <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-xs font-black border border-rose-200 animate-pulse">
                           ⚠️ عاجل
                         </span>
                       )}
@@ -693,7 +693,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="مثال: تسليم أوراق إجابات لجنة رقم 3، بدء تصحيح متن الآجرومية..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-[#005c55] outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-brand outline-none"
                 />
               </div>
 
@@ -707,7 +707,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     required
                     value={newTaskDate}
                     onChange={(e) => setNewTaskDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
 
@@ -718,7 +718,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
                     placeholder="10:00 ص"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
               </div>
@@ -729,7 +729,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-brand outline-none"
                   >
                     <option value="delivery">📦 تسليم أوراق وكشوف</option>
                     <option value="custom_delivery">✍️ تسليم يدوي مخصص (تكتب نوعه بيدك)</option>
@@ -747,7 +747,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <select
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-brand outline-none"
                   >
                     <option value="urgent">🔴 عاجل جداً</option>
                     <option value="high">🟡 هام</option>
@@ -780,7 +780,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     value={newCommitteeNum}
                     onChange={(e) => setNewCommitteeNum(e.target.value ? parseInt(e.target.value) : '')}
                     placeholder="رقم اللجنة..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
 
@@ -791,7 +791,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     value={newAssistant}
                     onChange={(e) => setNewAssistant(e.target.value)}
                     placeholder="اسم المعاون أو المشرف..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
               </div>
@@ -803,7 +803,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   value={newDeliverable}
                   onChange={(e) => setNewDeliverable(e.target.value)}
                   placeholder="مثال: دفاتر الإجابات + كشف التوقيعات"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-[#005c55] outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-brand outline-none"
                 />
               </div>
 
@@ -817,7 +817,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold cursor-pointer shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-bold cursor-pointer shadow-xs"
                 >
                   حفظ العمل والجدولة
                 </button>
@@ -871,7 +871,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                       }
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-brand outline-none"
                 >
                   {committees.map((c) => (
                     <option key={c.id} value={c.committeeNumber}>
@@ -903,7 +903,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                         setCeremonyDateInput(dayMap[e.target.value]);
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold focus:bg-white focus:border-brand outline-none"
                   >
                     <option value="الاثنين">الاثنين</option>
                     <option value="الثلاثاء">الثلاثاء</option>
@@ -924,7 +924,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     required
                     value={ceremonyDateInput}
                     onChange={(e) => setCeremonyDateInput(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
               </div>
@@ -941,7 +941,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     value={ceremonyTimeInput}
                     onChange={(e) => setCeremonyTimeInput(e.target.value)}
                     placeholder="مثال: 4 العصر، 4 المغرب، 8:00 م"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
 
@@ -954,7 +954,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                     min="0"
                     value={ceremonyHonoredCount}
                     onChange={(e) => setCeremonyHonoredCount(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold focus:bg-white focus:border-[#005c55] outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold focus:bg-white focus:border-brand outline-none"
                   />
                 </div>
               </div>
@@ -963,7 +963,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-800">أسماء المشايخ والضيوف الحاضرين للحفل:</label>
-                  <span className="text-[11px] font-bold text-slate-500 font-mono">
+                  <span className="text-xs font-bold text-slate-500 font-mono">
                     ({ceremonySheikhs.length}) مشايخ
                   </span>
                 </div>
@@ -998,12 +998,12 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                       }
                     }}
                     placeholder="اكتب اسم الشيخ واضغط إضافة عضو آخر..."
-                    className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold outline-none focus:border-[#005c55]"
+                    className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold outline-none focus:border-brand"
                   />
                   <button
                     type="button"
                     onClick={handleAddSheikhToCeremony}
-                    className="px-3 py-1.5 rounded-xl bg-[#005c55] text-white text-xs font-bold shrink-0 cursor-pointer shadow-2xs"
+                    className="px-3 py-1.5 rounded-xl bg-brand text-white text-xs font-bold shrink-0 cursor-pointer shadow-2xs"
                   >
                     + إضافة عضو آخر
                   </button>
@@ -1018,7 +1018,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   value={ceremonyPlaceInput}
                   onChange={(e) => setCeremonyPlaceInput(e.target.value)}
                   placeholder="مثال: القاعة الكبرى - مسجد الإمام البخاري"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-[#005c55] outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-brand outline-none"
                 />
               </div>
 
@@ -1029,7 +1029,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   value={ceremonyNotesInput}
                   onChange={(e) => setCeremonyNotesInput(e.target.value)}
                   placeholder="ملاحظات وتجهيزات الدروع وشهادات التكريم..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-[#005c55] outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-medium focus:bg-white focus:border-brand outline-none"
                 />
               </div>
 
@@ -1043,7 +1043,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#005c55] hover:bg-[#004742] text-white font-bold cursor-pointer shadow-md"
+                  className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-deep text-white font-bold cursor-pointer shadow-md"
                 >
                   حفظ الحفلة وإدراج التنبيه
                 </button>
