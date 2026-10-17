@@ -71,8 +71,8 @@ export const SupabaseDatabaseModal: React.FC<SupabaseDatabaseModalProps> = ({ is
             <div className="pt-2">
               <h4 className="font-bold text-xs text-slate-800 mb-2">الجداول ({status.tablesCount}) — عدد الصفوف تقديري</h4>
               <div className="grid grid-cols-2 gap-1.5 text-xs">
-                {status.tables.map((t) => (
-                  <div key={t.name} className="flex justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border">
+                {status.tables.map((t, idx) => (
+                  <div key={`${t.name}-${idx}`} className="flex justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border">
                     <span className="font-mono">{t.name}</span>
                     <span className="font-bold">{t.count}</span>
                   </div>

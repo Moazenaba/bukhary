@@ -26,26 +26,26 @@ export function createApp(config: AppConfig, pool: Pool) {
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
 
-  app.use(requestId);
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", ...(config.isProduction ? [] : ["'unsafe-inline'", "'unsafe-eval'"])],
-          // Fonts and icons are bundled with the app; nothing is loaded from third parties.
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          fontSrc: ["'self'", 'data:'],
-          imgSrc: ["'self'", 'data:', 'blob:'],
-          connectSrc: ["'self'", ...(config.isProduction ? [] : ['ws:', 'wss:'])],
-          frameSrc: ["'self'", 'blob:'],
-          objectSrc: ["'self'", 'blob:'],
-          upgradeInsecureRequests: config.isProduction ? [] : null,
+  if (config.isProduction) {
+    app.use(requestId);
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            fontSrc: ["'self'", 'data:'],
+            imgSrc: ["'self'", 'data:', 'blob:'],
+            connectSrc: ["'self'"],
+            frameSrc: ["'self'", 'blob:'],
+            objectSrc: ["'self'", 'blob:'],
+          },
         },
-      },
-      hsts: config.isProduction ? { maxAge: 31_536_000, includeSubDomains: true } : false,
-    })
-  );
+        hsts: { maxAge: 31_536_000, includeSubDomains: true },
+      })
+    );
+  }
   app.use((req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
@@ -77,6 +77,7 @@ export function createApp(config: AppConfig, pool: Pool) {
   });
 
   // ---- Public ----
+  app.get('/ping', (_req, res) => res.type('text/plain').send('pong'));
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.get('/api/ready', route(async (_req, res) => {
     try {

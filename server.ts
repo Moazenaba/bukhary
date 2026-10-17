@@ -37,7 +37,7 @@ async function main() {
     app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
   } else {
     const { createServer } = await import('vite');
-    const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' });
+    const vite = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'spa' });
     app.use(vite.middlewares);
   }
 

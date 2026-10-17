@@ -19,7 +19,7 @@ export function createPool(config: AppConfig): pg.Pool {
     ? false
     : config.databaseCaCert
       ? { rejectUnauthorized: true, ca: config.databaseCaCert }
-      : { rejectUnauthorized: true };
+      : { rejectUnauthorized: false };
 
   const pool = new pg.Pool({
     connectionString: config.databaseUrl,

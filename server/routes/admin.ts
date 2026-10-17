@@ -63,7 +63,7 @@ export function databaseRouter(pool: Pool) {
     const latencyMs = Date.now() - start;
     // Estimated row counts from statistics: one cheap catalog query instead of COUNT(*) per table.
     const { rows: tables } = await pool.query(
-      `SELECT relname AS name, n_live_tup::bigint AS count FROM pg_stat_user_tables ORDER BY relname;`
+      `SELECT relname AS name, n_live_tup::bigint AS count FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname;`
     );
     const pending = await pendingMigrations(pool);
     res.json({
