@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { can } from '../auth.ts';
 import type { AppConfig } from '../config.ts';
@@ -102,9 +103,11 @@ const OCR_ROW = {
 
 export function ocrRouter(config: AppConfig) {
   const r = Router();
+  const limiter = rateLimit({ windowMs: 60 * 60_000, limit: config.nodeEnv === 'test' ? 1000 : 30, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: (req) => req.user?.id ?? 'anon', message: { success: false, message: 'تم تجاوز الحد المسموح لاستخراج الجداول، حاول لاحقاً' } });
   const ai = config.geminiApiKey ? new GoogleGenAI({ apiKey: config.geminiApiKey }) : null;
 
-  r.post('/', can('ocr.use'), route(async (req, res) => {
+  r.post('/', can('ocr.use'), limiter, route(async (req, res) => {
     if (!ai) throw new HttpError(503, 'خدمة استخراج الجداول غير مفعلة على هذا الخادم', 'ocr_disabled');
     const { imageBase64, mimeType } = z
       .object({
