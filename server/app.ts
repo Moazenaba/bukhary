@@ -19,9 +19,12 @@ import { booksRouter, customPermissionsRouter, profilesRouter } from './routes/s
 import { summerRowsRouter } from './routes/summerRows.ts';
 import { tasksRouter } from './routes/tasks.ts';
 import { usersRouter } from './routes/users.ts';
+import { devicesRouter } from './routes/devices.ts';
+import { configurePush } from './push.ts';
 
 /** Builds the API. Static files / Vite are attached by the entry point (server.ts). */
 export function createApp(config: AppConfig, pool: Pool) {
+  configurePush(pool, config.fcmServiceAccount);
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
@@ -101,6 +104,7 @@ export function createApp(config: AppConfig, pool: Pool) {
   app.use('/api/exams', authed, examsRouter(pool));
   app.use('/api/tasks', authed, tasksRouter(pool));
   app.use('/api/notifications', authed, notificationsRouter(pool));
+  app.use('/api/devices', authed, devicesRouter(pool));
   app.use('/api/scoring', authed, scoringRouter(pool));
   app.use('/api/summer-course-rows', authed, summerRowsRouter(pool));
   app.use('/api/books', authed, booksRouter(pool));

@@ -6,6 +6,7 @@ import { audit } from '../audit.ts';
 import type { Pool, Queryable } from '../db.ts';
 import { notFound, route } from '../http.ts';
 import { optionalId } from '../schemas.ts';
+import { queuePush } from '../push.ts';
 
 export type NotificationType = 'urgent' | 'info' | 'success';
 
@@ -19,6 +20,8 @@ export async function notify(
      VALUES ($1,$2,$3,$4,$5,$6,NOW(),'{}'::jsonb);`,
     [crypto.randomUUID(), n.title, n.description, n.type ?? 'info', n.committeeId ?? null, n.targetUserId ?? null]
   );
+  // The same notification reaches the phones of the people it is for (no-op without FCM credentials).
+  queuePush(n);
 }
 
 function fromRow(r: any) {

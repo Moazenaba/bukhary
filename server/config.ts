@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { type FcmServiceAccount, loadServiceAccount } from './push.ts';
 
 export interface AppConfig {
   nodeEnv: 'production' | 'development' | 'test';
@@ -30,6 +31,8 @@ export interface AppConfig {
    * builds would send requests the server now refuses (rollout plan in docs/RELEASE.md).
    */
   minAndroidVersionCode: number;
+  /** Firebase service account for push notifications; without it notifications stay in-app only. */
+  fcmServiceAccount: FcmServiceAccount | undefined;
 }
 
 const DEV_JWT_SECRET = 'bukhari_dev_only_secret';
@@ -97,5 +100,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     legacyStagePatch: env.LEGACY_STAGE_PATCH !== 'false',
     apiRateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE === undefined ? 600 : Number(env.API_RATE_LIMIT_PER_MINUTE) || 0,
     minAndroidVersionCode: Number(env.MIN_ANDROID_VERSION_CODE) || 0,
+    fcmServiceAccount: loadServiceAccount(env)
   };
 }

@@ -21,6 +21,7 @@ import { HttpError, conflict, route } from '../http.ts';
 import { evaluatedPermissions } from '../policy.ts';
 import { optionalText, toAsciiDigits } from '../schemas.ts';
 import { emailSchema, passwordSchema, phoneSchema, userFromRow } from './users.ts';
+import { notify } from './notifications.ts';
 
 // Hash of a random string, compared when the account does not exist so that
 // "unknown user" and "wrong password" take the same time.
@@ -196,8 +197,10 @@ export function authRouter(config: AppConfig, pool: Pool) {
 
   // Ends the session immediately: its access tokens stop working and its refresh tokens are revoked.
   r.post('/logout', route(async (req, res) => {
-    const body = z.object({ refreshToken: z.string().max(500).optional() }).parse(req.body ?? {});
+    const body = z.object({ refreshToken: z.string().max(500).optional(), deviceToken: z.string().max(4096).optional() }).parse(req.body ?? {});
     const token = body.refreshToken ?? (isWebClient(req) ? readCookie(req, REFRESH_COOKIE) : undefined);
+    // The phone stops receiving this account's push notifications.
+    if (body.deviceToken) await pool.query('DELETE FROM device_tokens WHERE token = $1;', [body.deviceToken]);
     const sessions = new Set<string>();
     if (token) {
       const [id] = String(token).split('.');
@@ -236,6 +239,11 @@ export function authRouter(config: AppConfig, pool: Pool) {
       throw err;
     }
     await audit(pool, req, 'user.register', 'user', id, null, { name, role: roleKey, requestCode });
+    // Super admins are told at once, in the app and on their phones.
+    const { rows: admins } = await pool.query("SELECT id FROM app_users WHERE role = 'super_admin' AND status = 'approved';");
+    for (const admin of admins) {
+      await notify(pool, { title: 'طلب انضمام جديد', description: `${name} — ${phone}`, type: 'info', targetUserId: admin.id });
+    }
     res.status(201).json({ success: true, requestCode, message: 'تم تسجيل طلب الانضمام وهو الآن قيد المراجعة' });
   }));
 
