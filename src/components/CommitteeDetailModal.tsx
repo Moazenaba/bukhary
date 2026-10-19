@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { toast } from './Toasts';
 import {
   Committee,
   StageKey,
@@ -15,6 +17,7 @@ import {
   calculateCurrentStage,
   createDefaultQuestions,
   getScoringProgress,
+  todayISO,
 } from '../utils/stageUtils';
 import { STAGE_ACTION } from '../utils/committeeChanges';
 import { AuthService } from '../services/AuthService';
@@ -75,6 +78,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   const [sheikhPhone, setSheikhPhone] = useState<string>(committee.sheikhPhone || '');
   const [sheikhCountry, setSheikhCountry] = useState<string>(committee.sheikhCountry || '');
   const [studentsCount, setStudentsCount] = useState<number | ''>(committee.studentsCount ?? '');
+  const [members, setMembers] = useState<string[]>(committee.members || []);
+  const [newMemberInput, setNewMemberInput] = useState('');
   const [isSavedToast, setIsSavedToast] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -107,6 +112,16 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   const [isCeremonyExpanded, setIsCeremonyExpanded] = useState(true);
   const [newScorerInputs, setNewScorerInputs] = useState<Record<string, string>>({});
   const [newSheikhInput, setNewSheikhInput] = useState('');
+
+  // Sheet stage state & Excel import
+  const [isSheetExpanded, setIsSheetExpanded] = useState(Boolean(committee.stages?.sheet?.completed || committee.stages?.sheet?.notes));
+  const [sheetStudents, setSheetStudents] = useState<Array<{ number: number; name: string; score?: string | number; grade?: string; notes?: string }>>([]);
+  const [sheetFileName, setSheetFileName] = useState<string>(() => {
+    const n = committee.stages?.sheet?.notes || '';
+    const match = n.match(/كشف إكسيل:\s*([^\(]+)/);
+    return match ? match[1].trim() : '';
+  });
+  const sheetFileInputRef = useRef<HTMLInputElement>(null);
 
   // Ceremony stage state
   const [ceremonyDetails, setCeremonyDetails] = useState<CeremonyStageDetails>(() => {
@@ -154,6 +169,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
       sheikhName: sheikhName.trim() || undefined,
       sheikhPhone: sheikhPhone.trim() || undefined,
       sheikhCountry: sheikhCountry.trim() || undefined,
+      members: members.map((m) => m.trim()).filter(Boolean),
       studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
       isWomenCommittee,
       stages,
@@ -280,6 +296,148 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
       setScoringDetails(committee.scoringDetails ?? scoringDetails);
       setAggregationDetails(committee.aggregationDetails ?? aggregationDetails);
     });
+  };
+
+  // Excel import for committee score sheet (stage 6: sheet)
+  const handleSheetExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      if (rawRows.length === 0) {
+        toast.error('الملف المحدد لا يحتوي على صفوف أو بيانات مقروءة.');
+        return;
+      }
+
+      const parsedStudents = rawRows.map((row, idx) => {
+        const getVal = (keys: string[]) => {
+          for (const k of keys) {
+            if (row[k] !== undefined && row[k] !== '') return String(row[k]).trim();
+          }
+          return '';
+        };
+
+        const numVal = parseInt(getVal(['م', 'الرقم', 'رقم', 'id', 'number']), 10);
+        const name = getVal(['اسم الطالب', 'الطالب', 'الاسم', 'student_name', 'name', 'اسم الشيخ', 'الشيخ']);
+        const score = getVal(['الدرجة', 'المجموع', 'الدرجة النهائية', 'النسبة', 'score', 'total', 'mark']);
+        const grade = getVal(['التقدير', 'الحالة', 'النتيجة', 'grade', 'status', 'result']);
+        const notes = getVal(['ملاحظات', 'ملاحظة', 'notes']);
+
+        return {
+          number: !isNaN(numVal) && numVal > 0 ? numVal : idx + 1,
+          name: name || `طالب ${idx + 1}`,
+          score: score || '—',
+          grade: grade || '',
+          notes: notes || '',
+        };
+      });
+
+      setSheetStudents(parsedStudents);
+      setSheetFileName(file.name);
+      setIsSheetExpanded(true);
+
+      const noteText = `كشف إكسيل: ${file.name} (${parsedStudents.length} طالب)`;
+      const nowIso = new Date().toISOString();
+      const nextStages = {
+        ...stages,
+        sheet: {
+          ...(stages.sheet ?? {}),
+          completed: true,
+          completedAt: nowIso,
+          notes: noteText,
+        },
+      };
+      setStages(nextStages);
+      const nextStudentsCount: number | undefined =
+        parsedStudents.length > 0 && (!studentsCount || studentsCount === 0)
+          ? parsedStudents.length
+          : typeof studentsCount === 'number' && !isNaN(studentsCount)
+          ? studentsCount
+          : undefined;
+      if (parsedStudents.length > 0 && (!studentsCount || studentsCount === 0)) {
+        setStudentsCount(parsedStudents.length);
+      }
+
+      void save(
+        buildCommittee({
+          stages: nextStages,
+          studentsCount: nextStudentsCount,
+        }),
+        () => setStages(stages)
+      );
+
+      toast.success(`تم استيراد كشف الإكسيل بنجاح (${parsedStudents.length} طالب).`);
+    } catch (err: any) {
+      console.error('Error reading Excel file:', err);
+      toast.error('تعذر قراءة ملف الإكسيل، يرجى التأكد من اختيار ملف .xlsx أو .xls أو .csv صالح.');
+    } finally {
+      if (sheetFileInputRef.current) sheetFileInputRef.current.value = '';
+    }
+  };
+
+  const handleDownloadSheetTemplate = () => {
+    const templateData = [
+      { 'م': 1, 'اسم الطالب': 'أحمد محمد علي', 'الدرجة': 98, 'التقدير': 'ممتاز مرتفع', 'ملاحظات': 'حفظ متقن ومتميز' },
+      { 'م': 2, 'اسم الطالب': 'عبد الرحمن خالد', 'الدرجة': 92, 'التقدير': 'ممتاز', 'ملاحظات': 'أداء متقن' },
+      { 'م': 3, 'اسم الطالب': 'عمر يوسف إبراهيم', 'الدرجة': 85, 'التقدير': 'جيد جداً', 'ملاحظات': '' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    ws['!views'] = [{ RTL: true }];
+    ws['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 12 }, { wch: 16 }, { wch: 25 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'نموذج كشف درجات');
+    XLSX.writeFile(wb, `نموذج_كشف_درجات_لجنة_${committee.committeeNumber}.xlsx`);
+  };
+
+  const handleExportCommitteeSheet = () => {
+    try {
+      const exportData = (sheetStudents.length > 0 ? sheetStudents : Array.from({ length: Number(studentsCount) || 1 }, (_, i) => ({
+        number: i + 1,
+        name: `طالب ${i + 1}`,
+        score: '—',
+        grade: '—',
+        notes: '',
+      }))).map((s) => ({
+        'رقم اللجنة': `#${committee.committeeNumber}`,
+        'اسم اللجنة': committee.committeeName,
+        'الدورة': committee.courseName || '—',
+        'الكتاب المقرر': committee.competitionBook,
+        'الفرع': committee.branch,
+        'الشيخ المرسل إليه': committee.sheikhName || '—',
+        'م': s.number,
+        'اسم الطالب': s.name,
+        'الدرجة': s.score,
+        'التقدير': s.grade,
+        'ملاحظات': s.notes,
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws['!views'] = [{ RTL: true }];
+      ws['!cols'] = [
+        { wch: 12 }, // رقم اللجنة
+        { wch: 22 }, // اسم اللجنة
+        { wch: 18 }, // الدورة
+        { wch: 24 }, // الكتاب المقرر
+        { wch: 16 }, // الفرع
+        { wch: 20 }, // الشيخ
+        { wch: 6 },  // م
+        { wch: 25 }, // اسم الطالب
+        { wch: 12 }, // الدرجة
+        { wch: 14 }, // التقدير
+        { wch: 24 }, // ملاحظات
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'كشف درجات اللجنة');
+      XLSX.writeFile(wb, `كشف_درجات_لجنة_${committee.committeeNumber}_${todayISO()}.xlsx`);
+      toast.success(`تم تصدير كشف الدرجات إلى ملف Excel بنجاح.`);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast.error('تعذر تصدير الملف، يرجى المحاولة مرة أخرى.');
+    }
   };
 
   const canSaveAnything = canEditBase || canScore || canFinalize;
@@ -425,7 +583,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
             <div className="sm:col-span-3 pt-2 border-t border-line/20">
               <span className="text-muted font-semibold">أعضاء اللجنة: </span>
-              <span className="font-bold text-ink">{committee.members.join(' — ')}</span>
+              <span className="font-bold text-ink">{(members.length > 0 ? members : committee.members).join(' — ')}</span>
             </div>
           </div>
 
@@ -1065,6 +1223,65 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               </span>
                             </div>
 
+                            {/* Preset Sheikhs Quick Selection */}
+                            <div className="space-y-1.5">
+                              <span className="text-[11px] font-bold text-slate-600 block">
+                                اختر من المشايخ والفضلاء الأساسيين للحفل (انقر للاختيار أو الإلغاء):
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap max-h-40 overflow-y-auto p-1.5 bg-white rounded-xl border border-slate-200">
+                                {[
+                                  'مهندس محمود مجدي',
+                                  'الشيخ أشرف مازن',
+                                  'الشيخ ناصر الضليل',
+                                  'الشيخ محمد فرحات',
+                                  'الشيخ سمير أبو علفة',
+                                  'الشيخ رضا أبو جندي',
+                                  'الشيخ هيثم سعيد',
+                                  'الشيخ إبراهيم أبو موسى',
+                                  'دكتور إبراهيم أبو صقر',
+                                  'دكتور محمد رويشد',
+                                  'الشيخ محمود الضليل',
+                                  'الشيخ أحمد صابح',
+                                  'الشيخ أحمد الضليل',
+                                  'الشيخ هاني صبري',
+                                  'الشيخ عبد الله سيد أحمد',
+                                  'الشيخ أدهم مقلد',
+                                  'الشيخ وليد عبد السلام',
+                                  'الشيخ علاء عبد الجليل',
+                                ].map((sheikhName) => {
+                                  const isSelected = ceremonyDetails.attendingSheikhs.includes(sheikhName);
+                                  return (
+                                    <button
+                                      key={sheikhName}
+                                      type="button"
+                                      disabled={!canFinalize}
+                                      onClick={() => {
+                                        if (isSelected) {
+                                          saveCeremony({
+                                            ...ceremonyDetails,
+                                            attendingSheikhs: ceremonyDetails.attendingSheikhs.filter((s) => s !== sheikhName),
+                                          });
+                                        } else {
+                                          saveCeremony({
+                                            ...ceremonyDetails,
+                                            attendingSheikhs: [...ceremonyDetails.attendingSheikhs, sheikhName],
+                                          });
+                                        }
+                                      }}
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                        isSelected
+                                          ? 'bg-brand text-white shadow-2xs'
+                                          : 'bg-slate-100 hover:bg-emerald-50 text-slate-700 border border-slate-200'
+                                      }`}
+                                    >
+                                      <span>{isSelected ? '✓' : '+'}</span>
+                                      <span>{sheikhName}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
                             {/* Added Sheikhs chips */}
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {ceremonyDetails.attendingSheikhs.map((sheikh, idx) => (
@@ -1085,8 +1302,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               ))}
                             </div>
 
-                            {/* Input + Button to add another sheikh */}
-                            <div className="flex items-center gap-2">
+                            {/* Input + Button to add custom sheikh */}
+                            <div className="flex items-center gap-2 pt-1">
                               <input
                                 type="text"
                                 value={newSheikhInput}
@@ -1097,7 +1314,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                     handleAddSheikh();
                                   }
                                 }}
-                                placeholder="اكتب اسم الشيخ واضغط إضافة عضو آخر..."
+                                placeholder="أو اكتب اسم شيخ إضافي غير موجود بالقائمة..."
                                 className="flex-1 bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-brand font-semibold"
                               />
                               <button
@@ -1107,7 +1324,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                                 className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                               >
                                 <span className="material-symbols-outlined text-sm">add</span>
-                                <span>+ إضافة عضو آخر</span>
+                                <span>+ إضافة شيخ</span>
                               </button>
                             </div>
                           </div>
@@ -1150,7 +1367,208 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                   );
                 }
 
-                // STANDARD STAGES (التسجيل، الامتحان، كتابة الكشف، المراجعة، الإعلان)
+                // SPECIAL STAGE: SHEET (كتابة كشف الدرجات واستيراد ملف الإكسيل)
+                if (stageItem.key === 'sheet') {
+                  return (
+                    <div
+                      key={stageItem.key}
+                      className={`rounded-2xl border-2 transition-all overflow-hidden ${
+                        isCompleted
+                          ? 'border-purple-300 bg-purple-50/20 shadow-xs'
+                          : 'border-purple-200 bg-purple-50/10 shadow-xs'
+                      }`}
+                    >
+                      {/* Hidden Excel / CSV file input */}
+                      <input
+                        ref={sheetFileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        className="hidden"
+                        onChange={handleSheetExcelUpload}
+                      />
+
+                      {/* Header */}
+                      <div className="p-4 bg-gradient-to-l from-purple-100/70 to-purple-50/40 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl shrink-0">🟣</span>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-purple-950">
+                                مرحلة كتابة كشف الدرجات الرسمي والمسودة
+                              </span>
+                              <span
+                                className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                                  isCompleted
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : 'bg-purple-100 text-purple-800 border-purple-200'
+                                }`}
+                              >
+                                {isCompleted ? '✓ تم اعتماد الكشف' : 'قيد كتابة / استيراد الكشف'}
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-purple-900/80 mt-1 flex items-center gap-2 flex-wrap">
+                              {stageData?.notes && (
+                                <span className="font-semibold text-purple-950 bg-white/70 px-2 py-0.5 rounded-md border border-purple-200">
+                                  {stageData.notes}
+                                </span>
+                              )}
+                              {stageData?.completedAt && (
+                                <span className="flex items-center gap-1 text-purple-800">
+                                  <span className="material-symbols-outlined text-xs">schedule</span>
+                                  <span>تاريخ الإتمام: {formatWhen(stageData.completedAt)}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Controls: Quick Export, Quick Import, Toggle, Expand */}
+                        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                          {/* Quick Export Button */}
+                          <button
+                            type="button"
+                            onClick={handleExportCommitteeSheet}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95"
+                            title="تصدير كشف درجات الطلاب واللجنة إلى ملف Excel (.xlsx)"
+                          >
+                            <span className="material-symbols-outlined text-sm">file_download</span>
+                            <span>تصدير كشف Excel</span>
+                          </button>
+
+                          {/* Quick Import Button */}
+                          <button
+                            type="button"
+                            onClick={() => sheetFileInputRef.current?.click()}
+                            disabled={!canStage('sheet') || pending}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-800 hover:bg-purple-900 text-white flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                            title="استيراد كشف درجات الطلاب من ملف Excel أو CSV"
+                          >
+                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                            <span>استيراد كشف Excel</span>
+                          </button>
+
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!!isCompleted}
+                              disabled={!canStage('sheet') || pending}
+                              aria-label="كتابة الكشف"
+                              onChange={() => handleToggleStage('sheet')}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-700"></div>
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsSheetExpanded(!isSheetExpanded)}
+                            className="p-1.5 text-purple-900 hover:bg-purple-200/50 rounded-lg cursor-pointer"
+                            title="عرض / إخفاء تفاصيل الكشف والطلاب"
+                          >
+                            <span className="material-symbols-outlined text-lg">
+                              {isSheetExpanded ? 'expand_less' : 'expand_more'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expandable Sheet Details: Actions, Template, Preview Table */}
+                      {isSheetExpanded && (
+                        <div className="p-4 space-y-4 border-t border-purple-200/70 bg-white">
+                          {/* Action Toolbar */}
+                          <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-purple-50/50 border border-purple-200/60">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => sheetFileInputRef.current?.click()}
+                                disabled={!canStage('sheet') || pending}
+                                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#004d47] hover:bg-brand text-white flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                              >
+                                <span className="material-symbols-outlined text-base">table_view</span>
+                                <span>اختر ملف إكسيل لاستيراده (.xlsx / .csv)</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleDownloadSheetTemplate}
+                                className="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-purple-50 text-purple-900 border border-purple-300 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                              >
+                                <span className="material-symbols-outlined text-sm">download</span>
+                                <span>تنزيل نموذج إكسيل فارغ للكشف</span>
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleExportCommitteeSheet}
+                              className="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                            >
+                              <span className="material-symbols-outlined text-sm">file_download</span>
+                              <span>تصدير هذا الكشف إلى Excel</span>
+                            </button>
+                          </div>
+
+                          {/* Preview of Imported Students */}
+                          {sheetStudents.length > 0 ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-sm text-purple-700">groups</span>
+                                  <span>كشف درجات الطلاب المستورد من الإكسيل ({sheetStudents.length} طالب):</span>
+                                </span>
+                                {sheetFileName && (
+                                  <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    {sheetFileName}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="max-h-60 overflow-y-auto border border-purple-200/80 rounded-xl overflow-hidden shadow-2xs">
+                                <table className="w-full text-right text-xs">
+                                  <thead className="bg-purple-100/70 text-purple-950 font-bold border-b border-purple-200">
+                                    <tr>
+                                      <th className="p-2 w-12 text-center">م</th>
+                                      <th className="p-2">اسم الطالب</th>
+                                      <th className="p-2 w-24 text-center">الدرجة</th>
+                                      <th className="p-2 w-28 text-center">التقدير</th>
+                                      <th className="p-2">ملاحظات</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-purple-100 bg-white">
+                                    {sheetStudents.map((s, idx) => (
+                                      <tr key={idx} className="hover:bg-purple-50/40">
+                                        <td className="p-2 text-center font-mono font-bold text-slate-600">{s.number}</td>
+                                        <td className="p-2 font-bold text-slate-900">{s.name}</td>
+                                        <td className="p-2 text-center font-mono font-bold text-brand">{s.score}</td>
+                                        <td className="p-2 text-center font-semibold text-slate-700">{s.grade || '—'}</td>
+                                        <td className="p-2 text-slate-500">{s.notes || '—'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-4 rounded-xl border border-dashed border-purple-300 bg-purple-50/30 text-center space-y-1.5">
+                              <span className="material-symbols-outlined text-2xl text-purple-600 block mx-auto">
+                                upload_file
+                              </span>
+                              <p className="text-xs font-bold text-purple-950">
+                                يمكنك استيراد كشف درجات الطلاب واللجنة مباشرة من ملف إكسيل أو CSV
+                              </p>
+                              <p className="text-xs text-purple-800/80">
+                                يتعرف النظام تلقائياً على أعمدة: (اسم الطالب، الدرجة، التقدير، الملاحظات) ويحدث حالة كتابة الكشف وعدد الطلاب تلقائياً.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // STANDARD STAGES (التسجيل، الامتحان، المراجعة، الإعلان)
                 return (
                   <div
                     key={stageItem.key}
@@ -1186,11 +1604,6 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                         {stageItem.key === 'review' && (
                           <span className="text-xs text-muted block mt-0.5">
                             مراجعة وتدقيق الدرجات (قبل كتابة الكشف)
-                          </span>
-                        )}
-                        {stageItem.key === 'sheet' && (
-                          <span className="text-xs text-muted block mt-0.5">
-                            كتابة كشف الدرجات الرسمي والمسودة
                           </span>
                         )}
                         {stageItem.key === 'accreditation' && (
@@ -1311,6 +1724,144 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     placeholder=""
                     className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
                   />
+                </div>
+              </div>
+
+              {/* Committee Members / Exam Observers Section */}
+              <div className="pt-3 border-t border-line/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-ink flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-brand">groups</span>
+                    <span>أعضاء اللجنة (مراقبي الامتحانات):</span>
+                  </label>
+                  <span className="text-xs font-bold text-slate-500 font-mono">
+                    ({members.length}) أعضاء محددين
+                  </span>
+                </div>
+
+                {/* Preset Chips Box */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-600 block">
+                    اختر من أعضاء ومراقبي الامتحانات (انقر للاختيار أو الإلغاء):
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-line/50">
+                    {[
+                      'أحمد المخزنجي',
+                      'أحمد سلامة الهلباوي',
+                      'أحمد عبد الخالق',
+                      'أحمد ماهر',
+                      'أسامة عكاشة',
+                      'إبراهيم أبو صقر',
+                      'إبراهيم أبو موسى 2',
+                      'رشاد',
+                      'رضا أبو جندي 2',
+                      'سلامة البنا',
+                      'سلامة زلابية',
+                      'سمير أبو علفة',
+                      'شيخ احمد صابح',
+                      'شيخ ايمن احمد البرانيه',
+                      'عبد الله سيد أحمد',
+                      'علاء عبد الجليل',
+                      'عمر محمود مجدي',
+                      'مجاهد السروي',
+                      'محمد سلامة',
+                      'محمد فرحات',
+                      'محمود عبده عيد',
+                      'هاني صبري 2',
+                      'وليد عبد السلام',
+                      'ياسر سلامة',
+                      'يوسف المخزنجي',
+                      'أدهم مقلد',
+                      'محمد النحاس',
+                      'محمد ضياء',
+                      'معاذ أبو عنبة',
+                      'محمد عماد',
+                      'أحمد عطا',
+                      'محمود الحراني',
+                      'محمود المسلماني',
+                      'بكر خالد',
+                    ].map((name) => {
+                      const isAdded = members.includes(name);
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            if (isAdded) {
+                              setMembers(members.filter((m) => m !== name));
+                            } else {
+                              setMembers([...members, name]);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                            isAdded
+                              ? 'bg-brand text-white shadow-2xs'
+                              : 'bg-slate-100 hover:bg-emerald-50 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          <span>{isAdded ? '✓' : '+'}</span>
+                          <span>{name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Selected Members Chips */}
+                {members.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    {members.map((member, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 shadow-2xs"
+                      >
+                        <span>{member}</span>
+                        <button
+                          type="button"
+                          onClick={() => setMembers(members.filter((_, i) => i !== idx))}
+                          className="w-4 h-4 rounded-full hover:bg-rose-100 hover:text-rose-700 flex items-center justify-center cursor-pointer text-slate-400"
+                          title="حذف العضو"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Custom Member Field */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={newMemberInput}
+                    onChange={(e) => setNewMemberInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = newMemberInput.trim();
+                        if (trimmed && !members.includes(trimmed)) {
+                          setMembers([...members, trimmed]);
+                          setNewMemberInput('');
+                        }
+                      }
+                    }}
+                    placeholder="أو اكتب اسم عضو إضافي غير موجود بالقائمة..."
+                    className="flex-1 bg-white border border-line rounded-xl px-3 py-1.5 text-xs outline-none focus:border-brand font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newMemberInput.trim();
+                      if (trimmed && !members.includes(trimmed)) {
+                        setMembers([...members, trimmed]);
+                        setNewMemberInput('');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    <span>+ إضافة عضو</span>
+                  </button>
                 </div>
               </div>
             </div>

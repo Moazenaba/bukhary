@@ -146,6 +146,7 @@ export interface CommitteeStageRecord {
   /** Who completed it (set by the server). */
   completedBy?: string;
   notes?: string;
+  excelUrl?: string; // رابط ملف الإكسيل / كشف الدرجات
 }
 
 export interface CommitteeReceiptInfo {
@@ -183,6 +184,7 @@ export interface Committee {
   isWomenCommittee?: boolean;    // اختيار لجنة نسائية أو لا (true: نسائية / false: رجال)
 
   stages: Record<StageKey, CommitteeStageRecord>;
+  excelUrl?: string;                             // رابط ملف الإكسيل لكتابة الكشف
   scoringDetails?: ScoringStageDetails;          // تفاصيل وحالة تصحيح الأسئلة
   aggregationDetails?: AggregationStageDetails;  // تفاصيل تجميع الدرجات
   ceremonyDetails?: CeremonyStageDetails;        // تفاصيل مرحلة الحفل والتكريم

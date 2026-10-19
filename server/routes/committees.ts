@@ -45,6 +45,7 @@ const committeeInput = z.object({
   sheikhCountry: optionalText(200),
   studentsCount: nonNegativeInt.default(0),
   isWomenCommittee: z.boolean().default(false),
+  excelUrl: optionalText(2000),
   stages: stagesPartial.optional(),
   scoringDetails: scoringDetails.nullish(),
   aggregationDetails: aggregationDetails.nullish(),
@@ -57,6 +58,7 @@ type CommitteeInput = z.infer<typeof committeeInput>;
 
 const patchInput = z
   .object({
+    excelUrl: optionalText(2000),
     stages: stagesPartial.optional(),
     scoringDetails: scoringDetails.optional(),
     aggregationDetails: aggregationDetails.optional(),
@@ -85,6 +87,7 @@ export function committeeFromRow(r: any) {
     sheikhCountry: r.sheikh_country ?? undefined,
     studentsCount: r.students_count ?? 0,
     isWomenCommittee: Boolean(r.is_women_committee),
+    excelUrl: r.stages?.sheet?.excelUrl ?? r.data?.excelUrl ?? undefined,
     stages: { ...emptyStages(), ...(r.stages ?? {}) },
     scoringDetails: r.scoring_details && Object.keys(r.scoring_details).length ? r.scoring_details : undefined,
     aggregationDetails: r.aggregation_details && Object.keys(r.aggregation_details).length ? r.aggregation_details : undefined,
@@ -134,13 +137,18 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
     ...(existing?.stages ?? {}),
     ...mergeLegacyStages(existing?.stages ?? {}, c.stages ?? {}, user, new Date().toISOString()),
   };
+  const sheetExcel = c.excelUrl ?? c.stages?.sheet?.excelUrl ?? existing?.stages?.sheet?.excelUrl ?? existing?.data?.excelUrl ?? null;
+  if (sheetExcel !== null && sheetExcel !== undefined) {
+    stages.sheet = { ...(stages.sheet ?? { completed: false }), excelUrl: sheetExcel };
+  }
+  const committeeData = { ...(existing?.data ?? {}), ...(sheetExcel ? { excelUrl: sheetExcel } : {}) };
   const { rows } = await db.query(
     `INSERT INTO committees (
        id, committee_number, committee_name, association_name, members, branch, competition_book,
        general_notes, course_id, course_name, sheikh_name, sheikh_phone, sheikh_country, students_count,
        is_women_committee, stages, scoring_details, aggregation_details, ceremony_details,
        created_date, created_at_time, data, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'{}'::jsonb,NOW())
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
      ON CONFLICT (id) DO UPDATE SET
        committee_number = EXCLUDED.committee_number, committee_name = EXCLUDED.committee_name,
        association_name = EXCLUDED.association_name, members = EXCLUDED.members, branch = EXCLUDED.branch,
@@ -152,7 +160,7 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
        aggregation_details = EXCLUDED.aggregation_details, ceremony_details = EXCLUDED.ceremony_details,
        created_date = COALESCE(committees.created_date, EXCLUDED.created_date),
        created_at_time = COALESCE(committees.created_at_time, EXCLUDED.created_at_time),
-       data = '{}'::jsonb, updated_at = NOW()
+       data = EXCLUDED.data, updated_at = NOW()
      RETURNING *;`,
     [
       c.id, c.committeeNumber, c.committeeName, c.associationName, JSON.stringify(c.members), c.branch,
@@ -161,7 +169,7 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
       JSON.stringify(c.scoringDetails ?? existing?.scoring_details ?? {}),
       JSON.stringify(c.aggregationDetails ?? existing?.aggregation_details ?? {}),
       JSON.stringify(c.ceremonyDetails ?? existing?.ceremony_details ?? {}),
-      c.createdDate, c.createdAtTime,
+      c.createdDate, c.createdAtTime, JSON.stringify(committeeData),
     ]
   );
   if (existing && existing.committee_number !== c.committeeNumber) {

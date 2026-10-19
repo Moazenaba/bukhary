@@ -21,16 +21,9 @@ function passwordProblem(p: string): string | null {
 /** Phone typed with Arabic or Latin digits, spaces or dashes; the server normalises it. */
 const PHONE_PATTERN = /^\+?[0-9\u0660-\u0669\u06F0-\u06F9\s-]{6,30}$/;
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'قيد مراجعة المشرف العام',
-  interview: 'تم تحديد موعد مقابلة شخصية',
-  approved: 'تم اعتماد الحساب، يمكنك تسجيل الدخول',
-  rejected: 'تم الاعتذار عن قبول الطلب',
-};
-
-/** Login, join request and request tracking. Every outcome comes from the server. */
+/** Login and join request. Every outcome comes from the server. */
 export const CentralLoginPortal: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'register' | 'track' | 'login'>('login');
+  const [activeTab, setActiveTab] = useState<'register' | 'login'>('login');
 
   // Login form state
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -56,12 +49,6 @@ export const CentralLoginPortal: React.FC = () => {
   const [regError, setRegError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [submittedReceipt, setSubmittedReceipt] = useState<JoinReceipt | null>(null);
-
-  // Tracking by the server-issued request code
-  const [trackQuery, setTrackQuery] = useState('');
-  const [trackResult, setTrackResult] = useState<{ status: string; interviewDate?: string } | null>(null);
-  const [trackSearched, setTrackSearched] = useState(false);
-  const [trackError, setTrackError] = useState<string | null>(null);
 
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
@@ -116,7 +103,6 @@ export const CentralLoginPortal: React.FC = () => {
         notes: regNotes.trim() || undefined,
       });
       setSubmittedReceipt({ requestCode, name: regName.trim(), phone: regPhone.trim(), role: regRole, quranLevel: regQuranLevel.trim() });
-      setTrackQuery(requestCode);
       setRegPassword('');
     } catch (err) {
       setRegError(errorMessage(err));
@@ -151,22 +137,6 @@ export const CentralLoginPortal: React.FC = () => {
     } catch {
       // Clipboard blocked: the code stays on screen to copy by hand.
     }
-  };
-
-  const lookUp = async (code: string) => {
-    setTrackError(null);
-    setTrackSearched(true);
-    try {
-      setTrackResult(await AuthService.trackJoinRequest(code));
-    } catch (err) {
-      setTrackResult(null);
-      setTrackError(errorMessage(err));
-    }
-  };
-
-  const handleTrackSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (trackQuery.trim()) lookUp(trackQuery);
   };
 
   return (
@@ -277,21 +247,17 @@ export const CentralLoginPortal: React.FC = () => {
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                       <span className="material-symbols-outlined text-amber-300">
-                        {activeTab === 'register' ? 'how_to_reg' : activeTab === 'track' ? 'travel_explore' : 'vpn_key'}
+                        {activeTab === 'register' ? 'how_to_reg' : 'vpn_key'}
                       </span>
                       <span>
                         {activeTab === 'register'
                           ? 'استمارة تقديم طلب انضمام جديد'
-                          : activeTab === 'track'
-                          ? 'تتبع حالة طلب الانضمام والاستعلام'
                           : 'تسجيل الدخول للمعتمدين'}
                       </span>
                     </h2>
                     <p className="text-xs text-emerald-100 mt-0.5">
                       {activeTab === 'register'
                         ? 'املأ بياناتك لتقديم طلب انضمام رسمي لفريق لجان مسجد البخاري'
-                        : activeTab === 'track'
-                        ? 'استعلم بكود الطلب لمعرفة حالة الاعتماد'
                         : 'أدخل بيانات حسابك المعتمد للدخول إلى لوحة التحكم'}
                     </p>
                   </div>
@@ -301,44 +267,8 @@ export const CentralLoginPortal: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Tabs Switcher: 3 Clear Modes */}
-                <div role="tablist" aria-label="خيارات الدخول" className="grid grid-cols-3 bg-black/25 p-1 rounded-xl gap-1 text-xs font-bold">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === 'register'}
-                    onClick={() => {
-                      setActiveTab('register');
-                      setLoginError(null);
-                    }}
-                    className={`py-2 sm:py-2.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      activeTab === 'register'
-                        ? 'bg-white text-[#004d47] shadow-sm font-black'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-base">person_add</span>
-                    <span>طلب انضمام</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === 'track'}
-                    onClick={() => {
-                      setActiveTab('track');
-                      setLoginError(null);
-                    }}
-                    className={`py-2 sm:py-2.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      activeTab === 'track'
-                        ? 'bg-white text-[#004d47] shadow-sm font-black'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-base">search_check</span>
-                    <span>تتبع الطلب</span>
-                  </button>
-
+                {/* Tabs Switcher: 2 Clear Modes */}
+                <div role="tablist" aria-label="خيارات الدخول" className="grid grid-cols-2 bg-black/25 p-1 rounded-xl gap-1 text-xs font-bold">
                   <button
                     type="button"
                     role="tab"
@@ -355,6 +285,24 @@ export const CentralLoginPortal: React.FC = () => {
                   >
                     <span className="material-symbols-outlined text-base">login</span>
                     <span>تسجيل الدخول</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'register'}
+                    onClick={() => {
+                      setActiveTab('register');
+                      setLoginError(null);
+                    }}
+                    className={`py-2 sm:py-2.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      activeTab === 'register'
+                        ? 'bg-white text-[#004d47] shadow-sm font-black'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-base">person_add</span>
+                    <span>طلب انضمام</span>
                   </button>
                 </div>
               </div>
@@ -432,9 +380,7 @@ export const CentralLoginPortal: React.FC = () => {
                         <p className="text-xs text-emerald-900 leading-relaxed">
                           1. سيقوم فضيلة المشرف العام بمراجعة مؤهلاتك وحفظك للقرآن الكريم.
                           <br />
-                          2. سيتم إسناد اللجان الميدانية وتفعيل صلاحيات الدخول، أو جدولة مقابلة شخصية.
-                          <br />
-                          3. يمكنك تتبع حالة طلبك في أي لحظة باستخدام كود الطلب الظاهر أعلاه في تبويب <strong>«تتبع الطلب»</strong>.
+                          2. عند اعتماد طلبك سيتم تفعيل حسابك مباشرة ويمكنك الدخول برقم الجوال وكلمة المرور.
                         </p>
                       </div>
 
@@ -442,15 +388,11 @@ export const CentralLoginPortal: React.FC = () => {
                       <div className="pt-2 flex flex-wrap items-center gap-2.5">
                         <button
                           type="button"
-                          onClick={() => {
-                            setTrackQuery(submittedReceipt.requestCode);
-                            setActiveTab('track');
-                            lookUp(submittedReceipt.requestCode);
-                          }}
+                          onClick={() => setActiveTab('login')}
                           className="px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-deep text-white font-bold text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
                         >
-                          <span className="material-symbols-outlined text-sm">search</span>
-                          <span>متابعة وتتبع حالة هذا الطلب الآن</span>
+                          <span className="material-symbols-outlined text-sm">login</span>
+                          <span>الانتقال لتسجيل الدخول</span>
                         </button>
 
                         <button
@@ -727,80 +669,7 @@ export const CentralLoginPortal: React.FC = () => {
                 </div>
               )}
 
-              {/* TAB 2: TRACK JOIN REQUEST (تتبع حالة طلب الانضمام) */}
-              {activeTab === 'track' && (
-                <div className="p-5 sm:p-7 space-y-5">
-                  <div className="p-4 rounded-2xl bg-tint border border-blue-200 text-xs text-blue-950 space-y-2">
-                    <strong className="font-bold flex items-center gap-1.5 text-blue-900 text-xs">
-                      <span className="material-symbols-outlined text-base">travel_explore</span>
-                      <span>منظومة تتبع طلبات الانضمام الفورية:</span>
-                    </strong>
-                    <p className="text-xs leading-relaxed text-blue-900">
-                      أدخل كود الطلب الذي ظهر لك عند التسجيل (مثل <code>REQ-2026-XXXXXXXX</code>) للاستعلام عن حالة طلبك.
-                    </p>
-                  </div>
 
-                  {/* Search input form */}
-                  <form onSubmit={handleTrackSubmit} className="flex flex-col sm:flex-row items-center gap-2">
-                    <div className="relative flex-1 w-full">
-                      <span className="absolute inset-y-0 right-3.5 flex items-center pointer-events-none text-slate-400">
-                        <span className="material-symbols-outlined text-lg">search</span>
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        dir="ltr"
-                        maxLength={40}
-                        aria-label="كود الطلب"
-                        placeholder="كود الطلب REQ-XXXX..."
-                        value={trackQuery}
-                        onChange={(e) => setTrackQuery(e.target.value)}
-                        className="w-full bg-white border-2 border-emerald-300 rounded-2xl pr-11 pl-4 py-3 text-xs sm:text-sm font-mono outline-none focus:border-brand"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-brand hover:bg-brand-deep text-white font-bold text-xs sm:text-sm cursor-pointer shadow-md transition-all shrink-0 flex items-center justify-center gap-1.5"
-                    >
-                      <span className="material-symbols-outlined text-sm">search_check</span>
-                      <span>استعلام عن الطلب</span>
-                    </button>
-                  </form>
-
-
-
-                  {/* Track Result Display */}
-                  {trackSearched && (
-                    <div className="space-y-3" aria-live="polite">
-                      {trackError ? (
-                        <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">{trackError}</div>
-                      ) : trackResult ? (
-                        <div className="p-5 rounded-2xl bg-white border border-emerald-200 space-y-2 text-right">
-                          <span className="text-slate-500 text-xs block">حالة الطلب:</span>
-                          <strong className="text-sm text-emerald-950 block">{STATUS_LABEL[trackResult.status] ?? trackResult.status}</strong>
-                          {trackResult.status === 'interview' && trackResult.interviewDate && (
-                            <p className="text-xs text-slate-700">موعد المقابلة: {trackResult.interviewDate}</p>
-                          )}
-                          {trackResult.status === 'approved' && (
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('login')}
-                              className="mt-2 px-4 py-2 rounded-xl bg-brand text-white font-bold text-xs cursor-pointer"
-                            >
-                              الانتقال لتسجيل الدخول
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-2">
-                          <h4 className="font-bold text-sm text-slate-800">لم يتم العثور على طلب بهذا الكود</h4>
-                          <p className="text-xs text-slate-500">تأكد من كتابة كود الطلب كما ظهر لك بعد التسجيل.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* TAB 3: AUTHORIZED LOGIN FORM */}
               {activeTab === 'login' && (

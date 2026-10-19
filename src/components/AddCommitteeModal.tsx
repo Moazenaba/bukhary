@@ -365,8 +365,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min={1}
-                  max={500}
+                  min={0}
                   placeholder=""
                   value={studentsCount}
                   onChange={(e) =>
@@ -579,7 +578,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           <div className="bg-canvas border border-line/40 p-3.5 rounded-xl space-y-2">
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-bold text-ink">
-                أعضاء اللجنة
+                أعضاء اللجنة (مراقبي الامتحانات)
               </label>
               <button
                 type="button"
@@ -589,6 +588,81 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 <span className="material-symbols-outlined text-sm">add</span>
                 <span>+ إضافة عضو آخر</span>
               </button>
+            </div>
+
+            {/* Quick Preset Chips for Committee Members / Exam Observers */}
+            <div className="space-y-1.5 mb-2">
+              <span className="text-[11px] font-bold text-slate-600 block">
+                اختر من أعضاء ومراقبي الامتحانات (انقر للإضافة الفورية):
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-line/50">
+                {[
+                  'أحمد الضليل',
+                  'أحمد المخزنجي',
+                  'أحمد سلامة الهلباوي',
+                  'أحمد عبد الخالق',
+                  'أحمد ماهر',
+                  'أسامة عكاشة',
+                  'إبراهيم أبو صقر',
+                  'إبراهيم أبو موسى 2',
+                  'رشاد',
+                  'رضا أبو جندي 2',
+                  'سلامة البنا',
+                  'سلامة زلابية',
+                  'سمير أبو علفة',
+                  'شيخ احمد صابح',
+                  'شيخ ايمن احمد البرانيه',
+                  'عبد الله سيد أحمد',
+                  'علاء عبد الجليل',
+                  'عمر محمود مجدي',
+                  'مجاهد السروي',
+                  'محمد سلامة',
+                  'محمد فرحات',
+                  'محمود عبده عيد',
+                  'هاني صبري 2',
+                  'وليد عبد السلام',
+                  'ياسر سلامة',
+                  'يوسف المخزنجي',
+                  'أدهم مقلد',
+                  'محمد النحاس',
+                  'محمد ضياء',
+                  'معاذ أبو عنبة',
+                  'محمد عماد',
+                  'أحمد عطا',
+                  'محمود الحراني',
+                  'محمود المسلماني',
+                  'بكر خالد',
+                ].map((name) => {
+                  const isAdded = members.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        if (isAdded) {
+                          if (members.length > 1) {
+                            setMembers(members.filter((m) => m !== name));
+                          }
+                        } else {
+                          if (members.length === 1 && members[0].trim() === '') {
+                            setMembers([name]);
+                          } else {
+                            setMembers([...members, name]);
+                          }
+                        }
+                      }}
+                      className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                        isAdded
+                          ? 'bg-brand text-white shadow-2xs'
+                          : 'bg-slate-100 hover:bg-emerald-50 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      <span>{isAdded ? '✓' : '+'}</span>
+                      <span>{name}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -718,7 +792,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f766e] hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-sm">check</span>
-              <span>تسجيل اللجنة واعتمادها</span>
+              <span>تسجيل لجنة</span>
             </button>
           </div>
         </form>

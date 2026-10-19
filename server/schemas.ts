@@ -41,6 +41,7 @@ export const stageRecord = z.object({
   completedAt: z.string().max(100).nullish(),
   completedBy: z.string().max(200).nullish(),
   notes: z.string().max(2000).nullish(),
+  excelUrl: z.string().max(2000).nullish(),
 });
 
 export const stagesPartial = z.object(

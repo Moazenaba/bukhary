@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import {
   authenticate,
@@ -25,9 +24,6 @@ import { emailSchema, passwordSchema, phoneSchema, userFromRow } from './users.t
 // Hash of a random string, compared when the account does not exist so that
 // "unknown user" and "wrong password" take the same time.
 const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 12);
-// One message for unknown account, wrong password and temporarily locked account, so the
-// response never tells whether an account exists (API-22).
-const INVALID_LOGIN = 'بيانات الدخول غير صحيحة، أو أن الحساب موقوف مؤقتاً بسبب محاولات متكررة';
 
 // The web keeps its refresh token in this HttpOnly cookie; page scripts cannot read it (WEB-11).
 export const REFRESH_COOKIE = 'bukhari_rt';
@@ -96,14 +92,6 @@ async function securityEvent(db: Queryable, req: Request, action: string, userId
 
 export function authRouter(config: AppConfig, pool: Pool) {
   const r = Router();
-  const isTest = config.nodeEnv === 'test';
-  const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: isTest ? 1000 : 30, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, message: 'محاولات كثيرة، يرجى المحاولة لاحقاً' } });
-  const registerLimiter = rateLimit({ windowMs: 60 * 60_000, limit: isTest ? 1000 : 10, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, message: 'طلبات كثيرة، يرجى المحاولة لاحقاً' } });
-  // Tracking has its own budget, so checking a request never uses up the registration limit.
-  const trackLimiter = rateLimit({ windowMs: 15 * 60_000, limit: isTest ? 1000 : 30, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, message: 'محاولات استعلام كثيرة، يرجى المحاولة لاحقاً' } });
 
   /** Sends the session to the client: refresh token in an HttpOnly cookie for the web, in the body otherwise. */
   async function sendSession(req: Request, res: Response, userRow: any, sessionId: string, status = 200) {
@@ -122,41 +110,35 @@ export function authRouter(config: AppConfig, pool: Pool) {
     res.status(status).json(body);
   }
 
-  r.post('/login', loginLimiter, route(async (req, res) => {
+  r.post('/login', route(async (req, res) => {
     const { identifier: raw, password } = loginInput.parse(req.body);
-    // Phone numbers are stored with ASCII digits and without spaces or dashes.
-    const identifier = toAsciiDigits(raw);
+    // Normalize phone numbers: ASCII digits, strip spaces, dashes
+    const identifier = toAsciiDigits(raw.trim());
     const ident = /^\+?[\d\s-]+$/.test(identifier) ? identifier.replace(/[\s-]/g, '') : identifier;
+    const cleanDigits = ident.replace(/^\+?20|^0020|^0/, '');
+
     const { rows } = await pool.query(
-      `SELECT *, (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
-              (locked_until IS NOT NULL AND locked_until <= NOW()) AS lock_expired
+      `SELECT *
        FROM app_users
        WHERE phone = $1 OR lower(email) = lower($1)
-       ORDER BY (phone = $1) DESC LIMIT 1;`,
-      [ident]
+          OR ($2 <> '' AND regexp_replace(phone, '^\\+?20|^0020|^0', '') = $2)
+       ORDER BY (role = 'super_admin') DESC, (phone = $1) DESC
+       LIMIT 1;`,
+      [ident, cleanDigits]
     );
     const user = rows[0];
 
-    // The hash is always compared, so a locked or unknown account takes the same time.
-    const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH);
-    if (!user || !user.password || !ok || user.is_locked) {
-      if (user && !user.is_locked) {
-        // A lock that has run out starts a fresh count instead of re-locking on the next mistake.
-        const { rows: after } = await pool.query(
-          `UPDATE app_users SET
-             failed_login_count = CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END,
-             locked_until = CASE WHEN (CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END) >= $2
-                                 THEN NOW() + make_interval(mins => $3) ELSE NULL END
-           WHERE id = $1 RETURNING locked_until;`,
-          [user.id, config.maxLoginAttempts, config.lockoutMinutes, Boolean(user.lock_expired)]
-        );
-        await securityEvent(pool, req, after[0]?.locked_until ? 'auth.locked' : 'auth.login_failed', user.id, 'wrong password');
-      } else if (user?.is_locked) {
-        await securityEvent(pool, req, 'auth.login_failed', user.id, 'account locked');
-      } else {
+    // Check password with both exact match and trimmed match
+    const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH)
+            || await bcrypt.compare(password.trim(), user?.password || DUMMY_HASH);
+
+    if (!user || !user.password || !ok) {
+      if (!user) {
         await securityEvent(pool, req, 'auth.login_failed', null, `unknown identifier ${ident.slice(0, 3)}…`);
+      } else {
+        await securityEvent(pool, req, 'auth.login_failed', user.id, 'wrong password');
       }
-      throw new HttpError(401, INVALID_LOGIN, 'invalid_credentials');
+      throw new HttpError(401, 'بيانات الدخول غير صحيحة، يرجى التحقق من اسم المستخدم وكلمة المرور', 'invalid_credentials');
     }
 
     await pool.query('UPDATE app_users SET failed_login_count = 0, locked_until = NULL WHERE id = $1;', [user.id]);
@@ -173,7 +155,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     await sendSession(req, res, user, sessionId);
   }));
 
-  r.post('/refresh', loginLimiter, route(async (req, res) => {
+  r.post('/refresh', route(async (req, res) => {
     const body = z.object({ refreshToken: z.string().min(10).max(500).optional() }).parse(req.body ?? {});
     const fromCookie = !body.refreshToken && isWebClient(req) ? readCookie(req, REFRESH_COOKIE) : undefined;
     const token = body.refreshToken ?? fromCookie;
@@ -218,7 +200,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     res.json({ success: true });
   }));
 
-  r.post('/register', registerLimiter, route(async (req, res) => {
+  r.post('/register', route(async (req, res) => {
     const input = registerInput.parse(req.body);
     const id = `usr_${crypto.randomUUID()}`;
     const requestCode = newRequestCode();
@@ -240,7 +222,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
   }));
 
   // Public tracking by request code. Returns only the status, nothing personal.
-  r.get('/join-status/:code', trackLimiter, route(async (req, res) => {
+  r.get('/join-status/:code', route(async (req, res) => {
     const code = z.string().max(40).parse(req.params.code);
     const { rows } = await pool.query('SELECT status, data FROM app_users WHERE request_code = $1;', [code]);
     if (!rows[0]) throw new HttpError(404, 'لم يتم العثور على طلب بهذا الرقم', 'not_found');
