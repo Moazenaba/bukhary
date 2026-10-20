@@ -70,3 +70,8 @@ Who may do what is defined once in `server/policy.ts` and enforced on every requ
 actions the server will accept. Committee heads and assistants can change only the committees
 assigned to them; auditors are read-only; exam PDFs can be downloaded only by super admins and
 committee heads.
+
+
+## Vercel
+
+The web app and the API deploy together on Vercel (`vercel.json` runs `scripts/vercel-build.mjs`). Set `DATABASE_URL`, `DATABASE_CA_CERT`, `JWT_SECRET` and `FCM_SERVICE_ACCOUNT_JSON` in the project settings; pending migrations are applied during the build.
