@@ -14,6 +14,8 @@ interface SearchAndFiltersProps {
   setSelectedCourseId?: (id: string | 'all') => void;
   genderFilter?: 'all' | 'men' | 'women';
   setGenderFilter?: (g: 'all' | 'men' | 'women') => void;
+  onExportExamInProgress?: () => void;
+  onPrintExamInProgress?: () => void;
 }
 
 export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
@@ -29,6 +31,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   setSelectedCourseId,
   genderFilter = 'all',
   setGenderFilter,
+  onExportExamInProgress,
+  onPrintExamInProgress,
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -244,6 +248,31 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           })}
         </div>
       </section>
+
+      {onExportExamInProgress && (
+        <div className="-mt-3 mb-6 flex flex-wrap gap-2 justify-start">
+          <button
+            type="button"
+            onClick={onExportExamInProgress}
+            disabled={!stageCounts.exam}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-100 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined text-base">download</span>
+            <span>تصدير كشف «جاري الامتحان الآن» Excel ({stageCounts.exam || 0} لجنة)</span>
+          </button>
+          {onPrintExamInProgress && (
+            <button
+              type="button"
+              onClick={onPrintExamInProgress}
+              disabled={!stageCounts.exam}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined text-base">print</span>
+              <span>طباعة / PDF</span>
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 };

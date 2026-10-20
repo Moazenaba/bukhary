@@ -15,6 +15,7 @@ import {
 import { calculateCurrentStage, todayISO } from './utils/stageUtils';
 import { CommitteeStep, planCommitteeSave } from './utils/committeeChanges';
 import { createKeyedQueue } from './utils/keyedQueue';
+import { exportExamInProgressToExcel, printExamInProgress } from './utils/reportExport';
 import { readTabFromHash, writeTabToHash } from './utils/hashRoute';
 import { SummerCourseRow } from './types/summerCourse';
 import { Sidebar, NavTab } from './components/Sidebar';
@@ -913,6 +914,14 @@ export default function App() {
                 setGenderFilter={(g) => {
                   setGenderFilter(g);
                   setCurrentPage(1);
+                }}
+                onExportExamInProgress={() => {
+                  const n = exportExamInProgressToExcel(committees);
+                  if (n === 0) toast.info('لا توجد لجان في مرحلة «جاري الامتحان الآن» حالياً');
+                  else toast.success(`تم تصدير كشف ${n} لجنة جاري امتحانها الآن`);
+                }}
+                onPrintExamInProgress={() => {
+                  if (printExamInProgress(committees) === 0) toast.info('لا توجد لجان في مرحلة «جاري الامتحان الآن» حالياً');
                 }}
               />
 

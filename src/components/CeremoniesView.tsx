@@ -3,6 +3,8 @@ import { todayISO } from '../utils/stageUtils';
 import { Committee, ScheduleTask, AppUser, StageKey } from '../types';
 import { AuthService } from '../services/AuthService';
 import { AttendeePicker, MyCeremonies } from './CeremonyAttendees';
+import { CeremonyPeriod, ceremonyRows, exportCeremoniesToExcel, periodRange } from '../utils/reportExport';
+import { toast } from './Toasts';
 
 interface CeremoniesViewProps {
   committees: Committee[];
@@ -89,6 +91,20 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   const [honoredCount, setHonoredCount] = useState<number>(0);
   const [ceremonyNotes, setCeremonyNotes] = useState('');
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
+
+  // Ceremonies sheet export (daily / weekly / monthly)
+  const [exportPeriod, setExportPeriod] = useState<CeremonyPeriod>('day');
+  const [exportAnchor, setExportAnchor] = useState(todayISO());
+  const exportRange = periodRange(exportPeriod, exportAnchor || todayISO());
+  const exportCount = useMemo(
+    () => ceremonyRows(committees, scheduleTasks, exportPeriod, exportAnchor || todayISO()).length,
+    [committees, scheduleTasks, exportPeriod, exportAnchor]
+  );
+  const handleExportCeremonies = () => {
+    const n = exportCeremoniesToExcel(committees, scheduleTasks, exportPeriod, exportAnchor || todayISO());
+    if (n === 0) toast.info('لا توجد حفلات مجدولة في هذه الفترة');
+    else toast.success(`تم تصدير كشف ${n} حفل`);
+  };
 
 
   // Certificate / Honor Roll Print Modal
@@ -264,6 +280,51 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Ceremonies sheet export */}
+      <section aria-labelledby="ceremonies-export" className="bg-white rounded-2xl border border-emerald-200 p-4 shadow-2xs flex flex-col lg:flex-row lg:items-end gap-3 text-xs">
+        <div className="lg:flex-1">
+          <h2 id="ceremonies-export" className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base text-brand">download</span>
+            تصدير كشف الحفلات (Excel)
+          </h2>
+          <p className="text-slate-500 mt-1">
+            الموعد والمكان واسم الشيخ والبلد وعدد الطلاب المكرمين والمشايخ والمدعوين ومراقبي اللجنة — من {exportRange.from}
+            {exportRange.to !== exportRange.from && <> إلى {exportRange.to}</>}
+          </p>
+        </div>
+        <div role="group" aria-label="فترة الكشف" className="inline-flex rounded-xl border border-slate-200 overflow-hidden self-start lg:self-auto">
+          {([['day', 'يومي'], ['week', 'أسبوعي'], ['month', 'شهري']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={exportPeriod === key}
+              onClick={() => setExportPeriod(key)}
+              className={`px-4 py-2 font-bold cursor-pointer transition-all ${exportPeriod === key ? 'bg-brand text-white' : 'bg-white text-slate-700 hover:bg-emerald-50'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex flex-col gap-1 font-bold text-slate-700">
+          <span>{exportPeriod === 'day' ? 'اليوم' : exportPeriod === 'week' ? 'أي يوم في الأسبوع' : 'أي يوم في الشهر'}</span>
+          <input
+            type="date"
+            value={exportAnchor}
+            onChange={(e) => setExportAnchor(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-slate-200 outline-none focus:border-brand font-mono"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handleExportCeremonies}
+          disabled={exportCount === 0}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand text-white font-black hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className="material-symbols-outlined text-base">table_view</span>
+          <span>تصدير ({exportCount} حفل)</span>
+        </button>
+      </section>
 
       <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenCommitteeDetails} />
 
