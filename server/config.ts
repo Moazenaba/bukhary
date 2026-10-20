@@ -28,8 +28,6 @@ export interface AppConfig {
   strictPermissionIds: boolean;
   /** Accept stage changes through PATCH /api/committees/:id (older Android builds); new clients use /actions. */
   legacyStagePatch: boolean;
-  /** Requests per minute per IP across the whole API (0 disables the limiter). */
-  apiRateLimitPerMinute: number;
   /**
    * Oldest Android versionCode the server accepts (0 = any). Raised after a release whose old
    * builds would send requests the server now refuses (rollout plan in docs/RELEASE.md).
@@ -104,7 +102,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     enforcePasswordChange: env.ENFORCE_PASSWORD_CHANGE !== 'false',
     strictPermissionIds: env.STRICT_PERMISSION_IDS === 'true',
     legacyStagePatch: env.LEGACY_STAGE_PATCH !== 'false',
-    apiRateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE === undefined ? 600 : Number(env.API_RATE_LIMIT_PER_MINUTE) || 0,
     minAndroidVersionCode: Number(env.MIN_ANDROID_VERSION_CODE) || 0,
     fcmServiceAccount: loadServiceAccount(env)
   };

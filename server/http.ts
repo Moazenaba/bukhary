@@ -53,11 +53,15 @@ const PG_CLIENT_ERRORS: Record<string, { status: number; message: string }> = {
 
 export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
   const reqId = (req as any).id;
+  // The request log (requestLog.ts) prints why the request failed.
+  res.locals.error = { message: err?.message, code: err?.code, name: err?.name };
   if (err instanceof ZodError) {
+    const errors = err.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
+    res.locals.error = { message: 'invalid input', errors };
     return res.status(400).json({
       success: false,
       message: 'البيانات المرسلة غير صحيحة',
-      errors: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      errors,
       requestId: reqId,
     });
   }

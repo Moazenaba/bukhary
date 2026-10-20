@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import {
   authenticate,
@@ -97,14 +96,6 @@ async function securityEvent(db: Queryable, req: Request, action: string, userId
 
 export function authRouter(config: AppConfig, pool: Pool) {
   const r = Router();
-  const isTest = config.nodeEnv === 'test';
-  const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: isTest ? 1000 : 30, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, message: 'محاولات كثيرة، يرجى المحاولة لاحقاً' } });
-  const registerLimiter = rateLimit({ windowMs: 60 * 60_000, limit: isTest ? 1000 : 10, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, message: 'طلبات كثيرة، يرجى المحاولة لاحقاً' } });
-  // Tracking has its own budget, so checking a request never uses up the registration limit.
-  const trackLimiter = rateLimit({ windowMs: 15 * 60_000, limit: isTest ? 1000 : 30, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, message: 'محاولات استعلام كثيرة، يرجى المحاولة لاحقاً' } });
 
   /** Sends the session to the client: refresh token in an HttpOnly cookie for the web, in the body otherwise. */
   async function sendSession(req: Request, res: Response, userRow: any, sessionId: string, status = 200) {
@@ -123,7 +114,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     res.status(status).json(body);
   }
 
-  r.post('/login', loginLimiter, route(async (req, res) => {
+  r.post('/login', route(async (req, res) => {
     const { identifier: raw, password } = loginInput.parse(req.body);
     // Phones are stored in one form (normalizePhone); an older row may still hold the form typed.
     const identifier = toAsciiDigits(raw).trim();
@@ -202,7 +193,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     await sendSession(req, res, user, sessionId);
   }));
 
-  r.post('/refresh', loginLimiter, route(async (req, res) => {
+  r.post('/refresh', route(async (req, res) => {
     const body = z.object({ refreshToken: z.string().min(10).max(500).optional() }).parse(req.body ?? {});
     const fromCookie = !body.refreshToken && isWebClient(req) ? readCookie(req, REFRESH_COOKIE) : undefined;
     const token = body.refreshToken ?? fromCookie;
@@ -249,7 +240,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     res.json({ success: true });
   }));
 
-  r.post('/register', registerLimiter, route(async (req, res) => {
+  r.post('/register', route(async (req, res) => {
     const input = registerInput.parse(req.body);
     const id = `usr_${crypto.randomUUID()}`;
     const requestCode = newRequestCode();
@@ -291,7 +282,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
   }));
 
   // Public tracking by request code. Returns only the status, nothing personal.
-  r.get('/join-status/:code', trackLimiter, route(async (req, res) => {
+  r.get('/join-status/:code', route(async (req, res) => {
     const code = z.string().max(40).parse(req.params.code);
     const { rows } = await pool.query('SELECT status, data FROM app_users WHERE request_code = $1;', [code]);
     if (!rows[0]) throw new HttpError(404, 'لم يتم العثور على طلب بهذا الرقم', 'not_found');

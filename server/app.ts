@@ -1,12 +1,11 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { authenticate } from './auth.ts';
 import type { AppConfig } from './config.ts';
 import type { Pool } from './db.ts';
 import { errorHandler, notFound, requestId, route } from './http.ts';
 import { idempotency } from './idempotency.ts';
-import { logger } from './logger.ts';
+import { requestLog } from './requestLog.ts';
 import { pendingMigrations } from './migrate.ts';
 import { auditLogsRouter, databaseRouter, ocrRouter } from './routes/admin.ts';
 import { authRouter } from './routes/authRoutes.ts';
@@ -49,25 +48,10 @@ export function createApp(config: AppConfig, pool: Pool) {
       hsts: config.isProduction ? { maxAge: 31_536_000, includeSubDomains: true } : false,
     })
   );
-  app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-      if (req.path.startsWith('/api/')) {
-        logger.info('request', { requestId: (req as any).id, method: req.method, path: req.path, status: res.statusCode, ms: Date.now() - start, userId: req.user?.id });
-      }
-    });
-    next();
-  });
+  app.use(requestLog);
   // OCR images are the only large JSON bodies; everything else stays small.
   app.use('/api/extract-table', express.json({ limit: '15mb' }));
   app.use(express.json({ limit: '1mb' }));
-
-  // A ceiling for every API route per IP (API-26); login, registration and OCR have tighter ones.
-  // The store is in memory, so with several instances the effective limit multiplies (API-28).
-  if (config.apiRateLimitPerMinute > 0 && config.nodeEnv !== 'test') {
-    app.use('/api/', rateLimit({ windowMs: 60_000, limit: config.apiRateLimitPerMinute, standardHeaders: true, legacyHeaders: false,
-      message: { success: false, message: 'طلبات كثيرة، يرجى المحاولة بعد قليل' } }));
-  }
 
   // An Android build older than the minimum is told to update instead of having its writes refused
   // one by one; the app keeps them queued until it is updated (426 Upgrade Required).
