@@ -8,6 +8,8 @@ export interface AppConfig {
   databaseUrl: string | undefined;
   /** PEM of the CA that signs the database certificate (Supabase publishes one). */
   databaseCaCert: string | undefined;
+  /** Connections per server instance (serverless instances keep this small). */
+  databasePoolMax: number;
   /** Only for local databases without TLS. Never set in production. */
   databaseSslDisabled: boolean;
   jwtSecret: string;
@@ -87,6 +89,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     databaseUrl: buildDatabaseUrl(env),
     databaseCaCert,
     databaseSslDisabled,
+    databasePoolMax: Number(env.DATABASE_POOL_MAX) || 10,
     jwtSecret: jwtSecret.length >= 32 ? jwtSecret : DEV_JWT_SECRET.padEnd(32, '_'),
     accessTokenTtl: env.ACCESS_TOKEN_TTL || '15m',
     refreshTokenTtlDays: Number(env.REFRESH_TOKEN_TTL_DAYS) || 30,

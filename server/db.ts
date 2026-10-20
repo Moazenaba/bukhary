@@ -24,7 +24,7 @@ export function createPool(config: AppConfig): pg.Pool {
   const pool = new pg.Pool({
     connectionString: config.databaseUrl,
     ssl,
-    max: 10,
+    max: config.databasePoolMax,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 15_000,
     statement_timeout: 20_000,

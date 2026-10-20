@@ -15,7 +15,7 @@ export interface MigrationFile {
 }
 
 export function defaultMigrationsDir(): string {
-  return path.resolve(process.cwd(), 'migrations');
+  return process.env.MIGRATIONS_DIR || path.resolve(process.cwd(), 'migrations');
 }
 
 export function listMigrations(dir = defaultMigrationsDir()): MigrationFile[] {
