@@ -163,3 +163,14 @@ export async function pagedRows<T>(
 export function toAsciiDigits(value: string): string {
   return value.replace(/[٠-٩۰-۹]/g, (d) => String((d.charCodeAt(0) & 0xf) % 10));
 }
+
+/**
+ * One stored form per phone: ASCII digits without spaces, dashes or brackets, and Egyptian
+ * mobiles in local form (01XXXXXXXXX), so +2010…, 002010… and 010… are the same account.
+ * Other numbers keep their own form. migrations/014 applies the same rule to stored phones.
+ */
+export function normalizePhone(value: string): string {
+  const cleaned = toAsciiDigits(value).trim().replace(/[\s\-()]/g, '');
+  const egyptMobile = /^(?:\+20|0020|20)?0?(1[0125]\d{8})$/.exec(cleaned);
+  return egyptMobile ? `0${egyptMobile[1]}` : cleaned;
+}

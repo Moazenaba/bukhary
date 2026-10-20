@@ -15,7 +15,13 @@ export async function purgeExpired(pool: Pool) {
        AND s.created_at < NOW() - interval '1 day';`
   );
   const keys = await pool.query("DELETE FROM idempotency_keys WHERE created_at < NOW() - interval '7 days';");
-  return { refreshTokens: tokens.rowCount ?? 0, sessions: sessions.rowCount ?? 0, idempotencyKeys: keys.rowCount ?? 0 };
+  const failures = await pool.query("DELETE FROM login_failures WHERE updated_at < NOW() - interval '1 day';");
+  return {
+    refreshTokens: tokens.rowCount ?? 0,
+    sessions: sessions.rowCount ?? 0,
+    idempotencyKeys: keys.rowCount ?? 0,
+    loginFailures: failures.rowCount ?? 0,
+  };
 }
 
 export function startMaintenance(pool: Pool, everyMs = 6 * 60 * 60 * 1000) {

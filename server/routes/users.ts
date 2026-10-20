@@ -7,7 +7,7 @@ import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
 import { logger } from '../logger.ts';
 import { type Principal, ROLES, isAllowed, isCommitteeInScope, isSystemPermission } from '../policy.ts';
-import { id, optionalText, toAsciiDigits } from '../schemas.ts';
+import { id, normalizePhone, optionalText, toAsciiDigits } from '../schemas.ts';
 import { notify } from './notifications.ts';
 
 export const passwordSchema = z
@@ -22,8 +22,8 @@ export const phoneSchema = z
   .pipe(z.string().trim()
   .min(6, 'رقم الهاتف غير صحيح')
   .max(30)
-  .regex(/^\+?[\d\s-]+$/, 'رقم الهاتف غير صحيح'))
-  .transform((v) => v.replace(/[\s-]/g, ''));
+  .regex(/^\+?[\d\s\-()]+$/, 'رقم الهاتف غير صحيح'))
+  .transform(normalizePhone);
 
 export const emailSchema = z
   .string()

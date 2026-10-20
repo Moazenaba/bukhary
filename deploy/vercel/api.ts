@@ -54,7 +54,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     reportError('server.start_failed', { message: err?.message ?? String(err) });
     res.statusCode = 503;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ error: 'الخادم غير جاهز حاليًا، حاول بعد قليل.' }));
+    res.end(JSON.stringify({ success: false, code: 'unavailable', message: 'الخادم غير جاهز حاليًا، حاول بعد قليل.' }));
     return;
   }
 

@@ -19,7 +19,7 @@ import type { AppConfig } from '../config.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { HttpError, conflict, route } from '../http.ts';
 import { evaluatedPermissions } from '../policy.ts';
-import { optionalText, toAsciiDigits } from '../schemas.ts';
+import { normalizePhone, optionalText, toAsciiDigits } from '../schemas.ts';
 import { emailSchema, passwordSchema, phoneSchema, userFromRow } from './users.ts';
 import { notify } from './notifications.ts';
 
@@ -125,34 +125,61 @@ export function authRouter(config: AppConfig, pool: Pool) {
 
   r.post('/login', loginLimiter, route(async (req, res) => {
     const { identifier: raw, password } = loginInput.parse(req.body);
-    // Phone numbers are stored with ASCII digits and without spaces or dashes.
-    const identifier = toAsciiDigits(raw);
-    const ident = /^\+?[\d\s-]+$/.test(identifier) ? identifier.replace(/[\s-]/g, '') : identifier;
+    // Phones are stored in one form (normalizePhone); an older row may still hold the form typed.
+    const identifier = toAsciiDigits(raw).trim();
+    const isPhone = /^\+?[\d\s\-()]+$/.test(identifier);
+    const ident = isPhone ? normalizePhone(identifier) : identifier;
+    const typed = isPhone ? identifier.replace(/[\s\-()]/g, '') : identifier;
+    // Rows saved before migration 014 that could not be rewritten keep an international form.
+    const forms = [typed, ident];
+    if (isPhone && /^01\d{9}$/.test(ident)) forms.push(`+2${ident}`, `002${ident}`, `2${ident}`);
+    const ip = req.ip || 'unknown';
     const { rows } = await pool.query(
-      `SELECT *, (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
-              (locked_until IS NOT NULL AND locked_until <= NOW()) AS lock_expired
-       FROM app_users
-       WHERE phone = $1 OR lower(email) = lower($1)
-       ORDER BY (phone = $1) DESC LIMIT 1;`,
-      [ident]
+      `SELECT u.*, (u.locked_until IS NOT NULL AND u.locked_until > NOW()) AS account_locked,
+              (u.locked_until IS NOT NULL AND u.locked_until <= NOW()) AS lock_expired,
+              (f.locked_until IS NOT NULL AND f.locked_until > NOW()) AS caller_locked
+       FROM app_users u
+       LEFT JOIN login_failures f ON f.user_id = u.id AND f.ip = $3
+       WHERE u.phone = ANY($2::text[]) OR lower(u.email) = lower($1)
+       ORDER BY (u.phone = $2[1]) DESC, (u.phone = $1) DESC LIMIT 1;`,
+      [ident, forms, ip]
     );
     const user = rows[0];
+    const locked = Boolean(user?.account_locked || user?.caller_locked);
 
     // The hash is always compared, so a locked or unknown account takes the same time.
     const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH);
-    if (!user || !user.password || !ok || user.is_locked) {
-      if (user && !user.is_locked) {
-        // A lock that has run out starts a fresh count instead of re-locking on the next mistake.
-        const { rows: after } = await pool.query(
+    if (!user || !user.password || !ok || locked) {
+      if (user && !locked) {
+        // This caller's count locks only this caller. A lock or a quiet spell that has run out
+        // starts a fresh count instead of re-locking on the next mistake.
+        const { rows: mine } = await pool.query(
+          `INSERT INTO login_failures (user_id, ip, failed_count, locked_until, updated_at)
+           VALUES ($1, $2, 1, CASE WHEN 1 >= $3 THEN NOW() + make_interval(mins => $4) END, NOW())
+           ON CONFLICT (user_id, ip) DO UPDATE SET
+             failed_count = CASE WHEN login_failures.locked_until <= NOW()
+                                   OR login_failures.updated_at < NOW() - make_interval(mins => $4)
+                                 THEN 1 ELSE login_failures.failed_count + 1 END,
+             locked_until = CASE WHEN (CASE WHEN login_failures.locked_until <= NOW()
+                                              OR login_failures.updated_at < NOW() - make_interval(mins => $4)
+                                            THEN 1 ELSE login_failures.failed_count + 1 END) >= $3
+                                 THEN NOW() + make_interval(mins => $4) ELSE NULL END,
+             updated_at = NOW()
+           RETURNING locked_until;`,
+          [user.id, ip, config.maxLoginAttempts, config.lockoutMinutes]
+        );
+        // The account-wide count stops guessing spread over many addresses.
+        const { rows: account } = await pool.query(
           `UPDATE app_users SET
              failed_login_count = CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END,
              locked_until = CASE WHEN (CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END) >= $2
                                  THEN NOW() + make_interval(mins => $3) ELSE NULL END
            WHERE id = $1 RETURNING locked_until;`,
-          [user.id, config.maxLoginAttempts, config.lockoutMinutes, Boolean(user.lock_expired)]
+          [user.id, config.accountLockAttempts, config.lockoutMinutes, Boolean(user.lock_expired)]
         );
-        await securityEvent(pool, req, after[0]?.locked_until ? 'auth.locked' : 'auth.login_failed', user.id, 'wrong password');
-      } else if (user?.is_locked) {
+        const nowLocked = mine[0]?.locked_until || account[0]?.locked_until;
+        await securityEvent(pool, req, nowLocked ? 'auth.locked' : 'auth.login_failed', user.id, 'wrong password');
+      } else if (locked) {
         await securityEvent(pool, req, 'auth.login_failed', user.id, 'account locked');
       } else {
         await securityEvent(pool, req, 'auth.login_failed', null, `unknown identifier ${ident.slice(0, 3)}…`);
@@ -161,6 +188,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     }
 
     await pool.query('UPDATE app_users SET failed_login_count = 0, locked_until = NULL WHERE id = $1;', [user.id]);
+    await pool.query('DELETE FROM login_failures WHERE user_id = $1 AND ip = $2;', [user.id, ip]);
     // Status is revealed only after the password is proven.
     if (user.status !== 'approved') {
       const message =
@@ -235,8 +263,23 @@ export function authRouter(config: AppConfig, pool: Pool) {
         [id, name, phone, email, passwordHash, roleKey, notes, new Date().toISOString(), requestCode, JSON.stringify(profile)]
       );
     } catch (err: any) {
-      if (err.code === '23505') throw conflict('يوجد حساب مسجل بنفس رقم الهاتف أو البريد الإلكتروني');
-      throw err;
+      if (err.code !== '23505') throw err;
+      // Say what to do next: a second request for the same number can never succeed.
+      const { rows: existing } = await pool.query(
+        'SELECT status FROM app_users WHERE phone = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)) LIMIT 1;',
+        [phone, email]
+      );
+      const status = existing[0]?.status;
+      if (status === 'pending') {
+        throw new HttpError(409, 'لديك طلب انضمام بهذا الرقم قيد المراجعة بالفعل، انتظر موافقة المشرف أو تابع حالته برقم الطلب', 'join_request_pending');
+      }
+      if (status === 'approved') {
+        throw new HttpError(409, 'هذا الرقم أو البريد مسجل بحساب مفعّل بالفعل، سجّل الدخول به بدلاً من إرسال طلب جديد', 'account_exists');
+      }
+      if (status === 'rejected') {
+        throw new HttpError(409, 'تم الاعتذار عن طلب سابق بهذا الرقم، تواصل مع المشرف العام', 'join_request_rejected');
+      }
+      throw conflict('يوجد حساب مسجل بنفس رقم الهاتف أو البريد الإلكتروني');
     }
     await audit(pool, req, 'user.register', 'user', id, null, { name, role: roleKey, requestCode });
     // Super admins are told at once, in the app and on their phones.
