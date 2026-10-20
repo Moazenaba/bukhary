@@ -137,6 +137,7 @@ export interface CeremonyStageDetails {
   ceremonyTime?: string;           // موعد الحفل بالوقت يكتبه بيده (مثال: 4 العصر، 4 المغرب)
   ceremonyPlace?: string;          // مكان الحفل
   notes?: string;                  // ملاحظات وترتيبات خاصة
+  attendees?: Array<{ id: string; name: string }>; // المدعوون للحفل (حسابات؛ يصلهم إشعار)
 }
 
 export interface CommitteeStageRecord {

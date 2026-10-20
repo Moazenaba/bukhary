@@ -59,6 +59,8 @@ export const committeeAction = z.discriminatedUnion('type', [
     honoredStudentsCount: z.coerce.number().int().min(0).max(100_000).nullish(),
     attendingSheikhs: z.array(z.string().max(200)).max(50).optional(),
     notes: z.string().max(5000).nullish(),
+    /** Accounts invited to the ceremony; omitted = unchanged. Names are looked up by the server. */
+    attendeeUserIds: z.array(z.string().max(255)).max(200).optional(),
   }),
 ]);
 export type CommitteeAction = z.infer<typeof committeeAction>;
@@ -152,7 +154,8 @@ export function applyCommitteeAction(state: CommitteeState, a: CommitteeAction, 
       return next;
     }
     case 'scheduleCeremony': {
-      const { type: _t, ...fields } = a;
+      // Attendees are resolved against app_users by the route; the intent only carries their ids.
+      const { type: _t, attendeeUserIds: _ids, ...fields } = a;
       const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
       next.ceremonyDetails = ceremonyDetails.parse({ ...(next.ceremonyDetails ?? {}), ...clean });
       return next;

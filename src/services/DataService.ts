@@ -52,6 +52,8 @@ export type CommitteeAction =
       honoredStudentsCount?: number | null;
       attendingSheikhs?: string[];
       notes?: string | null;
+      /** Accounts invited to the ceremony; each newly added one is notified. Omitted = unchanged. */
+      attendeeUserIds?: string[];
     };
 
 export interface AssignableUser {
@@ -137,6 +139,8 @@ export const DataService = {
   resetUserPassword: (id: string, password: string) => api(`/users/${enc(id)}/reset-password`, { method: 'POST', body: { password } }),
   /** People the current user may assign tasks to (id and name only). */
   getAssignableUsers: async () => (await api<{ users: AssignableUser[] }>('/users/assignable')).users,
+  /** Approved accounts that can be invited to a ceremony (for those who schedule ceremonies). */
+  getCeremonyCandidates: async () => (await api<{ users: AssignableUser[] }>('/users/ceremony-candidates')).users,
 
   // ---- Shared settings ----
   getBooks: async () => (await api<{ books: Book[] }>('/books')).books,

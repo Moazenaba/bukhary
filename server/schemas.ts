@@ -82,6 +82,8 @@ export const ceremonyDetails = z.object({
   ceremonyTime: z.string().max(100).nullish(),
   ceremonyPlace: z.string().max(300).nullish(),
   notes: z.string().max(5000).nullish(),
+  /** People invited to the ceremony (accounts). Set by the server from attendeeUserIds, names from app_users. */
+  attendees: z.array(z.object({ id: z.string().max(255), name: z.string().max(200) })).max(200).optional(),
 });
 
 // Who received / approved is always taken from the logged-in user, never from the body;

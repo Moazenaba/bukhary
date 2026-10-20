@@ -342,7 +342,7 @@ export default function App() {
   /** The server stores the ceremony and keeps its single calendar task in step (WEB-08). */
   const handleUpdateCommitteeCeremony = async (
     committeeId: string,
-    info: { date: string; time: string; place: string; notes?: string; completed: boolean; honoredCount?: number; attendingSheikhs?: string[] }
+    info: { date: string; time: string; place: string; notes?: string; completed: boolean; honoredCount?: number; attendingSheikhs?: string[]; attendeeUserIds?: string[] }
   ) => {
     const c = committees.find((x) => x.id === committeeId);
     if (!c) {
@@ -360,6 +360,7 @@ export default function App() {
           notes: info.notes || null,
           honoredStudentsCount: info.honoredCount ?? c.ceremonyDetails?.honoredStudentsCount ?? null,
           attendingSheikhs: info.attendingSheikhs ?? c.ceremonyDetails?.attendingSheikhs ?? [],
+          ...(info.attendeeUserIds ? { attendeeUserIds: info.attendeeUserIds } : {}),
         },
       },
     ];

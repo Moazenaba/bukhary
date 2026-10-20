@@ -388,6 +388,11 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
    * People a task may be assigned to (D-07): anyone allowed to write tasks gets id and name of
    * approved staff, limited to their own committees when they are committee-scoped.
    */
+  r.get('/ceremony-candidates', can('committees.finalize'), route(async (_req, res) => {
+    const { rows } = await pool.query("SELECT id, name, role FROM app_users WHERE status = 'approved' ORDER BY name ASC;");
+    res.json({ success: true, users: rows.map((u) => ({ id: u.id, name: u.name, role: u.role })) });
+  }));
+
   r.get('/assignable', can('tasks.write'), route(async (req, res) => {
     const actor = req.user!;
     const unscoped = actor.role === 'super_admin' || actor.allCommittees || !['committee_head', 'assistant', 'teacher'].includes(actor.role);

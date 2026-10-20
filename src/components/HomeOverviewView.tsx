@@ -1,4 +1,5 @@
 import { AuthService } from '../services/AuthService';
+import { MyCeremonies } from './CeremonyAttendees';
 import React from 'react';
 import { Committee, STAGES_LIST, AppUser, Course, ScheduleTask } from '../types';
 import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
@@ -44,6 +45,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
   return (
     <div className="space-y-6 text-right">
+      <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenDetails} />
       {/* Welcome Banner tailored to User Role */}
       <div className="bg-gradient-to-l from-brand via-[#0f766e] to-brand rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl">
