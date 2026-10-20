@@ -1,5 +1,5 @@
 import fs from 'fs';
-import crypto from 'crypto';
+import { type FcmServiceAccount, loadServiceAccount } from './push.ts';
 
 export interface AppConfig {
   nodeEnv: 'production' | 'development' | 'test';
@@ -31,6 +31,8 @@ export interface AppConfig {
    * builds would send requests the server now refuses (rollout plan in docs/RELEASE.md).
    */
   minAndroidVersionCode: number;
+  /** Firebase service account for push notifications; without it notifications stay in-app only. */
+  fcmServiceAccount: FcmServiceAccount | undefined;
 }
 
 const DEV_JWT_SECRET = 'bukhari_dev_only_secret';
@@ -62,20 +64,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
   const nodeEnv = env.NODE_ENV === 'production' ? 'production' : env.NODE_ENV === 'test' ? 'test' : 'development';
   const isProduction = nodeEnv === 'production';
 
-  let jwtSecret = env.JWT_SECRET ?? '';
+  const jwtSecret = env.JWT_SECRET ?? '';
   if (PLACEHOLDER_SECRETS.has(jwtSecret) || jwtSecret.length < 32) {
-    if (requireSecrets) {
-      if (nodeEnv === 'test') {
-        jwtSecret = DEV_JWT_SECRET.padEnd(32, '_');
-      } else {
-        // Auto-generate a secure secret if missing or invalid
-        jwtSecret = crypto.randomBytes(32).toString('hex');
-      }
+    // A known or short secret would let anyone forge admin tokens. Only automated tests may use
+    // the built-in development secret; local development needs its own JWT_SECRET too.
+    if (nodeEnv !== 'test' && requireSecrets) {
+      throw new Error('JWT_SECRET must be set to a random value of at least 32 characters (see .env.example).');
     }
   }
 
   const caPath = env.DATABASE_CA_CERT_PATH;
-  const databaseCaCert = env.DATABASE_CA_CERT || (caPath && fs.existsSync(caPath) ? fs.readFileSync(caPath, 'utf8') : undefined);
+  const databaseCaCert = env.DATABASE_CA_CERT || (caPath ? fs.readFileSync(caPath, 'utf8') : undefined);
   const databaseSslDisabled = env.DATABASE_SSL === 'disable';
   if (isProduction && databaseSslDisabled) {
     throw new Error('DATABASE_SSL=disable is not allowed in production.');
@@ -84,7 +83,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
   return {
     nodeEnv,
     isProduction,
-    port: isProduction ? (Number(env.PORT) || 3000) : 3000,
+    port: Number(env.PORT) || 3000,
     databaseUrl: buildDatabaseUrl(env),
     databaseCaCert,
     databaseSslDisabled,
@@ -101,5 +100,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     legacyStagePatch: env.LEGACY_STAGE_PATCH !== 'false',
     apiRateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE === undefined ? 600 : Number(env.API_RATE_LIMIT_PER_MINUTE) || 0,
     minAndroidVersionCode: Number(env.MIN_ANDROID_VERSION_CODE) || 0,
+    fcmServiceAccount: loadServiceAccount(env)
   };
 }

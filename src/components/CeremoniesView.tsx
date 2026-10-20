@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { todayISO } from '../utils/stageUtils';
 import { Committee, ScheduleTask, AppUser, StageKey } from '../types';
 import { AuthService } from '../services/AuthService';
+import { AttendeePicker, MyCeremonies } from './CeremonyAttendees';
 
 interface CeremoniesViewProps {
   committees: Committee[];
@@ -16,6 +17,7 @@ interface CeremoniesViewProps {
       notes?: string;
       completed: boolean;
       honoredCount?: number;
+      attendeeUserIds?: string[];
     }
   ) => unknown;
   onToggleCommitteeStage: (committeeId: string, stageKey: StageKey) => void;
@@ -86,6 +88,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   const [ceremonyPlace, setCeremonyPlace] = useState('');
   const [honoredCount, setHonoredCount] = useState<number>(0);
   const [ceremonyNotes, setCeremonyNotes] = useState('');
+  const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
 
 
   // Certificate / Honor Roll Print Modal
@@ -137,6 +140,8 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
       setCeremonyNotes('');
     }
     setHonoredCount(comm.studentsCount || 0);
+    setAttendeeIds((comm.ceremonyDetails?.attendees ?? []).map((a) => a.id));
+    if (comm.ceremonyDetails?.ceremonyPlace) setCeremonyPlace(comm.ceremonyDetails.ceremonyPlace);
     setIsScheduleModalOpen(true);
   };
 
@@ -149,6 +154,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
       time: ceremonyTime,
       place: ceremonyPlace,
       notes: ceremonyNotes,
+      attendeeUserIds: attendeeIds,
       completed: targetCommittee.stages.ceremony?.completed || false,
       honoredCount: Number(honoredCount) || undefined,
     });
@@ -258,6 +264,8 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
           </div>
         </div>
       </div>
+
+      <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenCommitteeDetails} />
 
       {/* 2. Key Performance Indicators (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -494,6 +502,12 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                       </span>
                     </div>
 
+                    {comm.ceremonyDetails?.attendees && comm.ceremonyDetails.attendees.length > 0 && (
+                      <p className="text-xs text-slate-600">
+                        <span className="text-slate-400">المدعوون: </span>
+                        {comm.ceremonyDetails.attendees.map((a) => a.name).join('، ')}
+                      </p>
+                    )}
                     {/* Scheduled Info Box */}
                     {hasSchedule && (
                       <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-2.5 mt-2 space-y-1">
@@ -700,6 +714,8 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                   />
                 </div>
               </div>
+
+              <AttendeePicker selectedIds={attendeeIds} onChange={setAttendeeIds} />
 
               <div>
                 <label className="block text-slate-700 font-bold mb-1">

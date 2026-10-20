@@ -168,7 +168,11 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
       c.studentsCount, c.isWomenCommittee, JSON.stringify(stages),
       JSON.stringify(c.scoringDetails ?? existing?.scoring_details ?? {}),
       JSON.stringify(c.aggregationDetails ?? existing?.aggregation_details ?? {}),
-      JSON.stringify(c.ceremonyDetails ?? existing?.ceremony_details ?? {}),
+      JSON.stringify(
+        c.ceremonyDetails
+          ? { ...c.ceremonyDetails, attendees: existing?.ceremony_details?.attendees ?? [] }
+          : existing?.ceremony_details ?? {}
+      ),
       c.createdDate, c.createdAtTime, JSON.stringify(committeeData),
     ]
   );
@@ -189,6 +193,41 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
   await audit(db, req, existing ? 'committee.update' : 'committee.create', 'committee', c.id,
     existing ? committeeFromRow(existing) : null, committeeFromRow(rows[0]));
   return rows[0];
+}
+
+/**
+ * Tells each person what changed for them: added to the ceremony (with its details), removed from
+ * it, or — for those still invited — a new date, time or place.
+ */
+async function notifyCeremonyAttendees(
+  db: Queryable,
+  committee: any,
+  before: any,
+  beforeAttendees: Array<{ id: string; name: string }>,
+  after: any
+) {
+  const afterAttendees: Array<{ id: string; name: string }> = after.attendees ?? [];
+  const had = new Set(beforeAttendees.map((a) => a.id));
+  const has = new Set(afterAttendees.map((a) => a.id));
+  const when = [after.ceremonyDate, after.ceremonyTime].filter(Boolean).join(' ') || 'لم يحدد الموعد بعد';
+  const where = after.ceremonyPlace ? ` — ${after.ceremonyPlace}` : '';
+  const label = `لجنة ${committee.committee_number} (${committee.committee_name})`;
+  const moved =
+    (before.ceremonyDate ?? null) !== (after.ceremonyDate ?? null) ||
+    (before.ceremonyTime ?? null) !== (after.ceremonyTime ?? null) ||
+    (before.ceremonyPlace ?? null) !== (after.ceremonyPlace ?? null);
+  for (const a of afterAttendees) {
+    if (!had.has(a.id)) {
+      await notify(db, { title: `تمت إضافتك لحفل تكريم ${label}`, description: `${when}${where}`, type: 'info', committeeId: committee.id, targetUserId: a.id });
+    } else if (moved) {
+      await notify(db, { title: `تغيّر موعد حفل تكريم ${label}`, description: `${when}${where}`, type: 'urgent', committeeId: committee.id, targetUserId: a.id });
+    }
+  }
+  for (const a of beforeAttendees) {
+    if (!has.has(a.id)) {
+      await notify(db, { title: `تم إلغاء إضافتك لحفل تكريم ${label}`, description: '', type: 'info', committeeId: committee.id, targetUserId: a.id });
+    }
+  }
 }
 
 /** The ceremony's calendar task has one owner: the server (WEB-08). No date means no task. */
@@ -299,7 +338,9 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
           JSON.stringify(stages),
           body.scoringDetails ? JSON.stringify(body.scoringDetails) : null,
           body.aggregationDetails ? JSON.stringify(body.aggregationDetails) : null,
-          body.ceremonyDetails ? JSON.stringify(body.ceremonyDetails) : null,
+          body.ceremonyDetails
+            ? JSON.stringify({ ...body.ceremonyDetails, attendees: existing.ceremony_details?.attendees ?? [] })
+            : null,
           reception ? JSON.stringify(reception) : null,
           approval ? JSON.stringify(approval) : null,
         ]
@@ -326,6 +367,18 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       checkVersion(existing, expected);
       assertAllowed(user, actionPermission(action));
       assertCommitteeScope(user, existing.id);
+      const before = existing.ceremony_details ?? {};
+      const beforeAttendees: Array<{ id: string; name: string }> = before.attendees ?? [];
+      let attendees = beforeAttendees;
+      if (action.type === 'scheduleCeremony' && action.attendeeUserIds) {
+        const ids = [...new Set(action.attendeeUserIds)];
+        const { rows: people } = await db.query(
+          "SELECT id, name FROM app_users WHERE id = ANY($1::text[]) AND status = 'approved';",
+          [ids]
+        );
+        if (people.length !== ids.length) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
+        attendees = ids.map((id) => ({ id, name: people.find((p) => p.id === id)!.name as string }));
+      }
       const next = applyCommitteeAction(
         {
           stages: existing.stages ?? {},
@@ -339,6 +392,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         user,
         new Date().toISOString()
       );
+      if (action.type === 'scheduleCeremony') next.ceremonyDetails = { ...(next.ceremonyDetails ?? {}), attendees };
       const { rows: updated } = await db.query(
         `UPDATE committees SET stages = $2::jsonb, received_by_assistant = $3::jsonb, exam_approved_by = $4::jsonb,
            scoring_details = $5::jsonb, aggregation_details = $6::jsonb, ceremony_details = $7::jsonb, updated_at = NOW()
@@ -362,6 +416,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         );
       }
       if (action.type === 'scheduleCeremony') {
+        await notifyCeremonyAttendees(db, existing, before, beforeAttendees, next.ceremonyDetails ?? {});
         await syncCeremonyTask(db, updated[0]);
         if (action.ceremonyDate) {
           await notify(db, {
