@@ -74,7 +74,7 @@ describe('users', () => {
 describe('exam files', () => {
   const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(2048, 1)]);
 
-  it('uploads a PDF and serves it to whoever holds the exams permission, and not to other sheikhs', async () => {
+  it('uploads a PDF and serves it only to the people it was chosen for', async () => {
     const head = await userWithToken(t, { role: 'committee_head', permissions: ['exams_pdf'] });
     const create = await t.api().post('/api/exams').set(head.auth).send({ id: 'exam-a', title: 'امتحان', book: 'كتاب' });
     expect(create.status).toBe(200);
@@ -87,11 +87,16 @@ describe('exam files', () => {
     expect(exam.hasFile).toBe(true);
     expect(exam.pdfDataUrl).toBeUndefined();
 
-    // «الامتحانات ونماذج الـ PDF» opens every exam for any role, with no exam allow-list.
-    const teacher = await userWithToken(t, { role: 'sheikh', permissions: ['exams_pdf'] });
+    // «الامتحانات ونماذج الـ PDF» opens, at any time, only the exams chosen for that person.
+    const teacher = await userWithToken(t, { role: 'sheikh', permissions: ['exams_pdf'], allExams: false, allowedExamIds: ['exam-a'] });
     const seen = await t.api().get('/api/exams').set(teacher.auth);
-    expect(seen.body.exams.find((e: any) => e.id === 'exam-a')?.canOpen).toBe(true);
+    expect(seen.body.exams.map((e: any) => e.id)).toEqual(['exam-a']);
+    expect(seen.body.exams[0].canOpen).toBe(true);
     expect((await t.api().get('/api/exams/exam-a/file').set(teacher.auth)).status).toBe(200);
+    // Same permission, another exam: exam-a is neither listed nor opened.
+    const otherTeacher = await userWithToken(t, { role: 'sheikh', permissions: ['exams_pdf'], allExams: false, allowedExamIds: ['exam-b'] });
+    expect((await t.api().get('/api/exams').set(otherTeacher.auth)).body.exams.map((e: any) => e.id)).not.toContain('exam-a');
+    expect((await t.api().get('/api/exams/exam-a/file').set(otherTeacher.auth)).status).toBe(403);
     const other = await userWithToken(t, { role: 'sheikh' });
     expect((await t.api().get('/api/exams/exam-a/file').set(other.auth)).status).toBe(403);
     const file = await t.api().get('/api/exams/exam-a/file').set(head.auth).buffer(true);

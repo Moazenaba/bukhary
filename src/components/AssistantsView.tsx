@@ -1977,7 +1977,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                         />
                       )}
 
-                      {canGrant && ['committee_head'].includes(editAccess.role) && (
+                      {/* Which exams this person opens: committee heads, and anyone given «الامتحانات ونماذج الـ PDF». */}
+                      {canGrant && (editAccess.role === 'committee_head' || editAccess.permissions.includes('exams_pdf')) && (
                         <div className="space-y-2">
                           <label className="flex items-center gap-2 font-bold cursor-pointer text-slate-800">
                             <input type="checkbox" checked={editAccess.allExams} onChange={(e) => setEditAccess({ ...editAccess, allExams: e.target.checked })} />

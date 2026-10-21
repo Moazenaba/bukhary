@@ -66,8 +66,8 @@ export const ACTIONS = {
   },
   'courses.read': { roles: EVERYONE, description: 'عرض الدورات' },
   'courses.write': { roles: MANAGERS, anyPermission: ['manage_courses'], description: 'إضافة وتعديل وحذف الدورات' },
-  // Whoever holds «الامتحانات ونماذج الـ PDF» (any role) sees and downloads every exam, at any time
-  // (see canAccessExam); committee heads without it keep their per-exam allow-list.
+  // Whoever holds «الامتحانات ونماذج الـ PDF» (any role) sees and downloads the exams chosen for
+  // them, at any time (see canAccessExam); committee heads have the same per-exam allow-list.
   'exams.read': { roles: EVERYONE, anyPermission: ['exams_pdf'], grantedToRoles: HEADS, description: 'عرض بيانات الامتحانات' },
   'exams.write': { roles: MANAGERS, anyPermission: ['exams_pdf'], description: 'إضافة وتعديل الامتحانات ورفع الملفات' },
   'exams.delete': { roles: ADMIN_ROLES, description: 'حذف الامتحانات' },
@@ -161,14 +161,13 @@ export function grantableRoles(user: Pick<Principal, 'role' | 'permissions'>): R
 export const canSeeRole = (actor: Pick<Principal, 'role' | 'permissions'>, targetRole: string) =>
   isAllowed(actor, 'users.admins') || !ADMIN_ROLES.includes(targetRole as Role);
 
-/**
- * Admins, «الامتحانات ونماذج الـ PDF» holders and people granted all exams open every exam, whatever
- * the committees' dates or stages.
- */
-export const seesAllExams = (user: Pick<Principal, 'role' | 'permissions' | 'allExams'>) =>
-  isAdminRole(user.role) || user.allExams || user.permissions.includes('exams_pdf');
+/** Admins and people granted all exams open every exam. */
+export const seesAllExams = (user: Pick<Principal, 'role' | 'allExams'>) => isAdminRole(user.role) || user.allExams;
 
-/** Exam content (file, sample questions) is otherwise limited by the per-user exam allow-list. */
+/**
+ * Everyone else opens only the exams chosen for them (per-user allow-list), whatever the
+ * committees' dates or stages.
+ */
 export function canAccessExam(user: Principal, examId: string): boolean {
   if (!isAllowed(user, 'exams.file')) return false;
   if (seesAllExams(user)) return true;

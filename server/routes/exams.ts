@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { can } from '../auth.ts';
-import { type Principal, canAccessExam } from '../policy.ts';
+import { type Principal, canAccessExam, isAllowed } from '../policy.ts';
 import { audit } from '../audit.ts';
 import { type Pool, withTransaction } from '../db.ts';
 import { badRequest, forbidden, notFound, route } from '../http.ts';
@@ -57,14 +57,17 @@ const LIST_SQL = `
 export function examsRouter(pool: Pool) {
   const r = Router();
 
+  // People who manage exams see them all; everyone else sees only the exams chosen for them.
+  const visible = (user: Principal, examId: string) => isAllowed(user, 'exams.write') || canAccessExam(user, examId);
+
   r.get('/', can('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} ORDER BY e.updated_at DESC;`);
-    res.json({ success: true, exams: rows.map((r) => examFromRow(r, req.user)) });
+    res.json({ success: true, exams: rows.filter((r) => visible(req.user!, r.id)).map((r) => examFromRow(r, req.user)) });
   }));
 
   r.get('/:id', can('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} WHERE e.id = $1;`, [req.params.id]);
-    if (!rows[0]) throw notFound('الامتحان غير موجود');
+    if (!rows[0] || !visible(req.user!, rows[0].id)) throw notFound('الامتحان غير موجود');
     res.json({ success: true, exam: examFromRow(rows[0], req.user) });
   }));
 

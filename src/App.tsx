@@ -631,7 +631,11 @@ export default function App() {
     [committees]
   );
 
-  const pendingAssistantsCount = useMemo(() => users.filter((u) => u.status === 'pending').length, [users]);
+  // Join requests are announced (badges) to admins and super admins only.
+  const pendingAssistantsCount = useMemo(
+    () => (currentUser?.role === 'super_admin' || currentUser?.role === 'admin' ? users.filter((u) => u.status === 'pending').length : 0),
+    [users, currentUser?.role]
+  );
   const todaysTasksCount = useMemo(() => {
     const today = todayISO();
     return scheduleTasks.filter((t) => t.date === today && !t.completed).length;
