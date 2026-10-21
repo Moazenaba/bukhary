@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { StageKey, STAGES_LIST, Course } from '../types';
+import { StageKey, STAGES_LIST } from '../types';
 
 interface SearchAndFiltersProps {
   searchQuery: string;
@@ -9,9 +9,6 @@ interface SearchAndFiltersProps {
   stageCounts: Record<string, number>;
   sortBy: 'newest' | 'oldest' | 'committeeNumber' | 'book';
   setSortBy: (sort: 'newest' | 'oldest' | 'committeeNumber' | 'book') => void;
-  courses?: Course[];
-  selectedCourseId?: string | 'all';
-  setSelectedCourseId?: (id: string | 'all') => void;
   genderFilter?: 'all' | 'men' | 'women';
   setGenderFilter?: (g: 'all' | 'men' | 'women') => void;
   onExportExamInProgress?: () => void;
@@ -26,9 +23,6 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   stageCounts,
   sortBy,
   setSortBy,
-  courses = [],
-  selectedCourseId = 'all',
-  setSelectedCourseId,
   genderFilter = 'all',
   setGenderFilter,
   onExportExamInProgress,
@@ -108,26 +102,6 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
                   <span className="text-xs bg-white/25 px-1.5 py-0.2 rounded-full font-mono">مفعل ✓</span>
                 )}
               </button>
-            )}
-
-            {/* Course Filter Dropdown */}
-            {courses.length > 0 && setSelectedCourseId && (
-              <div className="flex items-center gap-1.5 bg-canvas border border-line/70 rounded-xl px-2.5 py-1.5">
-                <span className="material-symbols-outlined text-sm text-brand">event_repeat</span>
-                <span className="text-xs font-bold text-muted hidden sm:inline">الدورة:</span>
-                <select
-                  value={selectedCourseId}
-                  onChange={(e) => setSelectedCourseId(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-brand outline-none cursor-pointer"
-                >
-                  <option value="all">جميع الدورات ({courses.length})</option>
-                  {courses.map((course) => (
-                    <option key={course.id} value={course.id}>
-                      {course.name} {course.status === 'active' ? '⚡ (نشطة)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
             )}
 
             {/* Sort Controls */}

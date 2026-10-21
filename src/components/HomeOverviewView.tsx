@@ -6,7 +6,11 @@ import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
 import { NavTab } from './Sidebar';
 
 interface HomeOverviewViewProps {
+  /** Committees of the current course: every figure on this page is about that course alone. */
   committees: Committee[];
+  /** Committees of every course, only to count each course in the course list. */
+  allCommittees?: Committee[];
+  currentCourseId?: string;
   onNavigateCommittees: (stageFilter?: string) => void;
   onOpenDetails: (committee: Committee) => void;
   onOpenNewCommittee: () => void;
@@ -18,6 +22,8 @@ interface HomeOverviewViewProps {
 
 export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   committees,
+  allCommittees = committees,
+  currentCourseId,
   onNavigateCommittees,
   onOpenDetails,
   onOpenNewCommittee,
@@ -213,15 +219,15 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            {courses.slice(0, 3).map((c) => {
-              const count = committees.filter((comm) => comm.courseId === c.id).length;
+            {courses.map((c) => {
+              const count = allCommittees.filter((comm) => comm.courseId === c.id).length;
               return (
                 <div
                   key={c.id}
                   onClick={() => onNavigateTab('courses')}
                   className={`p-3.5 rounded-xl border transition-all cursor-pointer hover:border-brand ${
-                    c.status === 'active'
-                      ? 'bg-emerald-50/40 border-emerald-300'
+                    c.id === currentCourseId
+                      ? 'bg-emerald-50/40 border-emerald-500 ring-2 ring-emerald-400/30'
                       : 'bg-canvas border-gray-200'
                   }`}
                 >
@@ -234,7 +240,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                           : 'bg-gray-200 text-gray-700'
                       }`}
                     >
-                      {c.status === 'active' ? '⚡ نشطة' : 'مؤرشفة'}
+                      {c.id === currentCourseId ? 'معروضة الآن' : c.status === 'active' ? '⚡ نشطة' : 'مؤرشفة'}
                     </span>
                   </div>
                   <span className="text-xs text-muted block">

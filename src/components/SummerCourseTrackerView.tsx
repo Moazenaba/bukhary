@@ -54,6 +54,9 @@ import { ImageWorkbench } from './ImageWorkbench';
 interface SummerCourseTrackerViewProps {
   committees?: Committee[];
   courses?: Course[];
+  /** The course every screen is showing; the sheet shows that course's rows only. */
+  currentCourseId?: string;
+  onSelectCourse?: (courseId: string) => void;
   currentUser?: AppUser;
   /** Sets (not toggles) one stage of a committee on the server. */
   onSetCommitteeStage?: (committeeId: string, stageKey: StageKey, completed: boolean) => unknown;
@@ -67,6 +70,8 @@ interface SummerCourseTrackerViewProps {
 export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = ({
   committees = [],
   courses = [],
+  currentCourseId,
+  onSelectCourse,
   currentUser,
   onSetCommitteeStage,
   onAddCommitteeFromRow,
@@ -138,7 +143,6 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   const [statusFilter, setStatusFilter] = useState<CourseFilterStatus>('all');
   const [selectedBook, setSelectedBook] = useState<string>('all');
   const [selectedPlace, setSelectedPlace] = useState<string>('all');
-  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
 
   // Course & Row Modals state
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState<boolean>(false);
@@ -168,11 +172,13 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   const [newRowCeremony, setNewRowCeremony] = useState<boolean>(false);
   const [newRowNotes, setNewRowNotes] = useState<string>('');
 
-  // Default active course
+  // The course on screen: the app's current course (courses never mix on one sheet).
   const activeDefaultCourse = useMemo(() => {
     if (!courses || courses.length === 0) return undefined;
-    return courses.find((c) => c.status === 'active' || c.isDefault) || courses[0];
-  }, [courses]);
+    return courses.find((c) => c.id === currentCourseId) || courses.find((c) => c.status === 'active' || c.isDefault) || courses[0];
+  }, [courses, currentCourseId]);
+  const selectedCourseFilter = activeDefaultCourse?.id ?? 'all';
+  const setSelectedCourseFilter = (id: string) => onSelectCourse?.(id);
 
   const showToast = (msg: string) => toast.success(msg);
 
@@ -661,21 +667,6 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>عرض حسب الدورة:</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setSelectedCourseFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              selectedCourseFilter === 'all'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <span>جميع الدورات</span>
-            <span className="mr-1.5 px-1.5 py-0.5 rounded-full text-xs bg-black/10 font-mono">
-              {rows.length}
-            </span>
-          </button>
 
           {courses.map((crs) => {
             const countInCourse = rows.filter(

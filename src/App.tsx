@@ -68,6 +68,8 @@ const NO_EXAMS: ExamItem[] = [];
 const NO_BOOKS: Book[] = [];
 const NO_COURSES: Course[] = [];
 const NO_TASKS: ScheduleTask[] = [];
+/** The course the user last chose, remembered on this device only. */
+const CURRENT_COURSE_KEY = 'bukhari-current-course';
 const NO_NOTIFICATIONS: NotificationItem[] = [];
 
 export default function App() {
@@ -138,12 +140,48 @@ export default function App() {
   // their old names and call sites, but they write to the cache, so every screen reads one copy.
   const queryClient = useQueryClient();
   const server = useServerData(currentUser?.id);
-  const committees = server.queries.committees.data ?? NO_COMMITTEES;
+  // Every course stands alone: all screens show only the current course's data. The raw lists
+  // (all courses) are used only to keep the cache, to place people on committees and to list courses.
+  const allCommittees = server.queries.committees.data ?? NO_COMMITTEES;
   const exams = server.queries.exams.data ?? NO_EXAMS;
   const books = server.queries.books.data ?? NO_BOOKS;
   const courses = server.queries.courses.data ?? NO_COURSES;
-  const scheduleTasks = server.queries.tasks.data ?? NO_TASKS;
-  const notifications = server.queries.notifications.data ?? NO_NOTIFICATIONS;
+  const allTasks = server.queries.tasks.data ?? NO_TASKS;
+  const allNotifications = server.queries.notifications.data ?? NO_NOTIFICATIONS;
+  const [storedCourseId, setStoredCourseId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(CURRENT_COURSE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  // The chosen course if it still exists, else the default (current) course, else any active one.
+  const currentCourseId =
+    courses.find((c) => c.id === storedCourseId)?.id ??
+    courses.find((c) => c.isDefault)?.id ??
+    courses.find((c) => c.status === 'active')?.id ??
+    courses[0]?.id;
+  const committees = useMemo(
+    () => (currentCourseId ? allCommittees.filter((c) => c.courseId === currentCourseId) : allCommittees),
+    [allCommittees, currentCourseId]
+  );
+  // Tasks and notices about a committee of another course are hidden; general ones stay.
+  const courseOfCommittee = useMemo(() => new Map(allCommittees.map((c) => [c.id, c.courseId])), [allCommittees]);
+  const inCurrentCourse = (committeeId?: string | null) => {
+    if (!committeeId || !currentCourseId) return true;
+    const course = courseOfCommittee.get(committeeId);
+    return !course || course === currentCourseId;
+  };
+  const scheduleTasks = useMemo(
+    () => allTasks.filter((t) => inCurrentCourse(t.committeeId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allTasks, courseOfCommittee, currentCourseId]
+  );
+  const notifications = useMemo(
+    () => allNotifications.filter((n) => inCurrentCourse(n.committeeId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allNotifications, courseOfCommittee, currentCourseId]
+  );
   // Only system permissions grant anything (D-01); custom labels are no longer offered.
   const customPermissions = SYSTEM_PERMISSIONS;
   const savedBooks = useMemo(() => books.map((b) => b.name), [books]);
@@ -177,7 +215,6 @@ export default function App() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<'all' | StageKey>('all');
-  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'committeeNumber' | 'book'>('newest');
   const [assistantOnlyFilter, setAssistantOnlyFilter] = useState(false);
   const [needsScoringFilter, setNeedsScoringFilter] = useState(false);
@@ -561,7 +598,6 @@ export default function App() {
     }
     if (genderFilter === 'women') list = list.filter((c) => c.isWomenCommittee);
     else if (genderFilter === 'men') list = list.filter((c) => !c.isWomenCommittee);
-    if (selectedCourseFilter !== 'all') list = list.filter((c) => c.courseId === selectedCourseFilter);
     if ((currentUser?.role === 'sheikh' || currentUser?.role === 'committee_head') && assistantOnlyFilter) {
       list = list.filter((c) => AuthService.canAccessCommittee(c));
     }
@@ -570,7 +606,7 @@ export default function App() {
     else if (sortBy === 'oldest' || sortBy === 'committeeNumber') list.sort((a, b) => a.committeeNumber - b.committeeNumber);
     else if (sortBy === 'book') list.sort((a, b) => a.competitionBook.localeCompare(b.competitionBook, 'ar'));
     return list;
-  }, [committees, selectedStage, searchQuery, sortBy, assistantOnlyFilter, needsScoringFilter, currentUser, selectedCourseFilter, genderFilter]);
+  }, [committees, selectedStage, searchQuery, sortBy, assistantOnlyFilter, needsScoringFilter, currentUser, genderFilter]);
 
   const totalPages = Math.ceil(filteredCommittees.length / ITEMS_PER_PAGE) || 1;
   const paginatedCommittees = useMemo(() => {
@@ -580,11 +616,20 @@ export default function App() {
   const startIndexDisplay = (currentPage - 1) * ITEMS_PER_PAGE + 1;
   const endIndexDisplay = Math.min(currentPage * ITEMS_PER_PAGE, filteredCommittees.length);
 
-  const defaultCourseId = courses.find((c) => c.isDefault)?.id || courses.find((c) => c.status === 'active')?.id;
-  const nextCommitteeNumber = useMemo(() => {
-    const inCourse = committees.filter((c) => !defaultCourseId || c.courseId === defaultCourseId);
-    return inCourse.length === 0 ? 1 : Math.max(...inCourse.map((c) => c.committeeNumber), 0) + 1;
-  }, [committees, defaultCourseId]);
+  const selectCourse = (courseId: string) => {
+    setStoredCourseId(courseId);
+    setSelectedCommitteeId(null);
+    setCurrentPage(1);
+    try {
+      localStorage.setItem(CURRENT_COURSE_KEY, courseId);
+    } catch {
+      // Private window or blocked storage: the choice just lasts until the page is reloaded.
+    }
+  };
+  const nextCommitteeNumber = useMemo(
+    () => (committees.length === 0 ? 1 : Math.max(...committees.map((c) => c.committeeNumber), 0) + 1),
+    [committees]
+  );
 
   const pendingAssistantsCount = useMemo(() => users.filter((u) => u.status === 'pending').length, [users]);
   const todaysTasksCount = useMemo(() => {
@@ -652,6 +697,9 @@ export default function App() {
           onOpenDatabaseModal={can('database.admin') ? () => setIsSupabaseModalOpen(true) : undefined}
           canSendNotifications={can('notifications.create')}
           committees={committees}
+          courses={courses}
+          currentCourseId={currentCourseId}
+          onSelectCourse={selectCourse}
           onNotificationSent={() => void server.queries.notifications.refetch()}
           onSignOut={handleLogout}
           notifications={notifications}
@@ -687,6 +735,8 @@ export default function App() {
           {activeTab === 'home' && (
             <HomeOverviewView
               committees={committees}
+              allCommittees={allCommittees}
+              currentCourseId={currentCourseId}
               currentUser={currentUser}
               courses={courses}
               scheduleTasks={scheduleTasks}
@@ -709,6 +759,8 @@ export default function App() {
             <SummerCourseTrackerView
               committees={committees}
               courses={courses}
+              currentCourseId={currentCourseId}
+              onSelectCourse={selectCourse}
               currentUser={currentUser}
               onSetCommitteeStage={handleSetStage}
               onAddCommitteeFromRow={(newComm) => handleAddCommittee(newComm)}
@@ -737,7 +789,7 @@ export default function App() {
           {activeTab === 'assistants' && (
             <AssistantsView
               users={users}
-              committees={committees}
+              committees={allCommittees}
               exams={exams}
               currentUser={currentUser}
               profiles={profiles}
@@ -763,14 +815,15 @@ export default function App() {
           {activeTab === 'courses' && (
             <CoursesView
               courses={courses}
-              committees={committees}
+              committees={allCommittees}
+              currentCourseId={currentCourseId}
               currentUser={currentUser}
               onAddCourse={handleAddCourse}
               onUpdateCourse={handleUpdateCourse}
               onDeleteCourse={handleDeleteCourse}
               onSetDefaultCourse={handleSetDefaultCourse}
               onNavigateCommitteesByCourse={(courseId) => {
-                setSelectedCourseFilter(courseId);
+                selectCourse(courseId);
                 setActiveTab('committees');
                 setCurrentPage(1);
               }}
@@ -905,12 +958,6 @@ export default function App() {
                 stageCounts={stageCounts}
                 sortBy={sortBy}
                 setSortBy={setSortBy}
-                courses={courses}
-                selectedCourseId={selectedCourseFilter}
-                setSelectedCourseId={(id) => {
-                  setSelectedCourseFilter(id);
-                  setCurrentPage(1);
-                }}
                 genderFilter={genderFilter}
                 setGenderFilter={(g) => {
                   setGenderFilter(g);
@@ -1059,7 +1106,7 @@ export default function App() {
         nextCommitteeNumber={nextCommitteeNumber}
         savedBooks={savedBooks}
         courses={courses}
-        defaultCourseId={defaultCourseId}
+        defaultCourseId={currentCourseId}
         onAddCourse={handleAddCourse}
       />}
 

@@ -206,3 +206,17 @@ describe('migration 015', () => {
     await expect(t.pool.query("UPDATE app_users SET role = 'teacher' WHERE id = $1;", [head.id])).rejects.toThrow(/chk_app_users_role/);
   });
 });
+
+describe('migration 016', () => {
+  it('clears every existing notification and its read marks, and leaves later ones alone', async () => {
+    const sql = fs.readFileSync(path.resolve('migrations/016_clear_old_notifications.sql'), 'utf8');
+    const user = await createUser(t.pool, { role: 'sheikh' });
+    await t.pool.query("INSERT INTO notifications (id, title, description, type, target_user_id, created_at, data) VALUES ('n-old', 'قديم', '', 'info', $1, NOW(), '{}'::jsonb);", [user.id]);
+    await t.pool.query("INSERT INTO notification_reads (user_id, notification_id) VALUES ($1, 'n-old');", [user.id]);
+    await t.pool.query(sql);
+    expect((await t.pool.query('SELECT count(*)::int AS n FROM notifications;')).rows[0].n).toBe(0);
+    expect((await t.pool.query('SELECT count(*)::int AS n FROM notification_reads;')).rows[0].n).toBe(0);
+    await t.pool.query("INSERT INTO notifications (id, title, description, type, created_at, data) VALUES ('n-new', 'جديد', '', 'info', NOW(), '{}'::jsonb);");
+    expect((await t.pool.query('SELECT count(*)::int AS n FROM notifications;')).rows[0].n).toBe(1);
+  });
+});

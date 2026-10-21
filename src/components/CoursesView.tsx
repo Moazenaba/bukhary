@@ -5,7 +5,10 @@ import { Course, Committee, AppUser } from '../types';
 
 interface CoursesViewProps {
   courses: Course[];
+  /** Committees of every course (each card counts its own). */
   committees: Committee[];
+  /** The course every screen is showing right now. */
+  currentCourseId?: string;
   currentUser: AppUser;
   onAddCourse: (course: Omit<Course, 'id' | 'createdAt'>) => void;
   onUpdateCourse: (course: Course) => void;
@@ -17,6 +20,7 @@ interface CoursesViewProps {
 export const CoursesView: React.FC<CoursesViewProps> = ({
   courses,
   committees,
+  currentCourseId,
   currentUser,
   onAddCourse,
   onUpdateCourse,
@@ -214,9 +218,9 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
                     </div>
                   </div>
 
-                  {course.isDefault && (
+                  {course.id === currentCourseId && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-2xs">
-                      الدورة الحالية
+                      معروضة الآن
                     </span>
                   )}
                 </div>

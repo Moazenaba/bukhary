@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NotificationItem, AppUser, Committee } from '../types';
+import { NotificationItem, AppUser, Committee, Course } from '../types';
 import { AuthService } from '../services/AuthService';
 import { NotificationComposer } from './NotificationComposer';
 
@@ -28,6 +28,10 @@ interface TopNavBarProps {
   onNavigateToDailyAlerts?: () => void;
   canSendNotifications?: boolean;
   committees?: Committee[];
+  /** Courses stand alone; the chosen one scopes every screen. */
+  courses?: Course[];
+  currentCourseId?: string;
+  onSelectCourse?: (courseId: string) => void;
   onNotificationSent?: () => void;
 }
 
@@ -49,6 +53,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onNavigateToDailyAlerts,
   canSendNotifications = false,
   committees = [],
+  courses = [],
+  currentCourseId,
+  onSelectCourse,
   onNotificationSent,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -83,10 +90,31 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                 مسجد الإمام البخاري
               </span>
               <span className="text-xs text-[#0f766e] block font-bold">
-                متابعة الدورة العلمية الصيفية - المتون العلمية
+                متابعة الدورات العلمية - المتون العلمية
               </span>
             </div>
           </div>
+
+          {/* Each course stands alone: this choice decides which course every screen shows. */}
+          {courses.length > 0 && onSelectCourse && (
+            <label className="flex items-center gap-1.5 bg-canvas border border-line/70 rounded-xl px-2.5 py-1.5">
+              <span className="material-symbols-outlined text-sm text-brand">event_repeat</span>
+              <span className="text-xs font-bold text-muted hidden md:inline">الدورة:</span>
+              <select
+                value={currentCourseId ?? ''}
+                onChange={(e) => onSelectCourse(e.target.value)}
+                aria-label="الدورة المعروضة"
+                className="bg-transparent text-xs font-bold text-brand outline-none cursor-pointer max-w-[150px] sm:max-w-[220px]"
+              >
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name}
+                    {course.isDefault ? ' (الحالية)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
 
         {/* Left: Actions Cluster */}
