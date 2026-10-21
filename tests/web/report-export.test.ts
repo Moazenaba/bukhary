@@ -53,7 +53,7 @@ describe('ceremony periods', () => {
 
 describe('ceremonies sheet', () => {
   const task = (committeeId: string, date: string, time = ''): ScheduleTask =>
-    ({ id: `task-ceremony-${committeeId}`, type: 'ceremony', committeeId, date, time }) as ScheduleTask;
+    ({ id: `task-ceremony-${committeeId}`, type: 'ceremony', committeeId, date, time, notes: 'مكان من التقويم' }) as ScheduleTask;
 
   it('takes every ceremony detail from the committee, inside the period only, ordered by date', () => {
     const committees = [
@@ -88,6 +88,7 @@ describe('ceremonies sheet', () => {
       'المشايخ الحاضرون': 'الشيخ سالم',
       'المدعوون للحفل': 'خالد',
       'مراقبو اللجنة': 'مراقب ١',
+      'ملاحظات': '-',
     });
     expect(ceremonyRows(committees, [], 'day', '2026-10-21')).toEqual([]);
   });

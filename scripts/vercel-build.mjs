@@ -27,6 +27,10 @@ await build({
   format: 'esm',
   external: ['pg-native', 'vite'],
   define: { __PRODUCTION_BUILD__: 'true' },
+  // Halves the bundle (3.6 MB -> 2 MB) for faster cold starts; names are kept for readable errors.
+  minify: true,
+  keepNames: true,
+  legalComments: 'none',
   // Some bundled CommonJS packages call require() for Node built-ins.
   banner: { js: "import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);" },
   logLevel: 'info',

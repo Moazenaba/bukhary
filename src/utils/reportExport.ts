@@ -17,9 +17,10 @@ const parseISO = (iso: string) => {
 
 function writeSheet(rows: Record<string, string | number>[], widths: number[], sheetName: string, filename: string) {
   const sheet = XLSX.utils.json_to_sheet(rows);
-  sheet['!views'] = [{ RTL: true }];
   sheet['!cols'] = widths.map((wch) => ({ wch }));
   const book = XLSX.utils.book_new();
+  // SheetJS writes right-to-left from the workbook view; a sheet-level '!views' is ignored.
+  book.Workbook = { Views: [{ RTL: true }] };
   XLSX.utils.book_append_sheet(book, sheet, sheetName);
   XLSX.writeFile(book, `${filename}.xlsx`);
 }
@@ -118,7 +119,7 @@ export function ceremonyRows(committees: Committee[], tasks: ScheduleTask[], per
       'مراقبو اللجنة': joinNames(c.members),
       'الكتاب / المسابقة': c.competitionBook || '-',
       'الحالة': c.stages.ceremony?.completed ? 'تم الحفل' : 'مجدول',
-      'ملاحظات': d?.notes || task?.notes || '-',
+      'ملاحظات': d?.notes || '-',
     }));
 }
 

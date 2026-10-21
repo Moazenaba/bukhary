@@ -3,6 +3,8 @@ import { todayISO } from '../utils/stageUtils';
 import { ScheduleTask, Committee, AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
 import { AssigneeSelect, CommitteeSelect } from './AssigneeSelect';
+import { exportCeremoniesToExcel } from '../utils/reportExport';
+import { toast } from './Toasts';
 
 interface DailyAlertsViewProps {
   tasks: ScheduleTask[];
@@ -423,7 +425,19 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const n = exportCeremoniesToExcel(committees, tasks, 'day', selectedDate);
+                if (n === 0) toast.info('لا توجد حفلات مسجلة على لجانها في هذا اليوم');
+                else toast.success(`تم تصدير كشف ${n} حفل`);
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-slate-950 hover:bg-amber-50 text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-base">download</span>
+              <span>كشف حفلات اليوم Excel</span>
+            </button>
             {onNavigateToCeremonies && (
               <button
                 type="button"

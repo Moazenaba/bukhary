@@ -22,8 +22,6 @@ export function exportCourseRowsToExcel(rows: SummerCourseRow[], filename = `م�
 
   const worksheet = XLSX.utils.json_to_sheet(data);
 
-  // Set RTL on worksheet view
-  worksheet['!views'] = [{ RTL: true }];
 
   // Auto-size columns nicely
   worksheet['!cols'] = [
@@ -43,6 +41,8 @@ export function exportCourseRowsToExcel(rows: SummerCourseRow[], filename = `م�
   ];
 
   const workbook = XLSX.utils.book_new();
+  // Right-to-left comes from the workbook view; SheetJS ignores a sheet-level '!views'.
+  workbook.Workbook = { Views: [{ RTL: true }] };
   XLSX.utils.book_append_sheet(workbook, worksheet, 'كشف الدورة العلمية');
 
   XLSX.writeFile(workbook, `${filename}.xlsx`);
