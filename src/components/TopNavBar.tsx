@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NotificationItem, AppUser, Committee, Course } from '../types';
 import { AuthService } from '../services/AuthService';
 import { NotificationComposer } from './NotificationComposer';
+import { BackupButton } from './BackupButton';
 
 /** Server times are ISO; show them in the user's locale. Older free-text values are shown as they are. */
 function formatTime(value: string): string {
@@ -19,6 +20,8 @@ interface TopNavBarProps {
   onOpenSheetsSync?: () => void;
   sheetsSyncStatus?: { isConnected: boolean; lastSynced?: string };
   onOpenDatabaseModal?: () => void;
+  /** Admins and super admins: the full .db backup button. */
+  canBackup?: boolean;
   onToggleSidebar: () => void;
   isSidebarOpen?: boolean;
   currentUser: AppUser;
@@ -44,6 +47,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onOpenSheetsSync,
   sheetsSyncStatus,
   onOpenDatabaseModal,
+  canBackup = false,
   onToggleSidebar,
   isSidebarOpen = true,
   currentUser,
@@ -131,6 +135,8 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               <span>قاعدة البيانات</span>
             </button>
           )}
+
+          {canBackup && <BackupButton />}
 
           {/* User Profile / Switcher Button */}
           <button

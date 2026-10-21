@@ -79,6 +79,70 @@ export function databaseRouter(pool: Pool) {
       uptimeSeconds: Math.floor(process.uptime()),
     });
   }));
+
+  // ---- Full backup (admins and super admins). The browser fetches every table in pages and writes them into
+  // one SQLite .db file itself: a single response this size would exceed the host's limit.
+
+  /** Every table in the public schema with its columns (name, Postgres type) in order. */
+  async function backupTables() {
+    const { rows } = await pool.query(
+      `SELECT c.table_name, c.column_name, c.data_type
+       FROM information_schema.columns c
+       JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+       WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+       ORDER BY c.table_name, c.ordinal_position;`
+    );
+    const tables = new Map<string, { name: string; type: string }[]>();
+    for (const row of rows) {
+      if (!tables.has(row.table_name)) tables.set(row.table_name, []);
+      tables.get(row.table_name)!.push({ name: row.column_name, type: row.data_type });
+    }
+    return tables;
+  }
+  const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
+  r.get('/backup/tables', can('database.backup'), route(async (_req, res) => {
+    const tables = await backupTables();
+    const { rows: counts } = await pool.query(
+      `SELECT relname AS name, n_live_tup::bigint AS count FROM pg_stat_user_tables WHERE schemaname = 'public';`
+    );
+    const estimate = new Map(counts.map((c) => [c.name, Number(c.count)]));
+    res.json({
+      success: true,
+      tables: [...tables].map(([name, columns]) => ({ name, columns, estimatedRows: estimate.get(name) ?? 0 })),
+    });
+  }));
+
+  r.get('/backup/rows', can('database.backup'), route(async (req, res) => {
+    const q = z
+      .object({
+        table: z.string().max(200),
+        offset: z.coerce.number().int().min(0).default(0),
+        limit: z.coerce.number().int().min(1).max(1000).default(500),
+      })
+      .parse(req.query);
+    const columns = (await backupTables()).get(q.table);
+    // Only real table names are ever put into the query.
+    if (!columns) throw badRequest('جدول غير معروف');
+    const { rows } = await pool.query(
+      `SELECT * FROM ${quoteIdent(q.table)} ORDER BY ctid LIMIT $1 OFFSET $2;`,
+      [q.limit, q.offset]
+    );
+    // JSON-safe values: binary as base64, dates as ISO text, JSON columns as text.
+    const out = rows.map((row) =>
+      columns.map(({ name }) => {
+        const v = row[name];
+        if (v === null || v === undefined) return null;
+        if (Buffer.isBuffer(v)) return { b64: v.toString('base64') };
+        if (v instanceof Date) return v.toISOString();
+        if (typeof v === 'object') return JSON.stringify(v);
+        if (typeof v === 'boolean') return v ? 1 : 0;
+        return v;
+      })
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, rows: out });
+  }));
   return r;
 }
 

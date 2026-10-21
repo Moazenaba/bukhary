@@ -97,6 +97,7 @@ export const ACTIONS = {
   // Statistics are computed in the clients from data the user may read; this action decides who sees the screen.
   'stats.read': { roles: MANAGERS, anyPermission: ['progress_stats'], description: 'الإحصائيات' },
   'database.admin': { superOnly: true, description: 'حالة قاعدة البيانات' },
+  'database.backup': { roles: ADMIN_ROLES, description: 'تنزيل نسخة احتياطية كاملة من قاعدة البيانات' },
   'ocr.use': { roles: MANAGERS, anyPermission: ['database_sheets'], description: 'استخراج جدول من صورة' },
 } satisfies Record<string, ActionRule>;
 

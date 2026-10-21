@@ -699,6 +699,7 @@ export default function App() {
           onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
           onOpenExport={() => setIsExportOpen(true)}
           onOpenDatabaseModal={can('database.admin') ? () => setIsSupabaseModalOpen(true) : undefined}
+          canBackup={can('database.backup')}
           canSendNotifications={can('notifications.create')}
           committees={committees}
           courses={courses}
