@@ -462,13 +462,16 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             </button>
           )}
 
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/30 transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-lg">person_add</span>
-            <span>+ إضافة مستخدم</span>
-          </button>
+          {/* Creating accounts is the server's users.manage: admins, or a committee head given that permission. */}
+          {AuthService.canManageUsers() && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/30 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg">person_add</span>
+              <span>+ إضافة مستخدم</span>
+            </button>
+          )}
 
           <button
             onClick={onOpenAuthModal}
