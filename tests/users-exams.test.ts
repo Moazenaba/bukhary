@@ -13,14 +13,14 @@ afterAll(async () => {
 
 describe('users', () => {
   it('a user editing themself cannot change their role, status, permissions or committees', async () => {
-    const asst = await userWithToken(t, { role: 'assistant', assigned: [1] });
+    const asst = await userWithToken(t, { role: 'sheikh', assigned: [1] });
     const res = await t.api().post('/api/users').set(asst.auth)
       .send({ id: asst.id, name: 'جديد', phone: asst.phone, role: 'super_admin', permissions: ['manage_assistants'] });
     expect(res.status).toBe(403);
     const ok = await t.api().post('/api/users').set(asst.auth).send({ id: asst.id, name: 'اسم جديد', phone: asst.phone });
     expect(ok.status).toBe(200);
     const { rows } = await t.pool.query('SELECT name, role FROM app_users WHERE id = $1;', [asst.id]);
-    expect(rows[0]).toEqual({ name: 'اسم جديد', role: 'assistant' });
+    expect(rows[0]).toEqual({ name: 'اسم جديد', role: 'sheikh' });
   });
 
   it('managers who are not super admins cannot grant roles or permissions', async () => {
@@ -48,7 +48,7 @@ describe('users', () => {
 
   it('a super admin cannot demote themself, and the last super admin cannot be deleted', async () => {
     const demote = await t.api().post('/api/users').set(admin.auth)
-      .send({ id: admin.id, name: 'admin', phone: admin.phone, role: 'assistant' });
+      .send({ id: admin.id, name: 'admin', phone: admin.phone, role: 'sheikh' });
     expect(demote.status).toBe(403);
     const { rows } = await t.pool.query('SELECT role FROM app_users WHERE id = $1;', [admin.id]);
     expect(rows[0].role).toBe('super_admin');
@@ -64,8 +64,8 @@ describe('users', () => {
   });
 
   it('a role change signs the user out everywhere', async () => {
-    const u = await userWithToken(t, { role: 'assistant' });
-    await t.api().post('/api/users').set(admin.auth).send({ id: u.id, name: 'x', phone: u.phone, role: 'teacher' });
+    const u = await userWithToken(t, { role: 'sheikh' });
+    await t.api().post('/api/users').set(admin.auth).send({ id: u.id, name: 'x', phone: u.phone, role: 'committee_head' });
     expect((await t.api().get('/api/tasks').set(u.auth)).status).toBe(401);
     await login(t, u.phone, PASSWORD);
   });
@@ -87,7 +87,7 @@ describe('exam files', () => {
     expect(exam.hasFile).toBe(true);
     expect(exam.pdfDataUrl).toBeUndefined();
 
-    const teacher = await userWithToken(t, { role: 'teacher', permissions: ['exams_pdf'] });
+    const teacher = await userWithToken(t, { role: 'sheikh', permissions: ['exams_pdf'] });
     expect((await t.api().get('/api/exams/exam-a/file').set(teacher.auth)).status).toBe(403);
     const file = await t.api().get('/api/exams/exam-a/file').set(head.auth).buffer(true);
     expect(file.status).toBe(200);
@@ -103,7 +103,7 @@ describe('exam files', () => {
 describe('shared settings', () => {
   it('books and permission profiles are stored on the server', async () => {
     expect((await t.api().post('/api/books').set(admin.auth).send({ id: 'b1', name: 'كتاب التوحيد' })).status).toBe(200);
-    const asst = await userWithToken(t, { role: 'assistant' });
+    const asst = await userWithToken(t, { role: 'sheikh' });
     const books = await t.api().get('/api/books').set(asst.auth);
     expect(books.body.books.map((b: any) => b.name)).toContain('كتاب التوحيد');
     expect((await t.api().post('/api/books').set(asst.auth).send({ id: 'b2', name: 'x' })).status).toBe(403);
@@ -115,8 +115,8 @@ describe('shared settings', () => {
 
   it('notification read state is per user', async () => {
     await t.api().post('/api/notifications').set(admin.auth).send({ title: 'تنبيه', description: 'نص' });
-    const a = await userWithToken(t, { role: 'assistant' });
-    const b = await userWithToken(t, { role: 'assistant' });
+    const a = await userWithToken(t, { role: 'sheikh' });
+    const b = await userWithToken(t, { role: 'sheikh' });
     const listA = await t.api().get('/api/notifications').set(a.auth);
     const n = listA.body.notifications[0];
     await t.api().patch(`/api/notifications/${n.id}/read`).set(a.auth);
@@ -127,7 +127,7 @@ describe('shared settings', () => {
 
 describe('user conflict protection', () => {
   it('rejects an edit based on an outdated user version (409)', async () => {
-    const u = await userWithToken(t, { role: 'assistant', name: 'قديم' });
+    const u = await userWithToken(t, { role: 'sheikh', name: 'قديم' });
     const { rows } = await t.pool.query('SELECT updated_at FROM app_users WHERE id = $1;', [u.id]);
     const seen = new Date(rows[0].updated_at).toISOString();
     await t.api().post('/api/users').set(admin.auth).send({ id: u.id, name: 'جديد', phone: u.phone, expectedUpdatedAt: seen });

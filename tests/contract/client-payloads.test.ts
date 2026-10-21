@@ -26,8 +26,8 @@ beforeAll(async () => {
   expect(res.status).toBe(200);
   await t.pool.query(
     `INSERT INTO app_users (id, name, phone, role, status, permissions, assigned_committees, assigned_committee_ids, passport_number, created_at, data)
-     VALUES ('contract-applicant', 'متقدم', '0512345678', 'assistant', 'pending', '[]', '[]', '[]', 'P-CONTRACT', NOW(), '{}'),
-            ('contract-user', 'معاون', '0500000000', 'assistant', 'approved', '["calendar_schedule"]', '[]', '["contract-committee"]', NULL, NOW(), '{}');`
+     VALUES ('contract-applicant', 'متقدم', '0512345678', 'sheikh', 'pending', '[]', '[]', '[]', 'P-CONTRACT', NOW(), '{}'),
+            ('contract-user', 'معاون', '0500000000', 'sheikh', 'approved', '["calendar_schedule"]', '[]', '["contract-committee"]', NULL, NOW(), '{}');`
   );
 });
 afterAll(async () => {
@@ -116,7 +116,7 @@ describe('web client requests (real DataService code)', () => {
       const after = await DataService.committeeAction('contract-committee', { type: 'updateQuestion', questionId: 'q-1', completed: true });
       expect(after.scoringDetails?.questions[0].completed).toBe(true);
 
-      await createUser(t.pool, { role: 'assistant', status: 'pending', name: 'متقدم ويب', phone: '0577777777' });
+      await createUser(t.pool, { role: 'sheikh', status: 'pending', name: 'متقدم ويب', phone: '0577777777' });
       const { rows } = await t.pool.query("SELECT id, updated_at FROM app_users WHERE phone = '0577777777';");
       const saved = await DataService.saveUser({
         id: rows[0].id, name: 'متقدم ويب', phone: '0577777777', email: '', status: 'approved',

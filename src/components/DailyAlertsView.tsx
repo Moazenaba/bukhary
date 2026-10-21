@@ -553,7 +553,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onToggleTaskComplete(task.id)}
-                    disabled={!(canWriteTasks || task.assignedAssistantId === currentUser.id) || currentUser.role === 'auditor'}
+                    disabled={!(canWriteTasks || task.assignedAssistantId === currentUser.id)}
                     className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer mt-0.5 active:scale-95 ${
                       task.completed
                         ? 'bg-emerald-600 text-white shadow-2xs'

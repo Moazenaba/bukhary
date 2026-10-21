@@ -25,7 +25,7 @@ const cookieFrom = (res: any): string => {
 
 describe('sessions', () => {
   it('logout ends the session immediately: the access token stops working', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { token, refreshToken } = await login(t, u.phone);
     expect((await t.api().get('/api/tasks').set(bearer(token))).status).toBe(200);
     expect((await t.api().post('/api/auth/logout').set(bearer(token)).send({ refreshToken })).status).toBe(200);
@@ -34,7 +34,7 @@ describe('sessions', () => {
   });
 
   it('reusing a rotated refresh token revokes the whole session, including the newer token', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { refreshToken } = await login(t, u.phone);
     const first = await t.api().post('/api/auth/refresh').send({ refreshToken });
     expect(first.status).toBe(200);
@@ -44,7 +44,7 @@ describe('sessions', () => {
   });
 
   it('the web gets its refresh token only as an HttpOnly cookie', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const res = await t.api().post('/api/auth/login').set('X-Client', 'web').send({ identifier: u.phone, password: PASSWORD });
     expect(res.status).toBe(200);
     expect(res.body.refreshToken).toBeUndefined();
@@ -57,7 +57,7 @@ describe('sessions', () => {
   });
 
   it('two web tabs refreshing with the same cookie both keep a valid session', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const res = await t.api().post('/api/auth/login').set('X-Client', 'web').send({ identifier: u.phone, password: PASSWORD });
     const cookie = cookieFrom(res);
     const [a, b] = await Promise.all([
@@ -70,7 +70,7 @@ describe('sessions', () => {
   });
 
   it('access tokens carry a session id and expire in 15 minutes by default', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { token } = await login(t, u.phone);
     const claims = jwt.decode(token) as any;
     expect(claims.sid).toBeTruthy();
@@ -78,13 +78,13 @@ describe('sessions', () => {
   });
 
   it('old access tokens without a session id still work until they expire', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const legacy = jwt.sign({ ver: 0 }, t.config.jwtSecret, { subject: u.id, expiresIn: '5m', algorithm: 'HS256' });
     expect((await t.api().get('/api/tasks').set(bearer(legacy))).status).toBe(200);
   });
 
   it('the purge removes expired tokens and keeps live sessions', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { token } = await login(t, u.phone);
     await t.pool.query("UPDATE refresh_tokens SET expires_at = NOW() - interval '2 days' WHERE user_id = $1;", [admin.id]);
     const purged = await purgeExpired(t.pool);
@@ -96,13 +96,13 @@ describe('sessions', () => {
 describe('admin password reset (WEB-02)', () => {
   it('only a super admin resets passwords', async () => {
     const head = await userWithToken(t, { role: 'committee_head', permissions: ['manage_assistants'] });
-    const target = await createUser(t.pool, { role: 'assistant' });
+    const target = await createUser(t.pool, { role: 'sheikh' });
     const res = await t.api().post(`/api/users/${target.id}/reset-password`).set(head.auth).send({ password: 'Temp12345' });
     expect(res.status).toBe(403);
   });
 
   it('reset signs the user out, forces a new password, then everything works again', async () => {
-    const target = await createUser(t.pool, { role: 'assistant' });
+    const target = await createUser(t.pool, { role: 'sheikh' });
     const before = await login(t, target.phone);
     const reset = await t.api().post(`/api/users/${target.id}/reset-password`).set(admin.auth).send({ password: 'Temp12345' });
     expect(reset.status).toBe(200);
@@ -130,7 +130,7 @@ describe('admin password reset (WEB-02)', () => {
   });
 
   it('a new password must differ from the current one', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { token } = await login(t, u.phone);
     const res = await t.api().post('/api/auth/change-password').set(bearer(token)).send({ currentPassword: PASSWORD, newPassword: PASSWORD });
     expect(res.status).toBe(400);

@@ -6,7 +6,7 @@ import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
 import { logger } from '../logger.ts';
-import { type Principal, ROLES, isAllowed, isCommitteeInScope, isSystemPermission } from '../policy.ts';
+import { type Principal, ROLES, type Role, canSeeRole, grantableRoles, isAllowed, isCommitteeInScope, isSystemPermission } from '../policy.ts';
 import { id, normalizePhone, optionalText, toAsciiDigits } from '../schemas.ts';
 import { notify } from './notifications.ts';
 
@@ -189,14 +189,12 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
   const canGrant = isAllowed(actor, 'users.grant');
 
   if (!existing && !canManage) throw forbidden();
+  // Admin accounts do not exist for anyone but a super admin: not listed, not editable.
+  if (existing && !isSelf && !canSeeRole(actor, existing.role)) throw notFound('المستخدم غير موجود');
   if (existing && !isSelf && !canManage) throw forbidden('ليس لديك صلاحية لتعديل هذا المستخدم');
-  // Managers who are not super admins cannot touch super admins, and among approved accounts
-  // they manage assistants only (API-01). Applicants of any requested role stay visible to them.
-  if (existing && !isSelf && !canGrant) {
-    if (existing.role === 'super_admin') throw forbidden();
-    if (existing.status === 'approved' && existing.role !== 'assistant') {
-      throw forbidden('إدارة الحسابات المعتمدة لغير المعاونين متاحة للمشرف العام فقط');
-    }
+  // Committee heads who may manage people handle sheikhs only (API-01).
+  if (existing && !isSelf && !canGrant && existing.status === 'approved' && existing.role !== 'sheikh') {
+    throw forbidden('إدارة الحسابات المعتمدة لغير الشيوخ متاحة للأدمن فقط');
   }
 
   // ---- Access settings: start from the stored values, apply a profile, then explicit fields.
@@ -228,14 +226,14 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
   if (input.allExamsAllowed !== undefined) allExams = input.allExamsAllowed;
   if (input.allowedExamIds !== undefined) allowedExamIds = [...new Set(input.allowedExamIds)];
 
-  const role = input.role ?? existing?.role ?? 'assistant';
+  const role: Role = input.role ?? existing?.role ?? 'sheikh';
   const status = input.status ?? existing?.status ?? 'pending';
 
   const before = {
     permissions: cleanPermissions(asStrings(existing?.permissions), false),
     assignedIds: asStrings(existing?.assigned_committee_ids),
   };
-  const roleChanged = existing ? role !== existing.role : role !== 'assistant';
+  const roleChanged = existing ? role !== existing.role : role !== 'sheikh';
   const permsChanged = existing ? !sameSet(permissions, before.permissions) : permissions.length > 0;
   const statusChanged = existing ? status !== existing.status : status !== 'pending';
   const assignedChanged = existing ? !sameSet(assignedIds, before.assignedIds) : assignedIds.length > 0;
@@ -251,17 +249,22 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
     throw forbidden('لا يمكنك تعديل صلاحياتك أو لجانك أو حالة حسابك بنفسك');
   }
   if ((roleChanged || permsChanged || grantsChanged) && !canGrant) {
-    throw forbidden('تعيين الأدوار والصلاحيات متاح للمشرف العام فقط');
+    throw forbidden('تعيين الأدوار والصلاحيات متاح للأدمن فقط');
+  }
+  // Admins give only the roles below them; admin accounts are a super admin's.
+  if ((roleChanged || !existing) && !isSelf && !grantableRoles(actor).includes(role)) {
+    throw forbidden('لا يمكنك تعيين هذا الدور');
   }
   // Approving an account activates the role it carries. A join request may ask for any role,
-  // so activating anything above assistant is a grant, even when the role itself is unchanged.
+  // so activating anything above sheikh is a grant, even when the role itself is unchanged.
   const activating = status === 'approved' && existing?.status !== 'approved';
-  if (activating && role !== 'assistant' && !canGrant) {
-    throw forbidden('اعتماد حساب بدور غير «معاون» متاح للمشرف العام فقط');
+  if (activating && role !== 'sheikh' && !canGrant) {
+    throw forbidden('اعتماد حساب بدور غير «شيخ» متاح للأدمن فقط');
   }
+  if (activating && !grantableRoles(actor).includes(role)) throw forbidden('لا يمكنك اعتماد حساب بهذا الدور');
   // Managers who are not super admins may assign only committees inside their own scope.
   if (assignedChanged && !canGrant) {
-    if (role !== 'assistant') throw forbidden('تعيين لجان لغير المعاونين متاح للمشرف العام فقط');
+    if (role !== 'sheikh') throw forbidden('تعيين لجان لغير الشيوخ متاح للأدمن فقط');
     const changed = [
       ...assignedIds.filter((x) => !before.assignedIds.includes(x)),
       ...before.assignedIds.filter((x) => !assignedIds.includes(x)),
@@ -352,27 +355,45 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
 }
 
 /**
- * Which users a manager sees (API-08): super admins see everyone; other managers see themself,
- * applicants, and assistants in their committees or not assigned to any committee yet.
+ * Which users someone sees (API-08): super admins see everyone; admins see everyone except other
+ * admins and super admins; committee heads see themself and the approved sheikhs they can staff
+ * their committees with (plus applicants when they may manage people).
  */
 async function listUsersFor(db: Queryable, actor: Principal) {
-  const order = "ORDER BY (u.role = 'super_admin') DESC, u.created_at ASC NULLS LAST, u.name ASC";
-  if (isAllowed(actor, 'users.grant')) {
+  const order = "ORDER BY (u.role = 'super_admin') DESC, (u.role = 'admin') DESC, u.created_at ASC NULLS LAST, u.name ASC";
+  if (isAllowed(actor, 'users.admins')) {
     const { rows } = await db.query(`${USER_SELECT} ${order};`);
+    return rows;
+  }
+  if (isAllowed(actor, 'users.grant')) {
+    const { rows } = await db.query(`${USER_SELECT} WHERE u.id = $1 OR u.role NOT IN ('super_admin', 'admin') ${order};`, [actor.id]);
     return rows;
   }
   const { rows } = await db.query(
     `${USER_SELECT}
      WHERE u.id = $1
-        OR u.status <> 'approved'
-        OR (u.role = 'assistant' AND (
-              $2::boolean
-              OR jsonb_array_length(u.assigned_committee_ids) = 0
-              OR u.assigned_committee_ids ?| $3::text[]))
+        OR (u.role = 'sheikh' AND u.status = 'approved')
+        OR ($2::boolean AND u.status <> 'approved' AND u.role NOT IN ('super_admin', 'admin'))
      ${order};`,
-    [actor.id, actor.allCommittees, actor.assignedCommitteeIds]
+    [actor.id, isAllowed(actor, 'users.manage')]
   );
   return rows;
+}
+
+/** Approved people `actor` may add to a committee or a ceremony (admins never see admin accounts). */
+export async function staffableUsers(db: Queryable, actor: Principal, ids?: string[]) {
+  const roles: Role[] = isAllowed(actor, 'users.admins')
+    ? [...ROLES]
+    : isAllowed(actor, 'users.grant')
+      ? ['committee_head', 'sheikh']
+      : ['sheikh'];
+  const { rows } = await db.query(
+    `SELECT id, name, role FROM app_users
+     WHERE status = 'approved' AND (role = ANY($1::text[]) OR id = $2) AND ($3::text[] IS NULL OR id = ANY($3::text[]))
+     ORDER BY name ASC;`,
+    [roles, actor.id, ids ?? null]
+  );
+  return rows as Array<{ id: string; name: string; role: Role }>;
 }
 
 export function usersRouter(pool: Pool, opts: SaveOptions) {
@@ -388,17 +409,17 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
    * People a task may be assigned to (D-07): anyone allowed to write tasks gets id and name of
    * approved staff, limited to their own committees when they are committee-scoped.
    */
-  r.get('/ceremony-candidates', can('committees.finalize'), route(async (_req, res) => {
-    const { rows } = await pool.query("SELECT id, name, role FROM app_users WHERE status = 'approved' ORDER BY name ASC;");
+  r.get('/ceremony-candidates', can('committees.finalize'), route(async (req, res) => {
+    const rows = await staffableUsers(pool, req.user!);
     res.json({ success: true, users: rows.map((u) => ({ id: u.id, name: u.name, role: u.role })) });
   }));
 
   r.get('/assignable', can('tasks.write'), route(async (req, res) => {
     const actor = req.user!;
-    const unscoped = actor.role === 'super_admin' || actor.allCommittees || !['committee_head', 'assistant', 'teacher'].includes(actor.role);
+    const unscoped = actor.allCommittees || !['committee_head', 'sheikh'].includes(actor.role);
     const { rows } = await pool.query(
       `SELECT id, name, role FROM app_users
-       WHERE status = 'approved' AND role IN ('assistant', 'teacher', 'committee_head')
+       WHERE status = 'approved' AND role IN ('sheikh', 'committee_head')
          AND (id = $1 OR $2::boolean OR all_committees OR assigned_committee_ids ?| $3::text[])
        ORDER BY name ASC;`,
       [actor.id, unscoped, actor.assignedCommitteeIds]
@@ -418,8 +439,8 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
     const { password } = z.object({ password: passwordSchema }).parse(req.body);
     if (req.params.id === req.user!.id) throw badRequest('لتغيير كلمة مرورك استخدم «حسابي» ← تغيير كلمة المرور');
     await withTransaction(pool, async (db) => {
-      const { rows } = await db.query('SELECT id FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
-      if (!rows[0]) throw notFound('المستخدم غير موجود');
+      const { rows } = await db.query('SELECT id, role FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
+      if (!rows[0] || !canSeeRole(req.user!, rows[0].role)) throw notFound('المستخدم غير موجود');
       await db.query(
         `UPDATE app_users SET password = $2, password_changed_at = NOW(), must_change_password = true,
            token_version = token_version + 1, failed_login_count = 0, locked_until = NULL, updated_at = NOW()
@@ -438,7 +459,7 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
     if (req.params.id === req.user!.id) throw badRequest('لا يمكنك حذف حسابك الشخصي');
     await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
-      if (!rows[0]) throw notFound('المستخدم غير موجود');
+      if (!rows[0] || !canSeeRole(req.user!, rows[0].role)) throw notFound('المستخدم غير موجود');
       if (rows[0].role === 'super_admin' && (await countSuperAdmins(db, rows[0].id)) === 0) {
         throw conflict('لا يمكن حذف آخر مشرف عام في النظام');
       }

@@ -59,8 +59,8 @@ const token = () => `fcm-${crypto.randomUUID()}-token`;
 describe('push notifications', () => {
   it('a broadcast from the super admin reaches every registered phone', async () => {
     const admin = await userWithToken(t, { role: 'super_admin' });
-    const asst = await userWithToken(t, { role: 'assistant' });
-    const pending = await userWithToken(t, { role: 'assistant' });
+    const asst = await userWithToken(t, { role: 'sheikh' });
+    const pending = await userWithToken(t, { role: 'sheikh' });
     const a = token();
     const b = token();
     const c = token();
@@ -80,7 +80,7 @@ describe('push notifications', () => {
   it('a targeted notification reaches only that user, and the access token is reused', async () => {
     const admin = await userWithToken(t, { role: 'super_admin' });
     const head = await userWithToken(t, { role: 'committee_head', permissions: ['calendar_schedule'] });
-    const asst = await userWithToken(t, { role: 'assistant' });
+    const asst = await userWithToken(t, { role: 'sheikh' });
     const headToken = token();
     const asstToken = token();
     await t.api().post('/api/devices').set(head.auth).send({ token: headToken });
@@ -98,8 +98,8 @@ describe('push notifications', () => {
 
   it('removes tokens Firebase no longer accepts, and the token moves with the signed-in account', async () => {
     const admin = await userWithToken(t, { role: 'super_admin' });
-    const first = await userWithToken(t, { role: 'assistant' });
-    const second = await userWithToken(t, { role: 'assistant' });
+    const first = await userWithToken(t, { role: 'sheikh' });
+    const second = await userWithToken(t, { role: 'sheikh' });
     const shared = token();
     const dead = token();
     await t.api().post('/api/devices').set(first.auth).send({ token: shared });
@@ -117,7 +117,7 @@ describe('push notifications', () => {
   });
 
   it('signing out (or unregistering) stops pushes to that phone', async () => {
-    const asst = await userWithToken(t, { role: 'assistant' });
+    const asst = await userWithToken(t, { role: 'sheikh' });
     const a = token();
     const b = token();
     await t.api().post('/api/devices').set(asst.auth).send({ token: a });

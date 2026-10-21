@@ -10,6 +10,7 @@ import {
   ExamItem,
 } from '../types';
 import { AuthService, type AccessChanges } from '../services/AuthService';
+import { PersonAssignmentsModal, assignmentsOf } from './StaffAssignment';
 import { CommitteePicker } from './CommitteePicker';
 
 interface AssistantsViewProps {
@@ -35,11 +36,22 @@ interface AssistantsViewProps {
   onResetPassword?: (userId: string, temporaryPassword: string) => Promise<unknown>;
   onOpenAuthModal: () => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
+  /** The server returned a newer committee after a person was placed on it or invited to its ceremony. */
+  onCommitteeChanged?: (committee: Committee) => void;
   /** System permissions only: custom labels never granted anything (D-01). */
   customPermissions: PermissionDefinition[];
 }
 
 const sameSet = (a: string[] = [], b: string[] = []) => a.length === b.length && a.every((x) => b.includes(x));
+
+/** Role choices the current user may give (from the server: admins never give admin roles). */
+const RoleOptions: React.FC = () => (
+  <>
+    {AuthService.grantableRoles().map((r) => (
+      <option key={r} value={r}>{AuthService.getRoleLabel(r)}</option>
+    ))}
+  </>
+);
 
 /** A readable temporary password that satisfies the server rule (letters and digits, 10 characters). */
 function generateTemporaryPassword() {
@@ -70,6 +82,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   onResetPassword,
   onOpenAuthModal,
   onOpenCommitteeDetails,
+  onCommitteeChanged,
   customPermissions,
 }) => {
   // Super admins grant roles, permissions and access; other managers assign their own committees only.
@@ -94,7 +107,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [approvingUser, setApprovingUser] = useState<AppUser | null>(null);
   const [assigningProfileUser, setAssigningProfileUser] = useState<AppUser | null>(null);
   const [demotingUser, setDemotingUser] = useState<AppUser | null>(null);
-  const [demoteTo, setDemoteTo] = useState<UserRole>('committee_head');
+  const [demoteTo, setDemoteTo] = useState<UserRole>('admin');
+  const [assigningUser, setAssigningUser] = useState<AppUser | null>(null);
   const [saving, setSaving] = useState(false);
   // Edit modal: access settings edited next to the profile fields.
   const [editAccess, setEditAccess] = useState<{
@@ -131,7 +145,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [rejectionReason, setRejectionReason] = useState('نعتذر عن قبول الطلب حالياً لاكتمال النصاب المطلوب في لجان هذه الدورة، مع تمنياتنا بالتوفيق في الدورات القادمة.');
 
   // Approval modal: nothing extra is pre-selected (WEB-05).
-  const [approvalRole, setApprovalRole] = useState<UserRole>('assistant');
+  const [approvalRole, setApprovalRole] = useState<UserRole>('sheikh');
   const [approvalProfileId, setApprovalProfileId] = useState<string>('');
   const [approvalPermissions, setApprovalPermissions] = useState<AssistantPermission[]>([]);
   const [approvalCommittees, setApprovalCommittees] = useState<string[]>([]);
@@ -143,7 +157,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newNotes, setNewNotes] = useState('');
-  const [newRole, setNewRole] = useState<UserRole>('assistant');
+  const [newRole, setNewRole] = useState<UserRole>('sheikh');
   const [newProfileId, setNewProfileId] = useState<string>('');
   const [newPermissions, setNewPermissions] = useState<AssistantPermission[]>([]);
   const [newAssignedCommittees, setNewAssignedCommittees] = useState<string[]>([]);
@@ -159,7 +173,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
     { id: 'daily_alerts', label: 'التنبيهات والمهام اليومية', icon: 'notifications_active', desc: 'المهام اليومية العاجلة للمعاونين' },
     { id: 'stats', label: 'حساب ونسبة الإنجاز', icon: 'donut_large', desc: 'لوحة الإحصائيات الشاملة والنسب' },
     { id: 'courses', label: 'إضافة وإدارة الدورات', icon: 'event_repeat', desc: 'إدارة الدورات العلمية الصيفية' },
-    { id: 'assistants', label: 'المعاونون والصلاحيات', icon: 'badge', desc: 'إدارة المستخدمين وبناء الصلاحيات (للسوبر أدمن)' },
+    { id: 'assistants', label: 'الشيوخ والصلاحيات', icon: 'badge', desc: 'إدارة الشيوخ ورؤساء اللجان وإسنادهم للجان والحفلات' },
   ];
 
   // Fallback to AuthService & LocalStorage if props are syncing
@@ -347,7 +361,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       name: newName.trim(),
       phone: newPhone.trim(),
       email: newEmail.trim(),
-      role: canGrant ? newRole : 'assistant',
+      role: canGrant ? newRole : 'sheikh',
       profileId: canGrant && newProfileId ? newProfileId : undefined,
       status: 'approved',
       assignedCommittees: [],
@@ -529,6 +543,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
           </span>
         </div>
 
+        {isSuperAdmin && (
         <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs">
           <div>
             <span className="text-xs text-slate-500 block font-bold">المشرفون العامون (سوبر أدمن)</span>
@@ -543,6 +558,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <span className="material-symbols-outlined text-2xl">military_tech</span>
           </span>
         </div>
+        )}
       </div>
 
       {/* Main Tabs Navigation Bar */}
@@ -618,7 +634,10 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             {filteredApproved.map((user) => {
               const userProfile = effectiveProfiles.find((p) => p.id === user.profileId);
               const assignedLabel = committeeLabel(user.assignedCommitteeIds);
-              const canEditUser = canGrant || (user.role === 'assistant' && user.id !== currentUser.id) || user.id === currentUser.id;
+              const canEditUser = canGrant || (user.role === 'sheikh' && AuthService.canManageUsers()) || user.id === currentUser.id;
+              const placed = assignmentsOf(user, committees);
+              const canPlace = (user.role === 'sheikh' || (user.role === 'committee_head' && canGrant)) &&
+                (AuthService.can('committees.members') || AuthService.can('committees.finalize'));
 
               return (
                 <div
@@ -666,7 +685,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                           <span className="material-symbols-outlined text-base">edit</span>
                         </button>
                       )}
-                      {user.role !== 'super_admin' && AuthService.can('users.delete') && (
+                      {user.role !== 'super_admin' && user.id !== currentUser.id && AuthService.can('users.delete') && (
                         <button
                           onClick={() => setUserToDelete(user)}
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
@@ -703,10 +722,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                       <span className="text-xs text-slate-500 block font-bold">اللجان المسموح بها:</span>
                       <span className="text-emerald-950 font-semibold mt-0.5 block">
-                        {user.role === 'super_admin' || user.allCommitteesAllowed
+                        {user.role === 'super_admin' || user.role === 'admin' || user.allCommitteesAllowed
                           ? 'كل اللجان ✓'
-                          : user.role === 'auditor'
-                          ? 'اطلاع فقط على كل اللجان'
                           : assignedLabel || 'لا توجد لجان مسندة'}
                       </span>
                     </div>
@@ -714,7 +731,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                       <span className="text-xs text-slate-500 block font-bold">الامتحانات المصرح بها:</span>
                       <span className="text-blue-950 font-semibold mt-0.5 block">
-                        {user.role === 'super_admin' || user.allExamsAllowed
+                        {user.role === 'super_admin' || user.role === 'admin' || user.allExamsAllowed
                           ? 'كل الامتحانات ✓'
                           : user.allowedExamIds && user.allowedExamIds.length > 0
                           ? `${user.allowedExamIds.length} امتحان محدد`
@@ -723,15 +740,41 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Committees and ceremonies this person is placed on (sheikhs and committee heads) */}
+                  {(user.role === 'sheikh' || user.role === 'committee_head') && (
+                    <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-emerald-950">
+                          {placed.committees.length} لجنة · {placed.ceremonies.length} حفل
+                        </span>
+                        {canPlace && (
+                          <button
+                            type="button"
+                            onClick={() => setAssigningUser(user)}
+                            className="px-3 py-1.5 rounded-lg bg-brand text-white font-bold cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">event_available</span>
+                            <span>اللجان والحفلات</span>
+                          </button>
+                        )}
+                      </div>
+                      {placed.ceremonies.length > 0 && (
+                        <p className="text-slate-600">
+                          الحفلات: {placed.ceremonies.map((c) => `لجنة ${c.committeeNumber}${c.ceremonyDetails?.ceremonyDate ? ` (${c.ceremonyDetails.ceremonyDate})` : ''}`).join('، ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Super Admin Promotion / Demotion Action (Only Super Admin can do this) */}
-                  {canGrant && currentUser.id !== user.id && (
+                  {isSuperAdmin && currentUser.id !== user.id && (
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-xs text-slate-500">التحكم في رتبة السوبر أدمن:</span>
                       <button
                         type="button"
                         onClick={() => {
                           if (user.role === 'super_admin') {
-                            setDemoteTo('committee_head');
+                            setDemoteTo('admin');
                             setDemotingUser(user);
                           } else {
                             void handleToggleSuperAdmin(user);
@@ -1365,10 +1408,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       onChange={(e) => setApprovalRole(e.target.value as UserRole)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
                     >
-                      <option value="assistant">معاون ميداني معتمد</option>
-                      <option value="teacher">معلم ومقرئ معتمد</option>
-                      <option value="committee_head">رئيس لجنة ومقرئ</option>
-                      <option value="auditor">مراجع ومدقق جودة</option>
+                      <RoleOptions />
                     </select>
                     {approvingUser.role !== approvalRole && (
                       <p className="mt-1 text-slate-500">طلب المتقدم دور: {AuthService.getRoleLabel(approvingUser.role)}</p>
@@ -1470,10 +1510,9 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             <label className="block text-xs font-bold text-slate-700">
               الدور الجديد
               <select value={demoteTo} onChange={(e) => setDemoteTo(e.target.value as UserRole)} className="mt-1 w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs">
+                <option value="admin">أدمن</option>
                 <option value="committee_head">رئيس لجنة</option>
-                <option value="teacher">معلم ومقرئ</option>
-                <option value="assistant">معاون ميداني</option>
-                <option value="auditor">مراجع ومدقق</option>
+                <option value="sheikh">شيخ</option>
               </select>
             </label>
             <div className="flex justify-end gap-2">
@@ -1740,15 +1779,12 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">الدور الوظيفي</label>
                   <select
-                    value={canGrant ? newRole : 'assistant'}
+                    value={canGrant ? newRole : 'sheikh'}
                     disabled={!canGrant}
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none disabled:opacity-70"
                   >
-                    <option value="assistant">معاون ميداني</option>
-                    <option value="teacher">معلم ومقرئ</option>
-                    <option value="committee_head">رئيس لجنة</option>
-                    <option value="auditor">مراجع ومدقق</option>
+                    <RoleOptions />
                   </select>
                 </div>
               </div>
@@ -1872,10 +1908,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                           onChange={(e) => setEditAccess({ ...editAccess, role: e.target.value as UserRole })}
                           className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand outline-none"
                         >
-                          <option value="assistant">معاون ميداني</option>
-                          <option value="teacher">معلم ومقرئ</option>
-                          <option value="committee_head">رئيس لجنة</option>
-                          <option value="auditor">مراجع ومدقق</option>
+                          <RoleOptions />
                         </select>
                       </div>
                       <div>
@@ -1931,7 +1964,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                           <span>كل اللجان في كل الدورات</span>
                         </label>
                       )}
-                      {!editAccess.allCommittees && editAccess.role !== 'auditor' && (
+                      {!editAccess.allCommittees && (
                         <CommitteePicker
                           label="اللجان المسندة:"
                           committees={committees}
@@ -2065,6 +2098,15 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {assigningUser && (
+        <PersonAssignmentsModal
+          user={assigningUser}
+          committees={committees}
+          onClose={() => setAssigningUser(null)}
+          onChanged={(c) => onCommitteeChanged?.(c)}
+        />
       )}
     </div>
   );

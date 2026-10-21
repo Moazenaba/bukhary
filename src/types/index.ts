@@ -165,8 +165,17 @@ export interface CommitteeExamApprovalInfo {
   notes?: string;
 }
 
+/** A committee head or sheikh assigned to a committee (from the server). */
+export interface CommitteeStaff {
+  id: string;
+  name: string;
+  role: UserRole;
+}
+
 export interface Committee {
   id: string;
+  /** Committee heads and sheikhs assigned to this committee. */
+  staff?: CommitteeStaff[];
   committeeNumber: number;       // رقم اللجنة
   committeeName: string;         // اسم اللجنة
   associationName?: string;      // اسم الجمعية إن وُجد
@@ -234,11 +243,10 @@ export interface ScheduleTask {
 }
 
 export type UserRole =
-  | 'super_admin'      // المشرف العام / مدير النظام (صلاحيات كاملة)
-  | 'committee_head'   // رئيس لجنة / مشرف عام على لجان
-  | 'teacher'          // معلم / عضو هيئة التدريس
-  | 'assistant'        // معاون ميداني / إداري
-  | 'auditor';         // مراجع ومدقق جودة (استعراض وتقارير)
+  | 'super_admin'      // المشرف العام: كل شيء، والوحيد الذي يرى حسابات الأدمن
+  | 'admin'            // أدمن: كل الصلاحيات عدا صلاحيات المشرف العام، ولا يرى الأدمنز الآخرين
+  | 'committee_head'   // رئيس لجنة: يدير اللجان المسندة إليه ويضيف إليها الشيوخ
+  | 'sheikh';          // شيخ: يرى اللجان والحفلات المسندة إليه فقط
 
 export interface RoleDefinition {
   role: UserRole;
@@ -252,45 +260,39 @@ export interface RoleDefinition {
 export const SYSTEM_ROLES: RoleDefinition[] = [
   {
     role: 'super_admin',
-    title: 'المشرف العام (مدير النظام)',
-    shortLabel: 'مدير النظام',
+    title: 'المشرف العام (سوبر أدمن)',
+    shortLabel: 'سوبر أدمن',
     badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     icon: 'verified_user',
-    description: 'صلاحيات إدارية وفنية كاملة، إدارة المستخدمين، اللجان، الامتحانات، وإعدادات الربط بقواعد البيانات.',
+    description: 'يرى كل شيء، بما فيه حسابات الأدمن، ويدير الأدمنز وسجلات التدقيق وقاعدة البيانات.',
+  },
+  {
+    role: 'admin',
+    title: 'أدمن',
+    shortLabel: 'أدمن',
+    badgeClass: 'bg-teal-100 text-teal-800 border-teal-300',
+    icon: 'admin_panel_settings',
+    description: 'كل الصلاحيات عدا صلاحيات السوبر أدمن: يدير الشيوخ ورؤساء اللجان واللجان والحفلات، ولا يرى الأدمنز الآخرين.',
   },
   {
     role: 'committee_head',
-    title: 'رئيس لجنة واختبارات (معلم)',
+    title: 'رئيس لجنة',
     shortLabel: 'رئيس لجنة',
     badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
     icon: 'school',
-    description: 'إشراف على لجان مقرأة معينة، اعتماد نماذج الأسئلة، مراجعة وتدقيق الكشوف وتوزيع الطلاب.',
+    description: 'يدير اللجان التي يسندها إليه الأدمن: يضيف إليها الشيوخ أو يزيلهم، ويدعوهم لحفلاتها.',
   },
   {
-    role: 'teacher',
-    title: 'معلم / عضو هيئة تدريس',
-    shortLabel: 'معلم مقرأة',
-    badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-    icon: 'person_raised_hand',
-    description: 'تصحيح الأسئلة، رصد درجات الطلاب، تقييم الحفظ والأداء في اللجان.',
-  },
-  {
-    role: 'assistant',
-    title: 'معاون ميداني / تنفيذي',
-    shortLabel: 'معاون معتمد',
+    role: 'sheikh',
+    title: 'شيخ',
+    shortLabel: 'شيخ',
     badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
-    icon: 'assignment_ind',
-    description: 'استلام وتجهيز اللجان الميدانية، متابعة حضور الطلاب، ورصد الدرجات الميدانية.',
-  },
-  {
-    role: 'auditor',
-    title: 'مراجع ومدقق جودة (رقابي)',
-    shortLabel: 'مدقق ومراقب',
-    badgeClass: 'bg-purple-100 text-purple-800 border-purple-300',
-    icon: 'policy',
-    description: 'صلاحية قراءة ومتابعة شاملة لجميع السجلات، التقارير الإحصائية، وسجلات التدقيق الميداني.',
+    icon: 'person',
+    description: 'يرى اللجان والحفلات المسندة إليه فقط، ويصله تنبيه عند إضافته للجنة أو حفل.',
   },
 ];
+
+export const roleDefinition = (role?: string) => SYSTEM_ROLES.find((r) => r.role === role);
 
 export type AssistantStatus = 'pending' | 'interview' | 'approved' | 'rejected';
 

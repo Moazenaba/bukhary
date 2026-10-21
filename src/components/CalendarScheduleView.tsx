@@ -697,7 +697,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onToggleTaskComplete(task.id)}
-                          disabled={!(canWriteTasks || task.assignedAssistantId === currentUser.id) || currentUser.role === 'auditor'}
+                          disabled={!(canWriteTasks || task.assignedAssistantId === currentUser.id)}
                           className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-colors cursor-pointer mt-0.5 shrink-0 ${
                             task.completed
                               ? 'bg-emerald-600 text-white'

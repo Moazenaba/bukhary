@@ -108,7 +108,13 @@ async function deliver(message: PushMessage) {
         [message.targetUserId]
       )
     : await db.query(
-        `SELECT d.token FROM device_tokens d JOIN app_users u ON u.id = d.user_id WHERE u.status = 'approved';`
+        // A broadcast about a committee reaches only the people who see it (same rule as GET /api/notifications).
+        `SELECT d.token FROM device_tokens d JOIN app_users u ON u.id = d.user_id
+         WHERE u.status = 'approved' AND (
+           $1::text IS NULL OR u.role IN ('super_admin', 'admin') OR u.all_committees OR u.assigned_committee_ids ? $1
+           OR EXISTS (SELECT 1 FROM committees c WHERE c.id = $1
+                      AND c.ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', u.id))));`,
+        [message.committeeId ?? null]
       );
   if (rows.length === 0) return;
   const bearer = await accessToken();

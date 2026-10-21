@@ -147,15 +147,18 @@ export async function pagedRows<T>(
   pool: { query: (sql: string, params: unknown[]) => Promise<{ rows: any[] }> },
   sql: string,
   countSql: string,
-  query: z.infer<typeof pageQuery>
+  query: z.infer<typeof pageQuery>,
+  /** Parameters of `sql` and `countSql` ($1..$n); paging takes the next two. */
+  params: unknown[] = []
 ): Promise<{ rows: T[]; total: number | null; hasMore: boolean }> {
   if (query.limit === undefined) {
-    const { rows } = await pool.query(`${sql};`, []);
+    const { rows } = await pool.query(`${sql};`, params);
     return { rows, total: null, hasMore: false };
   }
-  const { rows: count } = await pool.query(countSql, []);
+  const { rows: count } = await pool.query(countSql, params);
   const total = Number(count[0].n);
-  const { rows } = await pool.query(`${sql} LIMIT $1 OFFSET $2;`, [query.limit, query.offset]);
+  const n = params.length;
+  const { rows } = await pool.query(`${sql} LIMIT $${n + 1} OFFSET $${n + 2};`, [...params, query.limit, query.offset]);
   return { rows, total, hasMore: query.offset + rows.length < total };
 }
 

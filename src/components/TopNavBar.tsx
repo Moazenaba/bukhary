@@ -113,14 +113,12 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
               currentUser.role === 'super_admin' ? 'bg-emerald-700 text-white' :
               currentUser.role === 'committee_head' ? 'bg-blue-700 text-white' :
-              currentUser.role === 'teacher' ? 'bg-teal-700 text-white' :
-              currentUser.role === 'auditor' ? 'bg-teal-700 text-white' :
+              currentUser.role === 'admin' ? 'bg-teal-700 text-white' :
               'bg-amber-600 text-white'
             }`}>
               {currentUser.role === 'super_admin' ? '👑' :
                currentUser.role === 'committee_head' ? '👨‍🏫' :
-               currentUser.role === 'teacher' ? '📖' :
-               currentUser.role === 'auditor' ? '🔍' : '👤'}
+               currentUser.role === 'admin' ? '🛡️' : '👤'}
             </span>
             <div className="text-right hidden sm:block">
               <span className="text-xs font-bold block leading-none truncate max-w-[130px]">
@@ -129,14 +127,12 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               <span className={`text-xs font-semibold leading-none ${
                 currentUser.role === 'super_admin' ? 'text-emerald-700 font-bold' :
                 currentUser.role === 'committee_head' ? 'text-blue-700 font-bold' :
-                currentUser.role === 'teacher' ? 'text-teal-700 font-bold' :
-                currentUser.role === 'auditor' ? 'text-teal-700 font-bold' :
+                currentUser.role === 'admin' ? 'text-teal-700 font-bold' :
                 'text-amber-700 font-bold'
               }`}>
-                {currentUser.role === 'super_admin' ? 'مدير النظام' :
-                 currentUser.role === 'committee_head' ? 'رئيس لجنة' :
-                 currentUser.role === 'teacher' ? 'معلم مقرأة' :
-                 currentUser.role === 'auditor' ? 'مدقق جودة' : 'معاون ميداني'}
+                {currentUser.role === 'super_admin' ? 'سوبر أدمن' :
+                 currentUser.role === 'admin' ? 'أدمن' :
+                 currentUser.role === 'committee_head' ? 'رئيس لجنة' : 'شيخ'}
               </span>
             </div>
             <span className="material-symbols-outlined text-xs text-muted">expand_more</span>
@@ -166,7 +162,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           )}
 
           {/* Export (Admin only) */}
-          {currentUser.role === 'super_admin' && (
+          {(currentUser.role === 'super_admin' || currentUser.role === 'admin') && (
             <button
               onClick={onOpenExport}
               title="تصدير الكشوف"

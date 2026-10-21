@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppUser, AssistantPermission, Committee, PermissionProfile, UserRole } from '../types';
+import { AppUser, AssistantPermission, Committee, PermissionProfile, UserRole, roleDefinition } from '../types';
 import { ApiError, api, onSessionExpired, refreshTokens, tokens } from './api';
 import { DataService } from './DataService';
 
@@ -14,6 +14,8 @@ export interface ServerPermissions {
   committeeNumbers?: number[] | 'all';
   /** Exam ids whose file and content the user may open, or 'all'. */
   exams?: string[] | 'all';
+  /** Roles this user may give to other accounts (admins never get admin roles). */
+  grantableRoles?: UserRole[];
   mustChangePassword?: boolean;
 }
 
@@ -280,7 +282,7 @@ class AuthServiceClass {
   }
 
   /** Promotes to super admin, or demotes to the role the super admin chose (WEB-14). */
-  public async setSuperAdmin(userId: string, makeSuper: boolean, demoteTo: UserRole = 'assistant'): Promise<{ success: boolean; message: string }> {
+  public async setSuperAdmin(userId: string, makeSuper: boolean, demoteTo: UserRole = 'admin'): Promise<{ success: boolean; message: string }> {
     try {
       await this.changeUser(userId, { role: makeSuper ? 'super_admin' : demoteTo });
       return { success: true, message: 'تم تحديث الرتبة بنجاح.' };
@@ -290,9 +292,11 @@ class AuthServiceClass {
   }
 
   public isSuperAdmin = () => this.currentUser?.role === 'super_admin';
-  public isCommitteeHead = () => this.currentUser?.role === 'committee_head' || this.isSuperAdmin();
-  public isTeacher = () => this.currentUser?.role === 'teacher' || this.isCommitteeHead();
-  public isAssistant = () => this.currentUser?.role === 'assistant';
+  public isAdmin = () => this.currentUser?.role === 'admin' || this.isSuperAdmin();
+  public isCommitteeHead = () => this.currentUser?.role === 'committee_head';
+  public isSheikh = () => this.currentUser?.role === 'sheikh';
+  /** Roles the current user may give to others, from the server (admins cannot create admins). */
+  public grantableRoles = (): UserRole[] => this.permissions?.grantableRoles ?? ['sheikh'];
 
   public hasPermission(permission: string): boolean {
     if (!this.currentUser) return false;
@@ -313,11 +317,11 @@ class AuthServiceClass {
       case 'committees':
         return true;
       case 'summer_course':
-        return this.can('summerRows.write') || this.can('audit.read');
+        return this.can('summerRows.read');
       case 'exams':
         return this.can('exams.write') || this.can('exams.file');
       case 'calendar':
-        return this.can('tasks.write') || this.currentUser.role === 'assistant';
+        return this.can('tasks.read');
       case 'stats':
         return this.can('stats.read');
       case 'assistants':
@@ -360,25 +364,11 @@ class AuthServiceClass {
   public canGrant = () => this.can('users.grant');
 
   public getRoleLabel(role?: UserRole): string {
-    switch (role || this.currentUser?.role) {
-      case 'super_admin': return 'المشرف العام (مدير النظام)';
-      case 'committee_head': return 'رئيس لجنة واختبارات';
-      case 'teacher': return 'معلم ومقرئ معتمد';
-      case 'assistant': return 'معاون ميداني معتمد';
-      case 'auditor': return 'مراجع ومدقق جودة (رقابي)';
-      default: return 'مستخدم النظام';
-    }
+    return roleDefinition(role || this.currentUser?.role)?.title ?? 'مستخدم النظام';
   }
 
   public getRoleBadgeClass(role?: UserRole): string {
-    switch (role || this.currentUser?.role) {
-      case 'super_admin': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-      case 'committee_head': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'teacher': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-      case 'assistant': return 'bg-amber-100 text-amber-800 border-amber-300';
-      case 'auditor': return 'bg-purple-100 text-purple-800 border-purple-300';
-      default: return 'bg-slate-100 text-slate-700 border-slate-300';
-    }
+    return roleDefinition(role || this.currentUser?.role)?.badgeClass ?? 'bg-slate-100 text-slate-700 border-slate-300';
   }
 }
 
@@ -426,8 +416,9 @@ export function useAuth() {
     canGrant: AuthService.canGrant(),
     isSuperAdmin: AuthService.isSuperAdmin(),
     isCommitteeHead: AuthService.isCommitteeHead(),
-    isTeacher: AuthService.isTeacher(),
-    isAssistant: AuthService.isAssistant(),
+    isAdmin: AuthService.isAdmin(),
+    isSheikh: AuthService.isSheikh(),
+    grantableRoles: AuthService.grantableRoles(),
     hasPermission: (p: string) => AuthService.hasPermission(p),
     canManageUsers: AuthService.canManageUsers(),
     getRoleLabel: (r?: UserRole) => AuthService.getRoleLabel(r),

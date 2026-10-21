@@ -42,7 +42,8 @@ export const CentralLoginPortal: React.FC = () => {
   const [regExperience, setRegExperience] = useState('');
   const [regAvailability, setRegAvailability] = useState('');
   const [regPreferredCommitteesText, setRegPreferredCommitteesText] = useState('');
-  const [regRole, setRegRole] = useState<UserRole>('assistant');
+  // Everyone joins as a sheikh; an admin sets the final role and committees.
+  const regRole: UserRole = 'sheikh';
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regNotes, setRegNotes] = useState('');
@@ -122,7 +123,6 @@ export const CentralLoginPortal: React.FC = () => {
     setRegExperience('');
     setRegAvailability('');
     setRegPreferredCommitteesText('');
-    setRegRole('assistant');
     setRegPassword('');
     setRegNotes('');
     setRegError(null);
@@ -537,26 +537,19 @@ export const CentralLoginPortal: React.FC = () => {
                       <div className="p-4 rounded-2xl bg-[#f8fafc] border border-slate-200 space-y-3">
                         <h3 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 border-b border-slate-200 pb-2">
                           <span className="material-symbols-outlined text-sm text-brand">tune</span>
-                          <span>٣. الدور المطلوب، أوقات التفرغ، وكلمة المرور:</span>
+                          <span>٣. أوقات التفرغ وكلمة المرور:</span>
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              الدور المطلوب
-                            </label>
-                            <select
-                              value={regRole}
-                              onChange={(e) => setRegRole(e.target.value as UserRole)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-bold text-brand"
-                            >
-                              <option value="assistant">معاون ميداني معتمد (استلام اللجان ومتابعة الطلاب)</option>
-                              <option value="teacher">معلم ومقرئ (اختبار الطلاب والتحكيم)</option>
-                              <option value="committee_head">رئيس لجنة ومقرئ (إدارة الاختبارات والاعتماد)</option>
-                              <option value="auditor">مراجع ومدقق جودة (رقابة ورصد الدرجات)</option>
-                            </select>
+                            <span className="block text-xs font-bold text-slate-700 mb-1">
+                              الدور
+                            </span>
+                            <div className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-brand">
+                              شيخ
+                            </div>
                             <span className="text-xs text-slate-500 block mt-0.5">
-                              هذا طلب فقط؛ الدور النهائي يحدده المشرف العام عند الاعتماد.
+                              تنضم كشيخ، والأدمن هو من يسند إليك اللجان والحفلات أو يجعلك رئيس لجنة.
                             </span>
                           </div>
 
@@ -789,7 +782,7 @@ export const CentralLoginPortal: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-slate-700 leading-relaxed">
-              تواصل مع المشرف العام. يعيد تعيين كلمة المرور من شاشة «المعاونون والصلاحيات» ← تعديل حسابك ← «إعادة تعيين كلمة
+              تواصل مع المشرف العام. يعيد تعيين كلمة المرور من شاشة «الشيوخ والصلاحيات» ← تعديل حسابك ← «إعادة تعيين كلمة
               المرور»، ويعطيك كلمة مؤقتة. سجّل الدخول بها، وسيطلب منك النظام اختيار كلمة مرور جديدة قبل المتابعة.
             </p>
             <div className="flex justify-end">

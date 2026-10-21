@@ -4,7 +4,7 @@ import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, forbidden, notFound, route } from '../http.ts';
-import { isAllowed, isCommitteeInScope, isScopedRole } from '../policy.ts';
+import { isAllowed, isCommitteeInScope, isScopedRole, seesAllCommittees } from '../policy.ts';
 import { dateOnly, id, optionalId, optionalText, pageQuery, pagedRows } from '../schemas.ts';
 import { notify } from './notifications.ts';
 
@@ -64,13 +64,23 @@ async function resolveRefs(db: Queryable, committeeId: string | null, assistantI
 export function tasksRouter(pool: Pool) {
   const r = Router();
 
+  // Committee heads and sheikhs see tasks of their committees, tasks assigned to them, and the
+  // ceremony tasks of ceremonies they are invited to.
   r.get('/', can('tasks.read'), route(async (req, res) => {
     const q = pageQuery.parse(req.query);
+    const user = req.user!;
+    const all = seesAllCommittees(user);
+    const where = all
+      ? ''
+      : `WHERE assigned_assistant_id = $2 OR committee_id = ANY($1::text[])
+           OR (type = 'ceremony' AND committee_id IN (
+                 SELECT id FROM committees WHERE ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $2::text))))`;
     const page = await pagedRows(
       pool,
-      'SELECT * FROM schedule_tasks ORDER BY date ASC, time ASC NULLS LAST, id ASC',
-      'SELECT count(*)::int AS n FROM schedule_tasks;',
-      q
+      `SELECT * FROM schedule_tasks ${where} ORDER BY date ASC, time ASC NULLS LAST, id ASC`,
+      `SELECT count(*)::int AS n FROM schedule_tasks ${where};`,
+      q,
+      all ? [] : [user.assignedCommitteeIds, user.id]
     );
     res.json({ success: true, tasks: page.rows.map(taskFromRow), total: page.total, hasMore: page.hasMore });
   }));
@@ -128,7 +138,7 @@ export function tasksRouter(pool: Pool) {
       const task = rows[0];
       if (!task) throw notFound('المهمة غير موجودة');
       const user = req.user!;
-      const isAssignee = task.assigned_assistant_id === user.id && user.role !== 'auditor';
+      const isAssignee = task.assigned_assistant_id === user.id;
       if (!isAssignee && !isAllowed(user, 'tasks.write')) throw forbidden();
       if (!isAssignee && task.committee_id) assertCommitteeScope(user, task.committee_id);
       const { rows: updated } = await db.query(

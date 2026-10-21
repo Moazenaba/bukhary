@@ -26,7 +26,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   scheduleTasks = [],
   onNavigateTab,
 }) => {
-  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'admin';
   const total = committees.length;
   const ceremonyCount = committees.filter((c) => c.stages.ceremony?.completed).length;
   const examCount = committees.filter(
@@ -54,7 +54,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             مسابقات مسجد البخاري العلمية
           </span>
 
-          {isSuperAdmin ? (
+          {isAdmin ? (
             <>
               <h2 className="text-2xl sm:text-3xl font-bold mb-2">
                 منظومة لجان الاختبار والتصحيح لمتون العقيدة
@@ -91,10 +91,10 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                 مرحباً بك: {currentUser.name}
               </h2>
               <p className="text-sm text-teal-50 leading-relaxed mb-4">
-                أنت مسجل حالياً بحساب <strong>معاون معتمد</strong> • الصلاحيات المفعلة لك: <strong>{currentUser.permissions.join('، ') || 'لا توجد صلاحيات إضافية'}</strong>.
+                أنت مسجل بحساب <strong>{AuthService.getRoleLabel(currentUser.role)}</strong>.
                 {myAssignedCommittees.length > 0
-                  ? ` لديك (${myAssignedCommittees.length}) لجان مسندة إليك لمتابعتها وتوثيق استلامها.`
-                  : ' يمكنك متابعة جدول أعمالك والتسليمات الميدانية المقررة.'}
+                  ? ` لديك (${myAssignedCommittees.length}) لجان مسندة إليك.`
+                  : ' لم تُسند إليك لجان بعد؛ ستصلك تنبيهات عند إضافتك للجنة أو حفل.'}
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <button
@@ -202,12 +202,14 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                 الدورات والمسابقات الموسمية واللجان المربوطة بها:
               </h3>
             </div>
-            <button
-              onClick={() => onNavigateTab('courses')}
-              className="text-xs text-brand font-bold hover:underline cursor-pointer"
-            >
-              إدارة الدورات وإضافة دورة جديدة &larr;
-            </button>
+            {AuthService.canAccessTab('courses') && (
+              <button
+                onClick={() => onNavigateTab('courses')}
+                className="text-xs text-brand font-bold hover:underline cursor-pointer"
+              >
+                إدارة الدورات وإضافة دورة جديدة &larr;
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">

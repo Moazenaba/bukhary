@@ -21,6 +21,7 @@ import {
 } from '../utils/stageUtils';
 import { STAGE_ACTION } from '../utils/committeeChanges';
 import { AuthService } from '../services/AuthService';
+import { CommitteeStaffPanel } from './StaffAssignment';
 
 interface CommitteeDetailModalProps {
   committee: Committee | null;
@@ -31,6 +32,8 @@ interface CommitteeDetailModalProps {
   courses?: Course[];
   onReceiveCommittee?: (committeeId: string, cancel?: boolean) => unknown;
   onApproveExamReadiness?: (committeeId: string, revoke?: boolean) => unknown;
+  /** The server returned a newer committee (staff added or removed). */
+  onCommitteeChanged?: (committee: Committee) => void;
 }
 
 /** Server times are ISO; older records may hold display text, shown as it is. */
@@ -52,6 +55,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   courses = [],
   onReceiveCommittee,
   onApproveExamReadiness,
+  onCommitteeChanged,
 }) => {
   useEscapeKey(onClose);
 
@@ -630,6 +634,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
               )}
             </div>
           </div>
+
+          <CommitteeStaffPanel committee={committee} onChanged={onCommitteeChanged} />
 
           {/* Section: Stages Progression with Special Scoring & Aggregation Details */}
           <div className="space-y-3">

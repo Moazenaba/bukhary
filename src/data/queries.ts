@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { ApiError } from '../services/api';
+import { AuthService } from '../services/AuthService';
 import { DataService } from '../services/DataService';
 
 /** Every server-data query starts with this key, so logout can clear all of it at once. */
@@ -31,7 +32,8 @@ export function useServerData(userId: string | undefined) {
 
   const committees = useQuery({ queryKey: keys.committees, queryFn: () => DataService.getCommittees(), enabled, retry: retryPolicy });
   const courses = useQuery({ queryKey: keys.courses, queryFn: () => DataService.getCourses(), enabled, retry: retryPolicy });
-  const exams = useQuery({ queryKey: keys.exams, queryFn: () => DataService.getExams(), enabled, retry: retryPolicy });
+  // Sheikhs have no exam screen; asking would only return 403.
+  const exams = useQuery({ queryKey: keys.exams, queryFn: () => (AuthService.can('exams.read') ? DataService.getExams() : Promise.resolve([])), enabled, retry: retryPolicy });
   const tasks = useQuery({ queryKey: keys.tasks, queryFn: () => DataService.getTasks(), enabled, retry: retryPolicy });
   const notifications = useQuery({ queryKey: keys.notifications, queryFn: () => DataService.getNotifications(), enabled, retry: retryPolicy });
   const books = useQuery({ queryKey: keys.books, queryFn: () => DataService.getBooks(), enabled, retry: retryPolicy });

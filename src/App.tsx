@@ -562,7 +562,7 @@ export default function App() {
     if (genderFilter === 'women') list = list.filter((c) => c.isWomenCommittee);
     else if (genderFilter === 'men') list = list.filter((c) => !c.isWomenCommittee);
     if (selectedCourseFilter !== 'all') list = list.filter((c) => c.courseId === selectedCourseFilter);
-    if (currentUser?.role === 'assistant' && assistantOnlyFilter) {
+    if ((currentUser?.role === 'sheikh' || currentUser?.role === 'committee_head') && assistantOnlyFilter) {
       list = list.filter((c) => AuthService.canAccessCommittee(c));
     }
     if (needsScoringFilter) list = list.filter((c) => c.scoringDetails?.questions?.some((q) => !q.completed));
@@ -755,6 +755,7 @@ export default function App() {
               onResetPassword={handleResetPassword}
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
               onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
+              onCommitteeChanged={replaceCommittee}
               customPermissions={customPermissions}
             />
           )}
@@ -826,13 +827,13 @@ export default function App() {
 
           {activeTab === 'committees' && (
             <>
-              {/* Assistant Quick Task & Assigned Committees Bar */}
-              {currentUser.role === 'assistant' && (
+              {/* Assigned committees bar for committee heads and sheikhs */}
+              {(currentUser.role === 'sheikh' || currentUser.role === 'committee_head') && (
                 <div className="mb-6 p-4 rounded-2xl bg-gradient-to-l from-emerald-50 via-teal-50 to-white border border-teal-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
                   <div>
                     <span className="font-bold text-brand text-sm block flex items-center gap-1.5 mb-1">
                       <span className="material-symbols-outlined text-lg">person_pin</span>
-                      <span>مرحباً بك: {currentUser.name} (معاون ميداني)</span>
+                      <span>مرحباً بك: {currentUser.name} ({currentUser.role === 'sheikh' ? 'شيخ' : 'رئيس لجنة'})</span>
                     </span>
                     <span className="text-ink-soft block leading-relaxed">
                       اللجان المسندة إليك:{' '}
@@ -1041,6 +1042,7 @@ export default function App() {
         onApproveExamReadiness={handleApproveExamReadiness}
         onClose={() => setSelectedCommitteeForDetails(null)}
         onSaveCommittee={handleSaveCommittee}
+        onCommitteeChanged={replaceCommittee}
       />
 
       <AuthModal

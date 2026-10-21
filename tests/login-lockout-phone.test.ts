@@ -37,7 +37,7 @@ describe('per-caller lockout', () => {
   });
 
   it('many addresses together still lock the whole account', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     // accountLockAttempts defaults to 10 x MAX_LOGIN_ATTEMPTS (3 in tests) = 30.
     for (let i = 0; i < 30; i++) await loginFrom(`192.0.2.${i + 1}`, u.phone, 'wrong-pass1');
     expect((await loginFrom('203.0.113.50', u.phone, PASSWORD)).status).toBe(401);
@@ -76,9 +76,9 @@ describe('phone forms', () => {
   it('migration 014 rewrites stored phones to the local form unless that number is taken', async () => {
     const taken = egyptMobile();
     const free = egyptMobile();
-    const owner = await createUser(t.pool, { role: 'assistant', phone: taken });
-    const duplicate = await createUser(t.pool, { role: 'assistant', phone: `+2${taken}` });
-    const other = await createUser(t.pool, { role: 'assistant', phone: `0020 ${free.slice(1)}` });
+    const owner = await createUser(t.pool, { role: 'sheikh', phone: taken });
+    const duplicate = await createUser(t.pool, { role: 'sheikh', phone: `+2${taken}` });
+    const other = await createUser(t.pool, { role: 'sheikh', phone: `0020 ${free.slice(1)}` });
     const sql = fs.readFileSync(path.resolve('migrations/014_login_failures_phone_form.sql'), 'utf8');
     await t.pool.query(sql.slice(sql.indexOf('WITH canon')));
     const { rows } = await t.pool.query('SELECT id, phone FROM app_users WHERE id = ANY($1);', [[owner.id, duplicate.id, other.id]]);
@@ -90,7 +90,7 @@ describe('phone forms', () => {
 
   it('an older account stored as +20… still signs in with what its owner types', async () => {
     const local = egyptMobile();
-    const u = await createUser(t.pool, { role: 'assistant', phone: `+2${local}` });
+    const u = await createUser(t.pool, { role: 'sheikh', phone: `+2${local}` });
     expect((await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD })).status).toBe(200);
     expect((await t.api().post('/api/auth/login').send({ identifier: local, password: PASSWORD })).status).toBe(200);
   });

@@ -42,7 +42,8 @@ const registerInput = z.object({
   name: z.string().trim().min(2, 'الاسم مطلوب').max(200),
   phone: phoneSchema,
   email: emailSchema,
-  roleKey: z.enum(['committee_head', 'teacher', 'assistant', 'auditor']).catch('assistant'),
+  // Everyone joins as a sheikh; an admin promotes them. Older clients still send their old role names.
+  roleKey: z.string().max(50).optional().transform((): 'sheikh' => 'sheikh'),
   password: passwordSchema,
   notes: optionalText(2000),
   whatsapp: optionalText(50),
@@ -273,8 +274,8 @@ export function authRouter(config: AppConfig, pool: Pool) {
       throw conflict('يوجد حساب مسجل بنفس رقم الهاتف أو البريد الإلكتروني');
     }
     await audit(pool, req, 'user.register', 'user', id, null, { name, role: roleKey, requestCode });
-    // Super admins are told at once, in the app and on their phones.
-    const { rows: admins } = await pool.query("SELECT id FROM app_users WHERE role = 'super_admin' AND status = 'approved';");
+    // Admins are told at once, in the app and on their phones.
+    const { rows: admins } = await pool.query("SELECT id FROM app_users WHERE role IN ('super_admin', 'admin') AND status = 'approved';");
     for (const admin of admins) {
       await notify(pool, { title: 'طلب انضمام جديد', description: `${name} — ${phone}`, type: 'info', targetUserId: admin.id });
     }

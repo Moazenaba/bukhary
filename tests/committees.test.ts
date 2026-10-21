@@ -79,7 +79,7 @@ describe('stage updates', () => {
 
   it('stamps reception and approval with the logged-in user, ignoring names sent by the client', async () => {
     const c = await createCommittee({ committeeNumber: 12 });
-    const asst = await userWithToken(t, { role: 'assistant', assigned: [12], name: 'المعاون الحقيقي' });
+    const asst = await userWithToken(t, { role: 'committee_head', assigned: [12], name: 'المعاون الحقيقي' });
     const res = await t.api().patch(`/api/committees/${c.id}`).set(asst.auth)
       .send({ receivedByAssistant: { assistantName: 'شخص آخر', notes: 'تم' }, stages: { registration: { completed: true } } });
     expect(res.status).toBe(200);
@@ -97,18 +97,20 @@ describe('stage updates', () => {
 });
 
 describe('authorization', () => {
-  it('assistants may record reception only on assigned committees and cannot finalize', async () => {
+  it('sheikhs see their committees but change nothing, not even on their own committee', async () => {
     const mine = await createCommittee({ committeeNumber: 20 });
-    const other = await createCommittee({ committeeNumber: 21 });
-    const asst = await userWithToken(t, { role: 'assistant', assigned: [20] });
-    const ok = await t.api().patch(`/api/committees/${mine.id}`).set(asst.auth).send({ stages: { exam: { completed: true } } });
+    const sheikh = await userWithToken(t, { role: 'sheikh', assigned: [20], permissions: ['manage_committees'] });
+    const ok = await t.api().get(`/api/committees/${mine.id}`).set(sheikh.auth);
     expect(ok.status).toBe(200);
-    const notMine = await t.api().patch(`/api/committees/${other.id}`).set(asst.auth).send({ stages: { exam: { completed: true } } });
-    expect(notMine.status).toBe(403);
-    const finalize = await t.api().patch(`/api/committees/${mine.id}`).set(asst.auth).send({ stages: { ceremony: { completed: true } } });
+    expect(ok.body.committee.studentsCount).toBe(10);
+    const reception = await t.api().patch(`/api/committees/${mine.id}`).set(sheikh.auth).send({ stages: { exam: { completed: true } } });
+    expect(reception.status).toBe(403);
+    const finalize = await t.api().patch(`/api/committees/${mine.id}`).set(sheikh.auth).send({ stages: { ceremony: { completed: true } } });
     expect(finalize.status).toBe(403);
-    const fullEdit = await t.api().post('/api/committees').set(asst.auth).send(committeeBody({ id: mine.id, committeeNumber: 20 }));
+    const fullEdit = await t.api().post('/api/committees').set(sheikh.auth).send(committeeBody({ id: mine.id, committeeNumber: 20 }));
     expect(fullEdit.status).toBe(403);
+    const create = await t.api().post('/api/committees').set(sheikh.auth).send(committeeBody({ committeeNumber: 22 }));
+    expect(create.status).toBe(403);
   });
 
   it('committee heads manage only their assigned committees', async () => {
@@ -121,31 +123,37 @@ describe('authorization', () => {
     expect(del.status).toBe(403);
   });
 
-  it('auditors can read everything but write nothing, whatever permissions they hold', async () => {
+  it('sheikhs write nothing anywhere, whatever permissions they hold', async () => {
     const c = await createCommittee({ committeeNumber: 40 });
-    const auditor = await userWithToken(t, { role: 'auditor', permissions: ['manage_committees', 'calendar_schedule', 'database_sheets'] });
-    expect((await t.api().get('/api/committees').set(auditor.auth)).status).toBe(200);
-    expect((await t.api().patch(`/api/committees/${c.id}`).set(auditor.auth).send({ stages: { exam: { completed: true } } })).status).toBe(403);
-    expect((await t.api().post('/api/tasks').set(auditor.auth).send({ id: 't1', title: 'x', date: '2026-10-01' })).status).toBe(403);
-    expect((await t.api().post('/api/summer-course-rows').set(auditor.auth).send({ id: 'r1', number: 1 })).status).toBe(403);
-    expect((await t.api().get('/api/audit-logs').set(auditor.auth)).status).toBe(200);
+    const sheikh = await userWithToken(t, { role: 'sheikh', permissions: ['manage_committees', 'calendar_schedule', 'database_sheets'] });
+    expect((await t.api().get('/api/committees').set(sheikh.auth)).status).toBe(200);
+    expect((await t.api().patch(`/api/committees/${c.id}`).set(sheikh.auth).send({ stages: { exam: { completed: true } } })).status).toBe(403);
+    expect((await t.api().post('/api/tasks').set(sheikh.auth).send({ id: 't1', title: 'x', date: '2026-10-01' })).status).toBe(403);
+    expect((await t.api().post('/api/summer-course-rows').set(sheikh.auth).send({ id: 'r1', number: 1 })).status).toBe(403);
+    expect((await t.api().get('/api/audit-logs').set(sheikh.auth)).status).toBe(403);
+    expect((await t.api().get('/api/users').set(sheikh.auth)).status).toBe(403);
+    expect((await t.api().get('/api/exams').set(sheikh.auth)).status).toBe(403);
   });
 
-  it('teachers score only their committees (D-02); "all committees" teachers score any', async () => {
+  it('committee heads score only their committees; sheikhs never score', async () => {
     const c = await createCommittee({ committeeNumber: 61 });
-    const scoped = await userWithToken(t, { role: 'teacher', name: 'معلم' });
+    const scoped = await userWithToken(t, { role: 'committee_head', name: 'رئيس' });
     const denied = await t.api().post('/api/scoring').set(scoped.auth)
       .send({ id: 's0', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
     expect(denied.status).toBe(403);
-    const assigned = await userWithToken(t, { role: 'teacher', committeeIds: [c.id] });
+    const sheikh = await userWithToken(t, { role: 'sheikh', committeeIds: [c.id] });
+    const notSheikh = await t.api().post('/api/scoring').set(sheikh.auth)
+      .send({ id: 's0', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
+    expect(notSheikh.status).toBe(403);
+    const assigned = await userWithToken(t, { role: 'committee_head', committeeIds: [c.id] });
     const ok = await t.api().post('/api/scoring').set(assigned.auth)
       .send({ id: 's0', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
     expect(ok.status).toBe(200);
   });
 
-  it('teachers with all committees record scores, scorer name comes from the token', async () => {
+  it('heads with all committees record scores, scorer name comes from the token', async () => {
     const c = await createCommittee({ committeeNumber: 60 });
-    const teacher = await userWithToken(t, { role: 'teacher', name: 'المعلم', allCommittees: true });
+    const teacher = await userWithToken(t, { role: 'committee_head', name: 'المعلم', allCommittees: true });
     const res = await t.api().post('/api/scoring').set(teacher.auth)
       .send({ id: 's1', committeeId: c.id, studentName: 'طالب', questionNumber: 1, score: 8, maxScore: 10 });
     expect(res.status).toBe(200);
@@ -158,11 +166,13 @@ describe('authorization', () => {
   it('/api/auth/me returns the same evaluated permissions the server enforces', async () => {
     const a = await createCommittee({ committeeNumber: 81 });
     const b = await createCommittee({ committeeNumber: 82 });
-    const asst = await userWithToken(t, { role: 'assistant', committeeIds: [a.id, b.id] });
+    const asst = await userWithToken(t, { role: 'sheikh', committeeIds: [a.id, b.id] });
     const me = await t.api().get('/api/auth/me').set(asst.auth);
     expect(me.status).toBe(200);
-    expect(me.body.permissions.actions['committees.reception']).toBe(true);
-    expect(me.body.permissions.actions['committees.finalize']).toBe(false);
+    expect(me.body.permissions.actions['committees.read']).toBe(true);
+    expect(me.body.permissions.actions['committees.reception']).toBe(false);
+    expect(me.body.permissions.actions['committees.create']).toBe(false);
+    expect(me.body.permissions.grantableRoles).toEqual(['sheikh']);
     expect([...me.body.permissions.committeeScope].sort()).toEqual([a.id, b.id].sort());
     expect(me.body.permissions.committeeNumbers).toEqual([81, 82]);
   });

@@ -49,7 +49,7 @@ describe('user management by committee heads (API-01)', () => {
     expect(rows[0]).toEqual({ all_committees: false, allowed_exam_ids: [] });
   });
 
-  it('a head assigns only committees inside their own scope, and only to assistants', async () => {
+  it('a head assigns only committees inside their own scope, and only to sheikhs', async () => {
     const h = await head();
     const ok = await t.api().post('/api/users').set(h.auth)
       .send({ id: 'usr_asst_in', name: 'معاون', phone: '0512000001', password: 'Initial123', status: 'approved', assignedCommitteeIds: [c1.id] });
@@ -60,14 +60,17 @@ describe('user management by committee heads (API-01)', () => {
     const otherHead = await userWithToken(t, { role: 'committee_head', permissions: ['manage_committees'] });
     const editHead = await t.api().post('/api/users').set(h.auth).send(userBody(otherHead, { status: 'rejected' }));
     expect(editHead.status).toBe(403);
-    const auditor = await userWithToken(t, { role: 'auditor' });
-    const editAuditor = await t.api().post('/api/users').set(h.auth).send(userBody(auditor, { name: 'تغيير' }));
-    expect(editAuditor.status).toBe(403);
+    const sheikh = await userWithToken(t, { role: 'sheikh' });
+    const promote = await t.api().post('/api/users').set(h.auth).send(userBody(sheikh, { role: 'committee_head' }));
+    expect(promote.status).toBe(403);
+    const superAdmin = await userWithToken(t, { role: 'super_admin' });
+    const editSuper = await t.api().post('/api/users').set(h.auth).send(userBody(superAdmin, { name: 'تغيير' }));
+    expect(editSuper.status).toBe(404);
   });
 
-  it('a head can still approve an assistant applicant without touching permissions (WEB-05)', async () => {
+  it('a head can still approve a sheikh applicant without touching permissions (WEB-05)', async () => {
     const h = await head();
-    const applicant = await userWithToken(t, { role: 'assistant', status: 'approved' });
+    const applicant = await userWithToken(t, { role: 'sheikh', status: 'approved' });
     await t.pool.query("UPDATE app_users SET status = 'pending' WHERE id = $1;", [applicant.id]);
     const res = await t.api().post('/api/users').set(h.auth).send(userBody(applicant, { status: 'approved', assignedCommitteeIds: [c1.id] }));
     expect(res.status).toBe(200);
@@ -138,21 +141,22 @@ describe('permission ids (API-34) and directory (API-08)', () => {
     expect(res.body.user.permissions).toEqual(['exams_pdf']);
   });
 
-  it('heads see applicants and assistants of their committees, not other heads or out-of-scope assistants', async () => {
-    const h = await userWithToken(t, { role: 'committee_head', permissions: ['manage_assistants'], committeeIds: [c1.id] });
-    const mine = await userWithToken(t, { role: 'assistant', committeeIds: [c1.id] });
-    const theirs = await userWithToken(t, { role: 'assistant', committeeIds: [c2.id] });
+  it('heads see the sheikhs they can staff committees with, not other heads or admins', async () => {
+    const h = await userWithToken(t, { role: 'committee_head', committeeIds: [c1.id] });
+    const mine = await userWithToken(t, { role: 'sheikh', committeeIds: [c1.id] });
+    const free = await userWithToken(t, { role: 'sheikh', committeeIds: [c2.id] });
     const otherHead = await userWithToken(t, { role: 'committee_head' });
+    const anAdmin = await userWithToken(t, { role: 'admin' });
     const list = await t.api().get('/api/users').set(h.auth);
     const ids = list.body.users.map((u: any) => u.id);
-    expect(ids).toContain(mine.id);
-    expect(ids).toContain(h.id);
-    expect(ids).not.toContain(theirs.id);
+    expect(ids).toEqual(expect.arrayContaining([mine.id, free.id, h.id]));
     expect(ids).not.toContain(otherHead.id);
+    expect(ids).not.toContain(anAdmin.id);
+    expect(ids).not.toContain(admin.id);
   });
 
   it('a manager cannot wipe a passport number they cannot see (MOB-09)', async () => {
-    const asst = await userWithToken(t, { role: 'assistant', committeeIds: [c1.id] });
+    const asst = await userWithToken(t, { role: 'sheikh', committeeIds: [c1.id] });
     await t.pool.query("UPDATE app_users SET passport_number = 'P-777' WHERE id = $1;", [asst.id]);
     const h = await userWithToken(t, { role: 'committee_head', permissions: ['manage_assistants'], committeeIds: [c1.id] });
     const res = await t.api().post('/api/users').set(h.auth).send(userBody(asst, { passportNumber: '' }));
@@ -162,7 +166,7 @@ describe('permission ids (API-34) and directory (API-08)', () => {
   });
 
   it('a save that leaves fields out keeps their stored values (found by the contract test)', async () => {
-    const u = await userWithToken(t, { role: 'assistant', committeeIds: [c1.id] });
+    const u = await userWithToken(t, { role: 'sheikh', committeeIds: [c1.id] });
     await t.pool.query(
       `UPDATE app_users SET notes = 'ملاحظة', passport_number = 'P-1', email = 'a@b.co',
          data = '{"whatsapp":"0599","interviewNotes":"جيد"}'::jsonb WHERE id = $1;`,
@@ -176,9 +180,9 @@ describe('permission ids (API-34) and directory (API-08)', () => {
   });
 
   it('task assignee list is limited to the actor\'s committees (D-07)', async () => {
-    const asst = await userWithToken(t, { role: 'assistant', permissions: ['calendar_schedule'], committeeIds: [c1.id] });
-    const colleague = await userWithToken(t, { role: 'assistant', committeeIds: [c1.id], name: 'زميل' });
-    const stranger = await userWithToken(t, { role: 'assistant', committeeIds: [c3.id], name: 'غريب' });
+    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [c1.id] });
+    const colleague = await userWithToken(t, { role: 'sheikh', committeeIds: [c1.id], name: 'زميل' });
+    const stranger = await userWithToken(t, { role: 'sheikh', committeeIds: [c3.id], name: 'غريب' });
     const res = await t.api().get('/api/users/assignable').set(asst.auth);
     expect(res.status).toBe(200);
     const ids = res.body.users.map((u: any) => u.id);
@@ -205,9 +209,10 @@ describe('exam allow-lists (API-06, API-13)', () => {
     expect(b.canOpen).toBe(false);
   });
 
-  it('assistants never see sample questions', async () => {
-    const asst = await userWithToken(t, { role: 'assistant' });
+  it('sheikhs never see exams or sample questions', async () => {
+    const asst = await userWithToken(t, { role: 'sheikh' });
     const list = await t.api().get('/api/exams').set(asst.auth);
+    expect(list.status).toBe(403);
     expect(JSON.stringify(list.body)).not.toContain('سؤال سري');
   });
 

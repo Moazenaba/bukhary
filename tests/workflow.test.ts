@@ -53,7 +53,7 @@ describe('committee actions endpoint', () => {
   it('web and Android reception give the same state', async () => {
     const a = await committee({ committeeNumber: 1 });
     const b = await committee({ committeeNumber: 2 });
-    const asst = await userWithToken(t, { role: 'assistant', committeeIds: [a.id, b.id] });
+    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [a.id, b.id] });
     const ra = await act(a.id, asst.auth, { type: 'receive', notes: 'web' });
     const rb = await act(b.id, asst.auth, { type: 'receive', notes: 'android' });
     expect(ra.status).toBe(200);
@@ -65,12 +65,13 @@ describe('committee actions endpoint', () => {
   it('out-of-order stage completion is a 400; permissions and scope still apply', async () => {
     const c = await committee({ committeeNumber: 3 });
     expect((await act(c.id, admin.auth, { type: 'completeStage', stage: 'scoring' })).status).toBe(400);
-    const outsider = await userWithToken(t, { role: 'assistant' });
+    const outsider = await userWithToken(t, { role: 'sheikh' });
     expect((await act(c.id, outsider.auth, { type: 'completeStage', stage: 'registration' })).status).toBe(403);
-    const asst = await userWithToken(t, { role: 'assistant', committeeIds: [c.id] });
-    expect((await act(c.id, asst.auth, { type: 'completeStage', stage: 'registration' })).status).toBe(200);
-    expect((await act(c.id, asst.auth, { type: 'completeStage', stage: 'exam' })).status).toBe(200);
-    expect((await act(c.id, asst.auth, { type: 'completeStage', stage: 'scoring' })).status).toBe(403);
+    const sheikh = await userWithToken(t, { role: 'sheikh', committeeIds: [c.id] });
+    expect((await act(c.id, sheikh.auth, { type: 'completeStage', stage: 'registration' })).status).toBe(403);
+    const head = await userWithToken(t, { role: 'committee_head', committeeIds: [c.id] });
+    expect((await act(c.id, head.auth, { type: 'completeStage', stage: 'registration' })).status).toBe(200);
+    expect((await act(c.id, head.auth, { type: 'completeStage', stage: 'exam' })).status).toBe(200);
   });
 
   it('scheduling a ceremony keeps exactly one calendar task, and moving it updates that task (WEB-08)', async () => {
@@ -132,7 +133,7 @@ describe('committee actions endpoint', () => {
 describe('tasks (API-12, WEB-07, MOB-06)', () => {
   it('a task keeps its committee and assignee, and the assignee can toggle it', async () => {
     const c = await committee({ committeeNumber: 20 });
-    const asst = await userWithToken(t, { role: 'assistant', committeeIds: [c.id] });
+    const asst = await userWithToken(t, { role: 'sheikh', committeeIds: [c.id] });
     const res = await t.api().post('/api/tasks').set(admin.auth)
       .send({ id: 'task-assigned', title: 'تسليم', date: '2026-10-21', committeeId: c.id, assignedAssistantId: asst.id });
     expect(res.status).toBe(200);
@@ -146,7 +147,7 @@ describe('tasks (API-12, WEB-07, MOB-06)', () => {
     const mine = await committee({ committeeNumber: 21 });
     const theirs = await committee({ committeeNumber: 22 });
     await t.api().post('/api/tasks').set(admin.auth).send({ id: 'task-theirs', title: 'لهم', date: '2026-10-21', committeeId: theirs.id });
-    const asst = await userWithToken(t, { role: 'assistant', permissions: ['calendar_schedule'], committeeIds: [mine.id] });
+    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [mine.id] });
     expect((await t.api().post('/api/tasks').set(asst.auth).send({ id: 'task-new', title: 'x', date: '2026-10-21', committeeId: theirs.id })).status).toBe(403);
     expect((await t.api().post('/api/tasks').set(asst.auth).send({ id: 'task-theirs', title: 'استيلاء', date: '2026-10-21', committeeId: mine.id })).status).toBe(403);
     expect((await t.api().post('/api/tasks').set(asst.auth).send({ id: 'task-mine', title: 'لي', date: '2026-10-21', committeeId: mine.id })).status).toBe(200);

@@ -24,31 +24,36 @@ const approve = (auth: Record<string, string>, u: { id: string; name: string; ph
   t.api().post('/api/users').set(auth).send({ id: u.id, name: u.name, phone: u.phone, status: 'approved' });
 
 describe('approving join requests', () => {
-  it('a committee head cannot activate an applicant who asked for a manager role', async () => {
+  it('everyone joins as a sheikh, whatever role they ask for; a head cannot promote them', async () => {
     const applicant = await apply('committee_head', '0561000001');
-    const res = await approve(head.auth, applicant);
-    expect(res.status).toBe(403);
+    const { rows } = await t.pool.query('SELECT role FROM app_users WHERE id = $1;', [applicant.id]);
+    expect(rows[0].role).toBe('sheikh');
+    const promote = await t.api().post('/api/users').set(head.auth)
+      .send({ id: applicant.id, name: applicant.name, phone: applicant.phone, status: 'approved', role: 'committee_head' });
+    expect(promote.status).toBe(403);
     const login = await t.api().post('/api/auth/login').send({ identifier: applicant.phone, password: 'Applicant123' });
     expect(login.status).toBe(403);
   });
 
-  it('the super admin can activate it, and only then can the applicant log in', async () => {
+  it('an admin approves and promotes to committee head, and only then can the applicant log in', async () => {
     const applicant = await apply('teacher', '0561000002');
-    expect((await approve(admin.auth, applicant)).status).toBe(200);
+    const res = await t.api().post('/api/users').set(admin.auth)
+      .send({ id: applicant.id, name: applicant.name, phone: applicant.phone, status: 'approved', role: 'committee_head' });
+    expect(res.status).toBe(200);
     const login = await t.api().post('/api/auth/login').send({ identifier: applicant.phone, password: 'Applicant123' });
     expect(login.status).toBe(200);
-    expect(login.body.user.role).toBe('teacher');
+    expect(login.body.user.role).toBe('committee_head');
   });
 
-  it('a committee head can still approve an assistant applicant', async () => {
+  it('a committee head can still approve a sheikh applicant', async () => {
     const applicant = await apply('assistant', '0561000003');
     expect((await approve(head.auth, applicant)).status).toBe(200);
   });
 
-  it('an unknown role in a join request falls back to assistant', async () => {
+  it('an unknown role in a join request falls back to sheikh', async () => {
     const applicant = await apply('super_admin', '0561000004');
     const { rows } = await t.pool.query('SELECT role, status FROM app_users WHERE id = $1;', [applicant.id]);
-    expect(rows[0]).toEqual({ role: 'assistant', status: 'pending' });
+    expect(rows[0]).toEqual({ role: 'sheikh', status: 'pending' });
   });
 
   it('accepts a phone typed with Arabic-Indic digits, at registration and at login', async () => {

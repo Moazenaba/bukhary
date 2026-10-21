@@ -11,7 +11,7 @@ afterAll(async () => {
 
 describe('login', () => {
   it('logs in an approved user by phone and returns access + refresh tokens without the password', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const res = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeTruthy();
@@ -21,7 +21,7 @@ describe('login', () => {
   });
 
   it('gives the same message for unknown users and wrong passwords', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const wrong = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'nope-123456' });
     const unknown = await t.api().post('/api/auth/login').send({ identifier: '0500000000', password: 'nope-123456' });
     expect(wrong.status).toBe(401);
@@ -30,7 +30,7 @@ describe('login', () => {
   });
 
   it('does not reveal a pending account before the password is correct', async () => {
-    const u = await createUser(t.pool, { role: 'assistant', status: 'pending' });
+    const u = await createUser(t.pool, { role: 'sheikh', status: 'pending' });
     const bad = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     expect(bad.status).toBe(401);
     const good = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
@@ -39,7 +39,7 @@ describe('login', () => {
   });
 
   it('locks the account after repeated failures, even with the right password, without revealing it (API-22)', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     for (let i = 0; i < 3; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const res = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
     const unknown = await t.api().post('/api/auth/login').send({ identifier: '0599999999', password: PASSWORD });
@@ -50,7 +50,7 @@ describe('login', () => {
   });
 
   it('starts a fresh failure count once a lock has run out', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     await t.pool.query("UPDATE app_users SET failed_login_count = 3, locked_until = NOW() - interval '1 minute' WHERE id = $1;", [u.id]);
     await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const { rows } = await t.pool.query('SELECT failed_login_count, locked_until FROM app_users WHERE id = $1;', [u.id]);
@@ -60,7 +60,7 @@ describe('login', () => {
   });
 
   it('records failed logins and lockouts in the audit log (API-32)', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     for (let i = 0; i < 3; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const { rows } = await t.pool.query("SELECT action FROM audit_logs WHERE entity = 'auth' AND entity_id = $1 ORDER BY created_at;", [u.id]);
     expect(rows.map((r) => r.action)).toEqual(['auth.login_failed', 'auth.login_failed', 'auth.locked']);
@@ -79,7 +79,7 @@ describe('sessions', () => {
   });
 
   it('rotates refresh tokens: a used refresh token cannot be reused', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { refreshToken } = await login(t, u.phone);
     const first = await t.api().post('/api/auth/refresh').send({ refreshToken });
     expect(first.status).toBe(200);
@@ -88,7 +88,7 @@ describe('sessions', () => {
   });
 
   it('change-password requires the current password and revokes old tokens', async () => {
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { token } = await login(t, u.phone);
     const auth = { Authorization: `Bearer ${token}` };
     const bad = await t.api().post('/api/auth/change-password').set(auth).send({ currentPassword: 'x', newPassword: 'NewPass123' });
@@ -104,7 +104,7 @@ describe('sessions', () => {
     const res = await t.api().get('/api/committees');
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
-    const u = await createUser(t.pool, { role: 'assistant' });
+    const u = await createUser(t.pool, { role: 'sheikh' });
     const { token } = await login(t, u.phone);
     const missing = await t.api().get('/api/does-not-exist').set('Authorization', `Bearer ${token}`);
     expect(missing.status).toBe(404);
@@ -121,7 +121,7 @@ describe('registration', () => {
     expect(res.body.requestCode).toMatch(/^REQ-\d{4}-[0-9A-F]{8}$/);
     const { rows } = await t.pool.query("SELECT role, status FROM app_users WHERE phone = '0511122233';");
     // Asking for super_admin is ignored.
-    expect(rows[0]).toEqual({ role: 'assistant', status: 'pending' });
+    expect(rows[0]).toEqual({ role: 'sheikh', status: 'pending' });
     const status = await t.api().get(`/api/auth/join-status/${res.body.requestCode}`);
     expect(status.body.status).toBe('pending');
   });

@@ -69,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'committees',
           label: 'إدارة اللجان الميدانية',
           icon: 'groups',
-          badge: isSuperAdmin || currentUser.allCommitteesAllowed ? committeesCount : (currentUser.assignedCommitteeIds ?? []).length,
+          badge: committeesCount,
           visible: AuthService.canAccessTab('committees', currentUser),
         },
         {
@@ -113,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'assistants',
-          label: 'المعاونون والصلاحيات',
+          label: 'الشيوخ والصلاحيات',
           icon: 'badge',
           badge: pendingAssistantsCount > 0 ? `${pendingAssistantsCount} معلق` : null,
           isPendingBadge: pendingAssistantsCount > 0,

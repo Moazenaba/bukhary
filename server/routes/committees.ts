@@ -5,7 +5,8 @@ import { audit } from '../audit.ts';
 import type { AppConfig } from '../config.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, notFound, route } from '../http.ts';
-import { type Action, isScopedRole } from '../policy.ts';
+import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, seesAllCommittees } from '../policy.ts';
+import { staffableUsers } from './users.ts';
 import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages } from '../workflow.ts';
 import { notify } from './notifications.ts';
 import {
@@ -98,6 +99,53 @@ export function committeeFromRow(r: any) {
     createdAtTime: r.created_at_time ?? '',
     updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : r.updated_at,
   };
+}
+
+interface Person {
+  id: string;
+  name: string;
+  role?: string;
+}
+
+/**
+ * Committees as `user` may see them: each lists its staff (committee heads and sheikhs assigned to
+ * it), and admin accounts are hidden from everyone but super admins, also among ceremony attendees.
+ */
+async function presenterFor(db: Queryable, user: Principal) {
+  const { rows } = await db.query(
+    `SELECT id, name, role, assigned_committee_ids FROM app_users
+     WHERE status = 'approved' AND (role IN ('super_admin', 'admin') OR jsonb_array_length(assigned_committee_ids) > 0)
+     ORDER BY name ASC;`
+  );
+  const hidden = new Set<string>(isAllowed(user, 'users.admins') ? [] : rows.filter((r) => isAdminRole(r.role)).map((r) => r.id));
+  const staffBy = new Map<string, Person[]>();
+  for (const r of rows) {
+    if (!isScopedRole(r.role)) continue;
+    for (const cid of Array.isArray(r.assigned_committee_ids) ? r.assigned_committee_ids : []) {
+      const list = staffBy.get(cid) ?? [];
+      list.push({ id: r.id, name: r.name, role: r.role });
+      staffBy.set(cid, list);
+    }
+  }
+  return {
+    hidden,
+    present(row: any) {
+      const c = committeeFromRow(row);
+      const attendees: Person[] | undefined = c.ceremonyDetails?.attendees;
+      return {
+        ...c,
+        ceremonyDetails: attendees ? { ...c.ceremonyDetails, attendees: attendees.filter((a) => !hidden.has(a.id)) } : c.ceremonyDetails,
+        staff: staffBy.get(row.id) ?? [],
+      };
+    },
+  };
+}
+
+/** Whether `user` may see the committee: in scope, or invited to its ceremony. */
+function canSeeCommittee(user: Principal, row: any) {
+  if (isCommitteeInScope(user, row.id)) return true;
+  const attendees: Person[] = row.ceremony_details?.attendees ?? [];
+  return attendees.some((a) => a.id === user.id);
 }
 
 async function courseName(db: Queryable, courseId: string | null): Promise<string | null> {
@@ -253,15 +301,126 @@ async function syncCeremonyTask(db: Queryable, committee: any) {
 export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStagePatch'>) {
   const r = Router();
 
+  // Committee heads and sheikhs see only their committees and the ceremonies they are invited to.
   r.get('/', can('committees.read'), route(async (req, res) => {
     const q = pageQuery.parse(req.query);
+    const user = req.user!;
+    const where = seesAllCommittees(user)
+      ? ''
+      : `WHERE id = ANY($1::text[]) OR ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $2::text))`;
+    const params = seesAllCommittees(user) ? [] : [user.assignedCommitteeIds, user.id];
     const page = await pagedRows(
       pool,
-      'SELECT * FROM committees ORDER BY committee_number ASC, id ASC',
-      'SELECT count(*)::int AS n FROM committees;',
-      q
+      `SELECT * FROM committees ${where} ORDER BY committee_number ASC, id ASC`,
+      `SELECT count(*)::int AS n FROM committees ${where};`,
+      q,
+      params
     );
-    res.json({ success: true, committees: page.rows.map(committeeFromRow), total: page.total, hasMore: page.hasMore });
+    const { present } = await presenterFor(pool, user);
+    res.json({ success: true, committees: page.rows.map(present), total: page.total, hasMore: page.hasMore });
+  }));
+
+  r.get('/:id', can('committees.read'), route(async (req, res) => {
+    const { rows } = await pool.query('SELECT * FROM committees WHERE id = $1;', [req.params.id]);
+    if (!rows[0] || !canSeeCommittee(req.user!, rows[0])) throw notFound('اللجنة غير موجودة');
+    const { present } = await presenterFor(pool, req.user!);
+    res.json({ success: true, committee: present(rows[0]) });
+  }));
+
+  /**
+   * Staffs a committee: `userIds` is the full list of members the caller can see. Admins place
+   * committee heads and sheikhs; committee heads place sheikhs in the committees they head.
+   * People the caller cannot place keep their membership. Each person added or removed is told.
+   */
+  r.put('/:id/members', can('committees.members'), route(async (req, res) => {
+    const { userIds } = z.object({ userIds: z.array(z.string().max(255)).max(500) }).parse(req.body);
+    const user = req.user!;
+    const row = await withTransaction(pool, async (db) => {
+      const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
+      const committee = rows[0];
+      if (!committee) throw notFound('اللجنة غير موجودة');
+      assertCommitteeScope(user, committee.id);
+      const wanted = new Set(userIds);
+      const placeable = (await staffableUsers(db, user)).filter((p) => isScopedRole(p.role) && p.id !== user.id);
+      const placeableIds = new Set(placeable.map((p) => p.id));
+      const unknown = [...wanted].filter((uid) => !placeableIds.has(uid));
+      if (unknown.length) throw badRequest('بعض الأشخاص المختارين غير موجودين أو لا يمكنك إضافتهم لهذه اللجنة');
+      const { rows: current } = await db.query(
+        'SELECT id FROM app_users WHERE assigned_committee_ids ? $1 AND id = ANY($2::text[]) FOR UPDATE;',
+        [committee.id, [...placeableIds]]
+      );
+      const had = new Set(current.map((r) => r.id as string));
+      const added = [...wanted].filter((uid) => !had.has(uid));
+      const removed = [...had].filter((uid) => !wanted.has(uid));
+      if (added.length) {
+        await db.query(
+          `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids || to_jsonb($2::text), updated_at = NOW()
+           WHERE id = ANY($1::text[]) AND NOT assigned_committee_ids ? $2;`,
+          [added, committee.id]
+        );
+      }
+      if (removed.length) {
+        await db.query(
+          `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids - $2::text, updated_at = NOW()
+           WHERE id = ANY($1::text[]);`,
+          [removed, committee.id]
+        );
+      }
+      await db.query(
+        `UPDATE app_users u SET assigned_committees = COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
+                                                               WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb)
+         WHERE u.id = ANY($1::text[]);`,
+        [[...added, ...removed]]
+      );
+      const label = `لجنة ${committee.committee_number} (${committee.committee_name})`;
+      for (const uid of added) {
+        await notify(db, { title: `تمت إضافتك إلى ${label}`, description: committee.course_name ?? '', type: 'info', committeeId: committee.id, targetUserId: uid });
+      }
+      for (const uid of removed) {
+        await notify(db, { title: `تم إلغاء إضافتك إلى ${label}`, description: '', type: 'info', targetUserId: uid });
+      }
+      await audit(db, req, 'committee.members', 'committee', committee.id, { members: [...had] }, { members: [...wanted] },
+        `added:${added.length},removed:${removed.length}`);
+      return committee;
+    });
+    const { present } = await presenterFor(pool, user);
+    res.json({ success: true, committee: present(row) });
+  }));
+
+  /**
+   * Invites people to (or removes them from) the committee's ceremony without touching its
+   * details: used from a sheikh's page ("add to this ceremony") and from the ceremony itself.
+   */
+  r.post('/:id/ceremony-attendees', can('committees.finalize'), route(async (req, res) => {
+    const body = z
+      .object({ add: z.array(z.string().max(255)).max(200).default([]), remove: z.array(z.string().max(255)).max(200).default([]) })
+      .parse(req.body);
+    const user = req.user!;
+    const row = await withTransaction(pool, async (db) => {
+      const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
+      const existing = rows[0];
+      if (!existing) throw notFound('اللجنة غير موجودة');
+      assertCommitteeScope(user, existing.id);
+      const before = existing.ceremony_details ?? {};
+      const beforeAttendees: Person[] = before.attendees ?? [];
+      const people = body.add.length ? await staffableUsers(db, user, [...new Set(body.add)]) : [];
+      if (people.length !== new Set(body.add).size) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
+      const removing = new Set(body.remove);
+      const attendees = [
+        ...beforeAttendees.filter((a) => !removing.has(a.id)),
+        ...people.filter((p) => !beforeAttendees.some((a) => a.id === p.id)).map((p) => ({ id: p.id, name: p.name })),
+      ];
+      const after = { ...before, attendees };
+      const { rows: updated } = await db.query(
+        'UPDATE committees SET ceremony_details = $2::jsonb, updated_at = NOW() WHERE id = $1 RETURNING *;',
+        [existing.id, JSON.stringify(after)]
+      );
+      await notifyCeremonyAttendees(db, existing, before, beforeAttendees, after);
+      await audit(db, req, 'committee.ceremonyAttendees', 'committee', existing.id, { attendees: beforeAttendees }, { attendees }, '');
+      return updated[0];
+    });
+    const { present } = await presenterFor(pool, user);
+    res.json({ success: true, committee: present(row) });
   }));
 
   r.post('/', route(async (req, res) => {
@@ -270,7 +429,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [c.id]);
       return upsertCommittee(db, req, c, rows[0]);
     });
-    res.json({ success: true, committee: committeeFromRow(row) });
+    res.json({ success: true, committee: (await presenterFor(pool, req.user!)).present(row) });
   }));
 
   // All rows are saved in one transaction: either every committee is stored or none.
@@ -284,7 +443,8 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       }
       return out;
     });
-    res.json({ success: true, count: saved.length, committees: saved.map(committeeFromRow) });
+    const { present } = await presenterFor(pool, req.user!);
+    res.json({ success: true, count: saved.length, committees: saved.map(present) });
   }));
 
   // Partial update from older clients. Stages are merged per key, so two people ticking different
@@ -350,7 +510,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         Object.keys(body).filter((k) => k !== 'expectedUpdatedAt').join(','));
       return updated[0];
     });
-    res.json({ success: true, committeeId: row.id, committee: committeeFromRow(row) });
+    res.json({ success: true, committeeId: row.id, committee: (await presenterFor(pool, req.user!)).present(row) });
   }));
 
   // Workflow intents (API-10): the server applies the rule, stamps who and when, and keeps the
@@ -371,13 +531,15 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       const beforeAttendees: Array<{ id: string; name: string }> = before.attendees ?? [];
       let attendees = beforeAttendees;
       if (action.type === 'scheduleCeremony' && action.attendeeUserIds) {
-        const ids = [...new Set(action.attendeeUserIds)];
-        const { rows: people } = await db.query(
-          "SELECT id, name FROM app_users WHERE id = ANY($1::text[]) AND status = 'approved';",
-          [ids]
-        );
-        if (people.length !== ids.length) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
-        attendees = ids.map((id) => ({ id, name: people.find((p) => p.id === id)!.name as string }));
+        // The caller sends the attendees they can see; attendees hidden from them stay invited.
+        const { hidden } = await presenterFor(db, user);
+        const kept = beforeAttendees.filter((a) => hidden.has(a.id));
+        const ids = [...new Set(action.attendeeUserIds)].filter((uid) => !hidden.has(uid));
+        const newIds = ids.filter((uid) => !beforeAttendees.some((a) => a.id === uid));
+        const people = newIds.length ? await staffableUsers(db, user, newIds) : [];
+        if (people.length !== newIds.length) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
+        const name = (uid: string) => people.find((p) => p.id === uid)?.name ?? beforeAttendees.find((a) => a.id === uid)!.name;
+        attendees = [...kept, ...ids.map((uid) => ({ id: uid, name: name(uid) }))];
       }
       const next = applyCommitteeAction(
         {
@@ -431,7 +593,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         'stage' in action ? action.stage : '');
       return updated[0];
     });
-    res.json({ success: true, committeeId: row.id, committee: committeeFromRow(row) });
+    res.json({ success: true, committeeId: row.id, committee: (await presenterFor(pool, req.user!)).present(row) });
   }));
 
   r.delete('/:id', route(async (req, res) => {

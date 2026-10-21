@@ -96,6 +96,12 @@ export const DataService = {
   committeeAction: async (id: string, action: CommitteeAction, expectedUpdatedAt?: string) =>
     (await api<{ committee: Committee }>(`/committees/${enc(id)}/actions`, { method: 'POST', body: { action, expectedUpdatedAt } })).committee,
   deleteCommittee: (id: string) => api(`/committees/${enc(id)}`, { method: 'DELETE' }),
+  /** Sets the committee heads and sheikhs on a committee (people the caller cannot place are kept). */
+  setCommitteeMembers: async (id: string, userIds: string[]) =>
+    (await api<{ committee: Committee }>(`/committees/${enc(id)}/members`, { method: 'PUT', body: { userIds } })).committee,
+  /** Invites people to, or removes them from, the committee's ceremony without changing its details. */
+  setCeremonyAttendees: async (id: string, change: { add?: string[]; remove?: string[] }) =>
+    (await api<{ committee: Committee }>(`/committees/${enc(id)}/ceremony-attendees`, { method: 'POST', body: change })).committee,
 
   // ---- Courses ----
   getCourses: async () => (await api<{ courses: Course[] }>('/courses')).courses,
