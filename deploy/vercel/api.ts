@@ -16,8 +16,8 @@ import { flushPushes } from '../../server/push.ts';
 
 process.env.NODE_ENV ??= 'production';
 process.env.DATABASE_POOL_MAX ??= '3';
-// Vercel's edge replaces X-Forwarded-For with the caller's address, so rate limits and the
-// login lockout see real client IPs instead of the proxy's.
+// Vercel's edge replaces X-Forwarded-For with the caller's address, so logs and the audit trail
+// see real client IPs instead of the proxy's.
 process.env.TRUST_PROXY ??= '1';
 // vercel-build copies migrations/ next to the bundle.
 process.env.MIGRATIONS_DIR ??= fileURLToPath(new URL('./migrations', import.meta.url));

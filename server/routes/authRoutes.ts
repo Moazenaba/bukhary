@@ -25,9 +25,9 @@ import { notify } from './notifications.ts';
 // Hash of a random string, compared when the account does not exist so that
 // "unknown user" and "wrong password" take the same time.
 const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 12);
-// One message for unknown account, wrong password and temporarily locked account, so the
-// response never tells whether an account exists (API-22).
-const INVALID_LOGIN = 'بيانات الدخول غير صحيحة، أو أن الحساب موقوف مؤقتاً بسبب محاولات متكررة';
+// One message for unknown account and wrong password, so the response never tells whether an
+// account exists (API-22).
+const INVALID_LOGIN = 'بيانات الدخول غير صحيحة';
 
 // The web keeps its refresh token in this HttpOnly cookie; page scripts cannot read it (WEB-11).
 export const REFRESH_COOKIE = 'bukhari_rt';
@@ -125,62 +125,22 @@ export function authRouter(config: AppConfig, pool: Pool) {
     // Rows saved before migration 014 that could not be rewritten keep an international form.
     const forms = [typed, ident];
     if (isPhone && /^01\d{9}$/.test(ident)) forms.push(`+2${ident}`, `002${ident}`, `2${ident}`);
-    const ip = req.ip || 'unknown';
     const { rows } = await pool.query(
-      `SELECT u.*, (u.locked_until IS NOT NULL AND u.locked_until > NOW()) AS account_locked,
-              (u.locked_until IS NOT NULL AND u.locked_until <= NOW()) AS lock_expired,
-              (f.locked_until IS NOT NULL AND f.locked_until > NOW()) AS caller_locked
-       FROM app_users u
-       LEFT JOIN login_failures f ON f.user_id = u.id AND f.ip = $3
+      `SELECT u.* FROM app_users u
        WHERE u.phone = ANY($2::text[]) OR lower(u.email) = lower($1)
        ORDER BY (u.phone = $2[1]) DESC, (u.phone = $1) DESC LIMIT 1;`,
-      [ident, forms, ip]
+      [ident, forms]
     );
     const user = rows[0];
-    const locked = Boolean(user?.account_locked || user?.caller_locked);
 
-    // The hash is always compared, so a locked or unknown account takes the same time.
+    // No limit on attempts: a wrong password is only recorded. The hash is always compared, so an
+    // unknown account takes the same time.
     const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH);
-    if (!user || !user.password || !ok || locked) {
-      if (user && !locked) {
-        // This caller's count locks only this caller. A lock or a quiet spell that has run out
-        // starts a fresh count instead of re-locking on the next mistake.
-        const { rows: mine } = await pool.query(
-          `INSERT INTO login_failures (user_id, ip, failed_count, locked_until, updated_at)
-           VALUES ($1, $2, 1, CASE WHEN 1 >= $3 THEN NOW() + make_interval(mins => $4) END, NOW())
-           ON CONFLICT (user_id, ip) DO UPDATE SET
-             failed_count = CASE WHEN login_failures.locked_until <= NOW()
-                                   OR login_failures.updated_at < NOW() - make_interval(mins => $4)
-                                 THEN 1 ELSE login_failures.failed_count + 1 END,
-             locked_until = CASE WHEN (CASE WHEN login_failures.locked_until <= NOW()
-                                              OR login_failures.updated_at < NOW() - make_interval(mins => $4)
-                                            THEN 1 ELSE login_failures.failed_count + 1 END) >= $3
-                                 THEN NOW() + make_interval(mins => $4) ELSE NULL END,
-             updated_at = NOW()
-           RETURNING locked_until;`,
-          [user.id, ip, config.maxLoginAttempts, config.lockoutMinutes]
-        );
-        // The account-wide count stops guessing spread over many addresses.
-        const { rows: account } = await pool.query(
-          `UPDATE app_users SET
-             failed_login_count = CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END,
-             locked_until = CASE WHEN (CASE WHEN $4 THEN 1 ELSE failed_login_count + 1 END) >= $2
-                                 THEN NOW() + make_interval(mins => $3) ELSE NULL END
-           WHERE id = $1 RETURNING locked_until;`,
-          [user.id, config.accountLockAttempts, config.lockoutMinutes, Boolean(user.lock_expired)]
-        );
-        const nowLocked = mine[0]?.locked_until || account[0]?.locked_until;
-        await securityEvent(pool, req, nowLocked ? 'auth.locked' : 'auth.login_failed', user.id, 'wrong password');
-      } else if (locked) {
-        await securityEvent(pool, req, 'auth.login_failed', user.id, 'account locked');
-      } else {
-        await securityEvent(pool, req, 'auth.login_failed', null, `unknown identifier ${ident.slice(0, 3)}…`);
-      }
+    if (!user || !user.password || !ok) {
+      if (user) await securityEvent(pool, req, 'auth.login_failed', user.id, 'wrong password');
+      else await securityEvent(pool, req, 'auth.login_failed', null, `unknown identifier ${ident.slice(0, 3)}…`);
       throw new HttpError(401, INVALID_LOGIN, 'invalid_credentials');
     }
-
-    await pool.query('UPDATE app_users SET failed_login_count = 0, locked_until = NULL WHERE id = $1;', [user.id]);
-    await pool.query('DELETE FROM login_failures WHERE user_id = $1 AND ip = $2;', [user.id, ip]);
     // Status is revealed only after the password is proven.
     if (user.status !== 'approved') {
       const message =

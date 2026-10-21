@@ -50,6 +50,8 @@ fs.writeFileSync(
       routes: [
         { src: '^/(api(?:/.*)?|ping)$', dest: '/api' },
         { src: '^/assets/(.*)$', headers: { 'Cache-Control': 'public, max-age=31536000, immutable' }, continue: true },
+        // The Android app's update manifest (scripts/publish-android.mjs) must never be served stale.
+        { src: '^/app/android\\.json$', headers: { 'Cache-Control': 'no-cache' }, continue: true },
         { handle: 'filesystem' },
         { src: '/(.*)', dest: '/index.html' },
       ],

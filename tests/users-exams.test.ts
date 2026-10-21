@@ -74,7 +74,7 @@ describe('users', () => {
 describe('exam files', () => {
   const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(2048, 1)]);
 
-  it('uploads a PDF and serves it only to super admins and committee heads', async () => {
+  it('uploads a PDF and serves it to whoever holds the exams permission, and not to other sheikhs', async () => {
     const head = await userWithToken(t, { role: 'committee_head', permissions: ['exams_pdf'] });
     const create = await t.api().post('/api/exams').set(head.auth).send({ id: 'exam-a', title: 'امتحان', book: 'كتاب' });
     expect(create.status).toBe(200);
@@ -87,8 +87,13 @@ describe('exam files', () => {
     expect(exam.hasFile).toBe(true);
     expect(exam.pdfDataUrl).toBeUndefined();
 
+    // «الامتحانات ونماذج الـ PDF» opens every exam for any role, with no exam allow-list.
     const teacher = await userWithToken(t, { role: 'sheikh', permissions: ['exams_pdf'] });
-    expect((await t.api().get('/api/exams/exam-a/file').set(teacher.auth)).status).toBe(403);
+    const seen = await t.api().get('/api/exams').set(teacher.auth);
+    expect(seen.body.exams.find((e: any) => e.id === 'exam-a')?.canOpen).toBe(true);
+    expect((await t.api().get('/api/exams/exam-a/file').set(teacher.auth)).status).toBe(200);
+    const other = await userWithToken(t, { role: 'sheikh' });
+    expect((await t.api().get('/api/exams/exam-a/file').set(other.auth)).status).toBe(403);
     const file = await t.api().get('/api/exams/exam-a/file').set(head.auth).buffer(true);
     expect(file.status).toBe(200);
     expect(file.headers['content-type']).toBe('application/pdf');

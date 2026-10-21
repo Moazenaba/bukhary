@@ -43,7 +43,6 @@ Run these with production access. Record the answers in the release notes.
 | `STRICT_PERMISSION_IDS` | `false` | Reject unknown permission ids (400) instead of dropping them. Turn on after older Android builds are gone. |
 | `LEGACY_STAGE_PATCH` | `true` | Accept stage changes through `PATCH /api/committees/:id` (older Android builds). Turn off after they are gone. |
 | `MIN_ANDROID_VERSION_CODE` | `0` | Oldest Android versionCode accepted; older builds get 426 "update the app" and keep their writes queued. |
-| `API_RATE_LIMIT_PER_MINUTE` | `600` | Requests per minute per IP for the whole API. In-memory: with several instances the limit multiplies. |
 
 `JWT_SECRET` is now required in every mode except automated tests.
 
@@ -82,7 +81,7 @@ not in the repository; whichever is used must:
 - route traffic only when `/api/ready` returns 200;
 - keep the previous image so a rollback is "start the previous image" (migrations are additive, so the
   previous server runs against the new schema);
-- set `TRUST_PROXY` to the number of proxies in front of the app, so rate limits see real client IPs.
+- set `TRUST_PROXY` to the number of proxies in front of the app, so logs see real client IPs.
 
 ## 6. What stays open
 

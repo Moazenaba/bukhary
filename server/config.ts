@@ -18,10 +18,6 @@ export interface AppConfig {
   geminiApiKey: string | undefined;
   geminiModel: string;
   trustProxy: string | number | boolean;
-  maxLoginAttempts: number;
-  lockoutMinutes: number;
-  /** Failures from all addresses together that lock the whole account (maxLoginAttempts locks one address). */
-  accountLockAttempts: number;
   /** After an admin password reset, block everything except account endpoints until the user sets a new one. */
   enforcePasswordChange: boolean;
   /** Reject unknown permission ids with 400 instead of dropping them (turn on once all clients send ids only). */
@@ -96,9 +92,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { require
     geminiApiKey: env.GEMINI_API_KEY || env.API_KEY || undefined,
     geminiModel: env.GEMINI_MODEL || 'gemini-2.5-flash',
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
-    maxLoginAttempts: Number(env.MAX_LOGIN_ATTEMPTS) || 5,
-    lockoutMinutes: Number(env.LOCKOUT_MINUTES) || 15,
-    accountLockAttempts: Number(env.ACCOUNT_LOCK_ATTEMPTS) || (Number(env.MAX_LOGIN_ATTEMPTS) || 5) * 10,
     enforcePasswordChange: env.ENFORCE_PASSWORD_CHANGE !== 'false',
     strictPermissionIds: env.STRICT_PERMISSION_IDS === 'true',
     legacyStagePatch: env.LEGACY_STAGE_PATCH !== 'false',

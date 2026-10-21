@@ -66,10 +66,12 @@ export const ACTIONS = {
   },
   'courses.read': { roles: EVERYONE, description: 'عرض الدورات' },
   'courses.write': { roles: MANAGERS, anyPermission: ['manage_courses'], description: 'إضافة وتعديل وحذف الدورات' },
-  'exams.read': { roles: MANAGERS, grantedToRoles: HEADS, description: 'عرض بيانات الامتحانات' },
+  // Whoever holds «الامتحانات ونماذج الـ PDF» (any role) sees and downloads every exam, at any time
+  // (see canAccessExam); committee heads without it keep their per-exam allow-list.
+  'exams.read': { roles: EVERYONE, anyPermission: ['exams_pdf'], grantedToRoles: HEADS, description: 'عرض بيانات الامتحانات' },
   'exams.write': { roles: MANAGERS, anyPermission: ['exams_pdf'], description: 'إضافة وتعديل الامتحانات ورفع الملفات' },
   'exams.delete': { roles: ADMIN_ROLES, description: 'حذف الامتحانات' },
-  'exams.file': { roles: MANAGERS, grantedToRoles: HEADS, description: 'تنزيل ملف أسئلة الامتحان' },
+  'exams.file': { roles: EVERYONE, anyPermission: ['exams_pdf'], grantedToRoles: HEADS, description: 'تنزيل ملف أسئلة الامتحان' },
   'tasks.read': { roles: EVERYONE, description: 'عرض المهام (الشيخ يرى مهامه ومهام لجانه فقط)' },
   'tasks.write': { roles: MANAGERS, grantedToRoles: HEADS, description: 'إضافة وتعديل المهام' },
   'tasks.delete': { roles: MANAGERS, grantedToRoles: HEADS, description: 'حذف المهام' },
@@ -159,11 +161,18 @@ export function grantableRoles(user: Pick<Principal, 'role' | 'permissions'>): R
 export const canSeeRole = (actor: Pick<Principal, 'role' | 'permissions'>, targetRole: string) =>
   isAllowed(actor, 'users.admins') || !ADMIN_ROLES.includes(targetRole as Role);
 
-/** Exam content (file, sample questions) is limited by the per-user exam allow-list. */
+/**
+ * Admins, «الامتحانات ونماذج الـ PDF» holders and people granted all exams open every exam, whatever
+ * the committees' dates or stages.
+ */
+export const seesAllExams = (user: Pick<Principal, 'role' | 'permissions' | 'allExams'>) =>
+  isAdminRole(user.role) || user.allExams || user.permissions.includes('exams_pdf');
+
+/** Exam content (file, sample questions) is otherwise limited by the per-user exam allow-list. */
 export function canAccessExam(user: Principal, examId: string): boolean {
   if (!isAllowed(user, 'exams.file')) return false;
-  if (isAdminRole(user.role)) return true;
-  return user.allExams || user.allowedExamIds.includes(examId);
+  if (seesAllExams(user)) return true;
+  return user.allowedExamIds.includes(examId);
 }
 
 /** Only system permissions grant anything; custom permission labels are display-only tags. */
@@ -181,7 +190,7 @@ export function evaluatedPermissions(user: Principal) {
     committeeScope: scoped ? user.assignedCommitteeIds : ('all' as const),
     // Same scope as committee numbers, for clients that predate committee ids.
     committeeNumbers: scoped ? user.assignedCommittees : ('all' as const),
-    exams: isAdminRole(user.role) || user.allExams ? ('all' as const) : user.allowedExamIds,
+    exams: seesAllExams(user) ? ('all' as const) : user.allowedExamIds,
     grantableRoles: grantableRoles(user),
     mustChangePassword: user.mustChangePassword,
   };

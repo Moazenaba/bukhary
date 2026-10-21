@@ -32,8 +32,6 @@ export const testEnv = (dbUrl = TEST_DB_URL): NodeJS.ProcessEnv => ({
   DATABASE_URL: dbUrl,
   DATABASE_SSL: 'disable',
   JWT_SECRET: 'test_secret_that_is_long_enough_for_hs256_signing',
-  MAX_LOGIN_ATTEMPTS: '3',
-  LOCKOUT_MINUTES: '15',
 });
 
 export async function setupApp(dbUrl = TEST_DB_URL) {

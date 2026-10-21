@@ -38,32 +38,27 @@ describe('login', () => {
     expect(good.body.code).toBe('account_pending');
   });
 
-  it('locks the account after repeated failures, even with the right password, without revealing it (API-22)', async () => {
+  it('never locks an account: the right password works after any number of wrong ones', async () => {
     const u = await createUser(t.pool, { role: 'sheikh' });
-    for (let i = 0; i < 3; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
-    const res = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
-    const unknown = await t.api().post('/api/auth/login').send({ identifier: '0599999999', password: PASSWORD });
-    expect(res.status).toBe(401);
-    // Same answer as for an account that does not exist.
-    expect(res.body.message).toBe(unknown.body.message);
-    expect(res.body.code).toBe(unknown.body.code);
-  });
-
-  it('starts a fresh failure count once a lock has run out', async () => {
-    const u = await createUser(t.pool, { role: 'sheikh' });
-    await t.pool.query("UPDATE app_users SET failed_login_count = 3, locked_until = NOW() - interval '1 minute' WHERE id = $1;", [u.id]);
-    await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
-    const { rows } = await t.pool.query('SELECT failed_login_count, locked_until FROM app_users WHERE id = $1;', [u.id]);
-    expect(rows[0]).toEqual({ failed_login_count: 1, locked_until: null });
+    for (let i = 0; i < 40; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const ok = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
     expect(ok.status).toBe(200);
   });
 
-  it('records failed logins and lockouts in the audit log (API-32)', async () => {
+  it('answers a wrong password like an unknown account (API-22)', async () => {
+    const u = await createUser(t.pool, { role: 'sheikh' });
+    const res = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
+    const unknown = await t.api().post('/api/auth/login').send({ identifier: '0599999999', password: PASSWORD });
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe(unknown.body.message);
+    expect(res.body.code).toBe(unknown.body.code);
+  });
+
+  it('records failed logins in the audit log (API-32)', async () => {
     const u = await createUser(t.pool, { role: 'sheikh' });
     for (let i = 0; i < 3; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const { rows } = await t.pool.query("SELECT action FROM audit_logs WHERE entity = 'auth' AND entity_id = $1 ORDER BY created_at;", [u.id]);
-    expect(rows.map((r) => r.action)).toEqual(['auth.login_failed', 'auth.login_failed', 'auth.locked']);
+    expect(rows.map((r) => r.action)).toEqual(['auth.login_failed', 'auth.login_failed', 'auth.login_failed']);
   });
 });
 

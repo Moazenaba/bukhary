@@ -8,8 +8,8 @@ import { loadConfig } from '../server/config.ts';
 import { normalizePhone } from '../server/schemas.ts';
 import { PASSWORD, createUser, setupApp, testEnv, type TestApp } from './helpers.ts';
 
-// Lockouts are per caller: people guessing a shared account's password lock only themselves out,
-// and the owner still signs in. Egyptian mobiles are one account whatever the typed form.
+// No lockouts: wrong guesses never stop the owner signing in. Egyptian mobiles are one account
+// whatever the typed form.
 
 let t: TestApp;
 let behindProxy: ReturnType<typeof createApp>;
@@ -26,21 +26,12 @@ const egyptMobile = () => `010${crypto.randomInt(10_000_000, 99_999_999)}`;
 const loginFrom = (ip: string, identifier: string, password: string) =>
   request(behindProxy).post('/api/auth/login').set('X-Forwarded-For', ip).send({ identifier, password });
 
-describe('per-caller lockout', () => {
-  it('wrong guesses from one address do not lock the owner out from another', async () => {
-    const u = await createUser(t.pool, { role: 'super_admin' });
-    for (let i = 0; i < 3; i++) expect((await loginFrom('198.51.100.7', u.phone, 'wrong-pass1')).status).toBe(401);
-    // The guesser is locked, even with the right password...
-    expect((await loginFrom('198.51.100.7', u.phone, PASSWORD)).status).toBe(401);
-    // ...the owner is not.
-    expect((await loginFrom('203.0.113.9', u.phone, PASSWORD)).status).toBe(200);
-  });
-
-  it('many addresses together still lock the whole account', async () => {
+describe('no lockout', () => {
+  it('wrong guesses from one or many addresses never lock anyone out', async () => {
     const u = await createUser(t.pool, { role: 'sheikh' });
-    // accountLockAttempts defaults to 10 x MAX_LOGIN_ATTEMPTS (3 in tests) = 30.
     for (let i = 0; i < 30; i++) await loginFrom(`192.0.2.${i + 1}`, u.phone, 'wrong-pass1');
-    expect((await loginFrom('203.0.113.50', u.phone, PASSWORD)).status).toBe(401);
+    expect((await loginFrom('192.0.2.1', u.phone, PASSWORD)).status).toBe(200);
+    expect((await loginFrom('203.0.113.50', u.phone, PASSWORD)).status).toBe(200);
   });
 });
 
