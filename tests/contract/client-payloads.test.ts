@@ -77,9 +77,7 @@ describe('Android payloads (tests/contract/android-payloads.json)', () => {
     expect(c[0].ceremony_details.ceremonyDate).toBe('2026-11-01');
     const { rows: ceremonyTask } = await t.pool.query("SELECT date FROM schedule_tasks WHERE id = 'task-ceremony-contract-committee';");
     expect(ceremonyTask[0].date).toBe('2026-11-01');
-    // The approval and the rejection did not wipe the passport number (MOB-09).
-    const { rows: u } = await t.pool.query("SELECT passport_number, assigned_committee_ids, data FROM app_users WHERE id = 'contract-applicant';");
-    expect(u[0].passport_number).toBe('P-CONTRACT');
+    const { rows: u } = await t.pool.query("SELECT assigned_committee_ids, data FROM app_users WHERE id = 'contract-applicant';");
     expect(u[0].assigned_committee_ids).toEqual(['contract-committee']);
     expect(u[0].data.rejectionReason).toBe('اكتمل العدد');
   });

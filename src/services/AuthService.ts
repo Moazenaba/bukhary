@@ -178,7 +178,6 @@ class AuthServiceClass {
         password: data.password,
         notes: data.notes,
         whatsapp: data.whatsapp,
-        nationalId: data.nationalId,
         quranLevel: data.quranLevel,
         qualification: data.qualification,
         experience: data.experience,

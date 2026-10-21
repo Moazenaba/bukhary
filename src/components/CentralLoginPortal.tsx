@@ -36,7 +36,6 @@ export const CentralLoginPortal: React.FC = () => {
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regWhatsapp, setRegWhatsapp] = useState('');
-  const [regNationalId, setRegNationalId] = useState('');
   const [regQuranLevel, setRegQuranLevel] = useState('');
   const [regQualification, setRegQualification] = useState('');
   const [regExperience, setRegExperience] = useState('');
@@ -93,7 +92,6 @@ export const CentralLoginPortal: React.FC = () => {
         name: regName.trim(),
         phone: regPhone.trim(),
         whatsapp: regWhatsapp.trim() || undefined,
-        nationalId: regNationalId.trim() || undefined,
         role: regRole,
         password: regPassword,
         quranLevel: regQuranLevel.trim() || undefined,
@@ -117,7 +115,6 @@ export const CentralLoginPortal: React.FC = () => {
     setRegName('');
     setRegPhone('');
     setRegWhatsapp('');
-    setRegNationalId('');
     setRegQuranLevel('');
     setRegQualification('');
     setRegExperience('');
@@ -457,19 +454,6 @@ export const CentralLoginPortal: React.FC = () => {
                               placeholder="نفس رقم الجوال أو رقم آخر..."
                               value={regWhatsapp}
                               onChange={(e) => setRegWhatsapp(e.target.value)}
-                              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              رقم الهوية الوطنية / الإقامة (اختياري)
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="رقم الهوية..."
-                              value={regNationalId}
-                              onChange={(e) => setRegNationalId(e.target.value)}
                               className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand font-mono text-left"
                             />
                           </div>

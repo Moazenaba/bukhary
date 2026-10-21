@@ -38,7 +38,6 @@ export const emailSchema = z
 // writable by the user themself.
 const PROFILE_FIELDS = {
   whatsapp: optionalText(50),
-  nationalId: optionalText(50),
   quranLevel: optionalText(500),
   qualification: optionalText(500),
   experience: optionalText(2000),
@@ -55,7 +54,6 @@ const userInput = z.object({
   name: z.string().trim().min(1, 'الاسم مطلوب').max(200),
   phone: phoneSchema,
   email: emailSchema,
-  passportNumber: optionalText(50),
   password: z.string().max(128).optional(),
   role: z.enum(ROLES).optional(),
   status: z.enum(['pending', 'interview', 'approved', 'rejected']).optional(),
@@ -85,8 +83,8 @@ const USER_SELECT = `
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 const iso = (v: any) => (v instanceof Date ? v.toISOString() : v);
 
-/** API representation. Identity documents are only shown to super admins and the user themself. */
-export function userFromRow(r: any, opts: { includeIdentity: boolean }) {
+/** API representation of a user. */
+export function userFromRow(r: any) {
   const profile = r.data ?? {};
   const numbers = Array.isArray(r.assigned_numbers) ? r.assigned_numbers : r.assigned_committees ?? [];
   const out: Record<string, unknown> = {
@@ -114,8 +112,6 @@ export function userFromRow(r: any, opts: { includeIdentity: boolean }) {
   for (const k of PROFILE_KEYS) if (profile[k] !== undefined && profile[k] !== null) out[k] = profile[k];
   if (profile.rejectedAt) out.rejectedAt = profile.rejectedAt;
   if (profile.rejectedBy) out.rejectedBy = profile.rejectedBy;
-  if (opts.includeIdentity) out.passportNumber = r.passport_number ?? undefined;
-  else delete out.nationalId;
   return out;
 }
 
@@ -328,9 +324,8 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
       input.id, input.name, input.phone,
       sent('email') || !existing ? input.email : existing.email,
       passwordHash,
-      // Only people who can see the passport number may change it; managers receive the list
-      // without it, so a value they send back (usually empty) must not wipe it (MOB-09).
-      sent('passportNumber') && (canGrant || isSelf) ? input.passportNumber : existing?.passport_number ?? null,
+      // No ID or passport number is kept (migration 018).
+      null,
       role, status, JSON.stringify(numbers), JSON.stringify(assignedIds), allCommittees, allExams,
       JSON.stringify(allowedExamIds), profileId, mustChange, JSON.stringify(permissions),
       sent('notes') ? input.notes : existing?.notes ?? null,
@@ -349,7 +344,7 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
     await notify(db, { title: 'تم تحديث اللجان المسندة إليك', description: `عدد اللجان: ${allCommittees ? 'كل اللجان' : assignedIds.length}`, type: 'info', targetUserId: input.id });
   }
 
-  const safe = (r: any) => (r ? userFromRow(r, { includeIdentity: false }) : null);
+  const safe = (r: any) => (r ? userFromRow(r) : null);
   await audit(db, req, existing ? 'user.update' : 'user.create', 'user', input.id, safe(existing), safe(saved[0]));
   return saved[0];
 }
@@ -400,9 +395,8 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
   const r = Router();
 
   r.get('/', can('users.read'), route(async (req, res) => {
-    const includeIdentity = isAllowed(req.user!, 'users.grant');
     const rows = await listUsersFor(pool, req.user!);
-    res.json({ success: true, users: rows.map((u) => userFromRow(u, { includeIdentity })) });
+    res.json({ success: true, users: rows.map((u) => userFromRow(u)) });
   }));
 
   /**
@@ -431,7 +425,7 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
     const input = userInput.parse(req.body);
     const row = await withTransaction(pool, (db) => saveUser(db, req, input, opts));
     const { rows } = await pool.query(`${USER_SELECT} WHERE u.id = $1;`, [row.id]);
-    res.json({ success: true, user: userFromRow(rows[0], { includeIdentity: isAllowed(req.user!, 'users.grant') || req.user!.id === row.id }) });
+    res.json({ success: true, user: userFromRow(rows[0]) });
   }));
 
   // Admin password reset (WEB-02): the user must choose a new password at the next login.
@@ -464,7 +458,7 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
         throw conflict('لا يمكن حذف آخر مشرف عام في النظام');
       }
       await db.query('DELETE FROM app_users WHERE id = $1;', [req.params.id]);
-      await audit(db, req, 'user.delete', 'user', req.params.id, userFromRow(rows[0], { includeIdentity: false }), null);
+      await audit(db, req, 'user.delete', 'user', req.params.id, userFromRow(rows[0]), null);
     });
     res.json({ success: true });
   }));

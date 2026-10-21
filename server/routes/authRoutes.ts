@@ -47,7 +47,6 @@ const registerInput = z.object({
   password: passwordSchema,
   notes: optionalText(2000),
   whatsapp: optionalText(50),
-  nationalId: optionalText(50),
   quranLevel: optionalText(500),
   qualification: optionalText(500),
   experience: optionalText(2000),
@@ -106,7 +105,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     const body: Record<string, unknown> = {
       success: true,
       token,
-      user: userFromRow(userRow, { includeIdentity: true }),
+      user: userFromRow(userRow),
       mustChangePassword: Boolean(userRow.must_change_password),
       permissions: principal ? evaluatedPermissions(principal) : undefined,
     };
@@ -256,7 +255,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
     const { rows } = await pool.query('SELECT * FROM app_users WHERE id = $1;', [req.user!.id]);
     res.json({
       success: true,
-      user: userFromRow(rows[0], { includeIdentity: true }),
+      user: userFromRow(rows[0]),
       permissions: evaluatedPermissions(req.user!),
       mustChangePassword: req.user!.mustChangePassword,
     });

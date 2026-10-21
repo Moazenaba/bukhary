@@ -393,8 +393,6 @@ export interface AppUser {
   name: string;
   phone: string;
   whatsapp?: string;
-  nationalId?: string;
-  passportNumber?: string; // رقم الجواز أو الهوية
   email: string;
   password?: string;
   role: UserRole;
