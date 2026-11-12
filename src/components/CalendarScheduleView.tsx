@@ -776,7 +776,8 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onDeleteTask(task.id)}
-                        hidden={!AuthService.can('tasks.delete')}
+                        // A ceremony's task belongs to the committee: its date is changed or cleared from the ceremonies screen.
+                        hidden={!AuthService.can('tasks.delete') || task.id.startsWith('task-ceremony-')}
                         className="text-red-500 hover:text-red-700 text-xs font-semibold cursor-pointer"
                       >
                         حذف

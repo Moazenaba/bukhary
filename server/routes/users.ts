@@ -200,6 +200,7 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
   let allExams = Boolean(existing?.all_exams);
   let allowedExamIds: string[] = asStrings(existing?.allowed_exam_ids);
   let profileId: string | null = existing?.profile_id ?? null;
+  let profileCommitteeIds = new Set<string>();
 
   if (input.profileId !== undefined && (input.profileId ?? null) !== profileId) {
     profileId = input.profileId ?? null;
@@ -209,6 +210,7 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
       const p = prof[0];
       permissions = asStrings(p.permissions);
       allCommittees = Boolean(p.all_committees_allowed);
+      profileCommitteeIds = new Set(asStrings(p.allowed_committee_ids));
       assignedIds = allCommittees ? assignedIds : asStrings(p.allowed_committee_ids);
       allExams = Boolean(p.all_exams_allowed);
       allowedExamIds = asStrings(p.allowed_exam_ids);
@@ -269,8 +271,14 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
     if (outside.length) throw forbidden('لا يمكنك إسناد لجان خارج نطاق لجانك');
   }
   if (assignedIds.length) {
-    const { rows: found } = await db.query('SELECT count(*)::int AS n FROM committees WHERE id = ANY($1::text[]);', [assignedIds]);
-    if (found[0].n !== assignedIds.length) throw badRequest('إحدى اللجان المحددة غير موجودة');
+    // Committees deleted since they were assigned (or kept on a permission profile) are dropped
+    // quietly; only a committee being added now must exist.
+    const { rows: found } = await db.query('SELECT id FROM committees WHERE id = ANY($1::text[]);', [assignedIds]);
+    const existingIds = new Set(found.map((r) => r.id as string));
+    if (assignedIds.some((cid) => !existingIds.has(cid) && !before.assignedIds.includes(cid) && !profileCommitteeIds.has(cid))) {
+      throw badRequest('إحدى اللجان المحددة غير موجودة');
+    }
+    assignedIds = assignedIds.filter((cid) => existingIds.has(cid));
   }
 
   // Never leave the system without an approved super admin.
@@ -458,6 +466,14 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
         throw conflict('لا يمكن حذف آخر مشرف عام في النظام');
       }
       await db.query('DELETE FROM app_users WHERE id = $1;', [req.params.id]);
+      // A deleted account is no longer invited to any ceremony.
+      await db.query(
+        `UPDATE committees SET ceremony_details = jsonb_set(ceremony_details, '{attendees}',
+           COALESCE((SELECT jsonb_agg(a) FROM jsonb_array_elements(ceremony_details -> 'attendees') a WHERE a ->> 'id' <> $1), '[]'::jsonb)),
+           updated_at = NOW()
+         WHERE ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $1::text));`,
+        [req.params.id]
+      );
       await audit(db, req, 'user.delete', 'user', req.params.id, userFromRow(rows[0]), null);
     });
     res.json({ success: true });

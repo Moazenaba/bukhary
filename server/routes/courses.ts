@@ -17,6 +17,9 @@ const courseInput = z.object({
   description: optionalText(5000),
   targetCommitteesCount: nonNegativeInt.nullish(),
   isDefault: z.boolean().default(false),
+}).refine((c) => !c.startDate || !c.endDate || c.endDate >= c.startDate, {
+  message: 'تاريخ نهاية الدورة لا يمكن أن يسبق تاريخ بدايتها',
+  path: ['endDate'],
 });
 
 export function courseFromRow(r: any) {

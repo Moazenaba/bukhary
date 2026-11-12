@@ -7,7 +7,7 @@ import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, notFound, route } from '../http.ts';
 import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, seesAllCommittees } from '../policy.ts';
 import { staffableUsers } from './users.ts';
-import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages } from '../workflow.ts';
+import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages, normalizeStageOrder } from '../workflow.ts';
 import { notify } from './notifications.ts';
 import {
   STAGE_KEYS,
@@ -180,11 +180,17 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
 
   const name = await courseName(db, c.courseId);
   // Stage flags from a full save get server timestamps, as with PATCH (WEB-18, MOB-15).
+  const now = new Date().toISOString();
   const stages = {
     ...emptyStages(),
     ...(existing?.stages ?? {}),
-    ...mergeLegacyStages(existing?.stages ?? {}, c.stages ?? {}, user, new Date().toISOString()),
+    ...mergeLegacyStages(existing?.stages ?? {}, c.stages ?? {}, user, now),
   };
+  // The stage order holds for whole saves too (no «تم الحفل» without the exam, etc.), and each
+  // changed stage needs the same right as the stage action.
+  const ceremonyAfter = c.ceremonyDetails ?? existing?.ceremony_details;
+  const { changed } = normalizeStageOrder(existing?.stages ?? {}, stages, user, now, ceremonyAfter);
+  for (const k of changed) assertAllowed(user, STAGE_ACTION[k]);
   const sheetExcel = c.excelUrl ?? c.stages?.sheet?.excelUrl ?? existing?.stages?.sheet?.excelUrl ?? existing?.data?.excelUrl ?? null;
   if (sheetExcel !== null && sheetExcel !== undefined) {
     stages.sheet = { ...(stages.sheet ?? { completed: false }), excelUrl: sheetExcel };
@@ -229,7 +235,9 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
     await db.query('UPDATE schedule_tasks SET committee_number = $2 WHERE committee_id = $1;', [c.id, c.committeeNumber]);
     await db.query('UPDATE scoring_records SET committee_number = $2 WHERE committee_id = $1;', [c.id, c.committeeNumber]);
   }
+  // The ceremony's calendar task follows the committee (date and «تم الحفل»).
   if (c.ceremonyDetails) await syncCeremonyTask(db, rows[0]);
+  else if (changed.includes('ceremony')) await syncCeremonyTask(db, rows[0], { detailsChanged: false });
   if (!existing && isScopedRole(user.role) && !user.allCommittees) {
     // A scoped manager who creates a committee is responsible for it.
     await db.query(
@@ -278,23 +286,40 @@ async function notifyCeremonyAttendees(
   }
 }
 
-/** The ceremony's calendar task has one owner: the server (WEB-08). No date means no task. */
-async function syncCeremonyTask(db: Queryable, committee: any) {
+/**
+ * The ceremony's calendar task has one owner: the server (WEB-08). No date means no task; the task
+ * is completed exactly when the committee's ceremony stage is.
+ */
+export async function syncCeremonyTask(db: Queryable, committee: any, opts: { detailsChanged: boolean } = { detailsChanged: true }) {
   const taskId = `task-ceremony-${committee.id}`;
   const details = committee.ceremony_details ?? {};
   const raw = typeof details.ceremonyDate === 'string' ? details.ceremonyDate.trim().replace(/\//g, '-') : '';
   const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(Date.parse(`${raw}T00:00:00Z`)) ? raw : null;
   if (!date) {
-    await db.query('DELETE FROM schedule_tasks WHERE id = $1;', [taskId]);
+    // The date was cleared on purpose: no task. When only the stage changed, an older task that
+    // still holds the date is kept and just follows the stage (its data is never deleted here).
+    if (opts.detailsChanged) await db.query('DELETE FROM schedule_tasks WHERE id = $1;', [taskId]);
+    else {
+      await db.query(
+        `UPDATE schedule_tasks SET completed = $2,
+           completed_at = CASE WHEN $2 THEN COALESCE(completed_at, NOW()) ELSE NULL END, updated_at = NOW()
+         WHERE id = $1;`,
+        [taskId, Boolean(committee.stages?.ceremony?.completed)]
+      );
+    }
     return;
   }
   await db.query(
-    `INSERT INTO schedule_tasks (id, title, date, time, committee_id, committee_number, type, priority, completed, notes, data, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'ceremony','high',false,$7,'{}'::jsonb,NOW())
+    `INSERT INTO schedule_tasks (id, title, date, time, committee_id, committee_number, type, priority, completed, completed_at, notes, data, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'ceremony','high',$8,CASE WHEN $8 THEN NOW() ELSE NULL END,$7,'{}'::jsonb,NOW())
      ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, date = EXCLUDED.date, time = EXCLUDED.time,
-       committee_id = EXCLUDED.committee_id, committee_number = EXCLUDED.committee_number, notes = EXCLUDED.notes, updated_at = NOW();`,
+       committee_id = EXCLUDED.committee_id, committee_number = EXCLUDED.committee_number, notes = EXCLUDED.notes,
+       completed = EXCLUDED.completed,
+       completed_at = CASE WHEN EXCLUDED.completed THEN COALESCE(schedule_tasks.completed_at, NOW()) ELSE NULL END,
+       updated_at = NOW();`,
     [taskId, `حفل تكريم لجنة ${committee.committee_number} - ${committee.committee_name}`, date,
-      details.ceremonyTime ?? null, committee.id, committee.committee_number, details.ceremonyPlace ?? null]
+      details.ceremonyTime ?? null, committee.id, committee.committee_number, details.ceremonyPlace ?? null,
+      Boolean(committee.stages?.ceremony?.completed)]
   );
 }
 
@@ -469,7 +494,12 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       assertCommitteeScope(user, existing.id);
 
       const now = new Date().toISOString();
-      const stages = body.stages ? mergeLegacyStages(existing.stages ?? {}, body.stages, user, now) : {};
+      const stages = { ...emptyStages(), ...(existing.stages ?? {}) };
+      if (body.stages) {
+        Object.assign(stages, mergeLegacyStages(existing.stages ?? {}, body.stages, user, now));
+        const { changed } = normalizeStageOrder(existing.stages ?? {}, stages, user, now, body.ceremonyDetails ?? existing.ceremony_details);
+        for (const k of changed) assertAllowed(user, STAGE_ACTION[k]);
+      }
       const reception =
         body.receivedByAssistant === undefined
           ? existing.received_by_assistant
@@ -485,7 +515,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
 
       const { rows: updated } = await db.query(
         `UPDATE committees SET
-           stages = COALESCE(stages, '{}'::jsonb) || $2::jsonb,
+           stages = $2::jsonb,
            scoring_details = COALESCE($3::jsonb, scoring_details),
            aggregation_details = COALESCE($4::jsonb, aggregation_details),
            ceremony_details = COALESCE($5::jsonb, ceremony_details),
@@ -506,6 +536,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         ]
       );
       if (body.ceremonyDetails) await syncCeremonyTask(db, updated[0]);
+      else if (body.stages) await syncCeremonyTask(db, updated[0], { detailsChanged: false });
       await audit(db, req, 'committee.patch', 'committee', req.params.id, committeeFromRow(existing), committeeFromRow(updated[0]),
         Object.keys(body).filter((k) => k !== 'expectedUpdatedAt').join(','));
       return updated[0];
@@ -571,11 +602,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       );
       if ((action.type === 'completeStage' || action.type === 'reopenStage') && action.stage === 'ceremony') {
         // The ceremony's calendar task follows the stage.
-        await db.query(
-          `UPDATE schedule_tasks SET completed = $2, completed_at = CASE WHEN $2 THEN NOW() ELSE NULL END, updated_at = NOW()
-           WHERE id = $1;`,
-          [`task-ceremony-${existing.id}`, action.type === 'completeStage']
-        );
+        await syncCeremonyTask(db, updated[0], { detailsChanged: false });
       }
       if (action.type === 'scheduleCeremony') {
         await notifyCeremonyAttendees(db, existing, before, beforeAttendees, next.ceremonyDetails ?? {});
@@ -604,6 +631,20 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       assertCommitteeScope(req.user!, rows[0].id);
       await db.query('DELETE FROM schedule_tasks WHERE id = $1;', [`task-ceremony-${req.params.id}`]);
       await db.query('DELETE FROM committees WHERE id = $1;', [req.params.id]);
+      // Nobody stays assigned to a committee that no longer exists (it would block saving that
+      // person later and show a committee number that is gone).
+      await db.query(
+        `UPDATE app_users u SET assigned_committee_ids = u.assigned_committee_ids - $1::text,
+           assigned_committees = COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
+                                           WHERE (u.assigned_committee_ids - $1::text) ? c.id), '[]'::jsonb),
+           updated_at = NOW()
+         WHERE u.assigned_committee_ids ? $1;`,
+        [req.params.id]
+      );
+      await db.query(
+        'UPDATE permission_profiles SET allowed_committee_ids = allowed_committee_ids - $1::text WHERE allowed_committee_ids ? $1;',
+        [req.params.id]
+      );
       await audit(db, req, 'committee.delete', 'committee', req.params.id, committeeFromRow(rows[0]), null);
     });
     res.json({ success: true });

@@ -651,7 +651,8 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onDeleteTask(task.id)}
-                    hidden={!AuthService.can('tasks.delete')}
+                    // A ceremony's task belongs to the committee: its date is changed or cleared from the ceremonies screen.
+                    hidden={!AuthService.can('tasks.delete') || task.id.startsWith('task-ceremony-')}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="حذف هذا التنبيه"
                   >

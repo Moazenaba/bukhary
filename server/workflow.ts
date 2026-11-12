@@ -100,6 +100,49 @@ export function actionPermission(a: CommitteeAction): Action {
 
 const isDone = (stages: Record<string, any>, k: StageKey) => Boolean(stages?.[k]?.completed);
 
+/** The organisation works in Egypt: «today» for ceremony dates is the date in Cairo. */
+export const APP_TIME_ZONE = 'Africa/Cairo';
+export const localDate = (iso: string) => {
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(Number.isNaN(d.getTime()) ? new Date() : d);
+};
+
+/** A ceremony cannot be marked as held before its scheduled day. */
+export function assertCeremonyHeldDate(ceremonyDetails: any, now: string) {
+  const date = typeof ceremonyDetails?.ceremonyDate === 'string' ? ceremonyDetails.ceremonyDate.slice(0, 10) : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date > localDate(now)) {
+    throw badRequest(`موعد الحفل (${date}) لم يأتِ بعد؛ لا يمكن تسجيل «تم الحفل» قبل موعده. عدّل الموعد إن كان الحفل أُقيم بالفعل.`);
+  }
+}
+
+/**
+ * Stage flags sent as a whole (committee save, older clients) must still follow the stage order:
+ * - completing a stage completes every earlier stage too (server-stamped), so no gaps remain;
+ * - an earlier stage cannot be reopened while a later one stays completed (same rule as reopenStage).
+ * Returns the completed/reopened stage keys so the caller can check permissions for them.
+ */
+export function normalizeStageOrder(
+  before: Record<string, any>,
+  stages: Record<string, any>,
+  actor: Actor,
+  now: string,
+  ceremonyDetails?: any
+): { changed: StageKey[] } {
+  const last = STAGE_KEYS.reduce((acc, k, i) => (isDone(stages, k) ? i : acc), -1);
+  for (let i = 0; i < last; i++) {
+    const k = STAGE_KEYS[i];
+    if (isDone(stages, k)) continue;
+    if (isDone(before, k)) {
+      throw badRequest('لا يمكن إلغاء مرحلة تليها مراحل مكتملة', { stage: k, later: STAGE_KEYS.slice(i + 1).filter((x) => isDone(stages, x)) });
+    }
+    stages[k] = { ...(stages[k] ?? {}), completed: true, completedAt: now, completedBy: actor.name };
+  }
+  const changed = STAGE_KEYS.filter((k) => isDone(stages, k) !== isDone(before, k));
+  if (changed.includes('ceremony') && isDone(stages, 'ceremony')) assertCeremonyHeldDate(ceremonyDetails, now);
+  return { changed };
+}
+
 /** Applies one intent. Pure: returns the new state or throws a 400 for an invalid transition. */
 export function applyCommitteeAction(state: CommitteeState, a: CommitteeAction, actor: Actor, now: string): CommitteeState {
   const next: CommitteeState = structuredClone(state);
@@ -122,6 +165,7 @@ export function applyCommitteeAction(state: CommitteeState, a: CommitteeAction, 
       if (isDone(next.stages, a.stage)) return next;
       const missing = STAGE_KEYS.slice(0, i).filter((k) => !isDone(next.stages, k));
       if (missing.length) throw badRequest('يجب إكمال المراحل السابقة أولاً', { missing });
+      if (a.stage === 'ceremony') assertCeremonyHeldDate(next.ceremonyDetails, now);
       next.stages[a.stage] = { completed: true, completedAt: now, completedBy: actor.name, notes: a.notes ?? next.stages[a.stage]?.notes ?? null };
       return next;
     }

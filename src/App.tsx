@@ -270,7 +270,8 @@ export default function App() {
           current = await runStep(step, current);
           replaceCommittee(current);
         }
-        if (steps.some((st) => st.kind === 'action' && st.action.type === 'scheduleCeremony')) {
+        // The server keeps the ceremony's calendar task in step with the ceremony's date and stage.
+        if (steps.some((st) => st.kind === 'action' && (st.action.type === 'scheduleCeremony' || ('stage' in st.action && st.action.stage === 'ceremony')))) {
           void queryClient.invalidateQueries({ queryKey: server.keys.tasks });
         }
         if (success) toast.success(success);
@@ -539,6 +540,8 @@ export default function App() {
     if (!task) return;
     const saved = await attempt(() => DataService.toggleTask(taskId, !task.completed));
     if (saved) replaceTask(saved);
+    // Ticking a ceremony in the calendar records «تم الحفل» on its committee (server side).
+    if (saved && taskId.startsWith('task-ceremony-')) void server.queries.committees.refetch();
   };
 
   const handleDeleteScheduleTask = async (taskId: string) => {

@@ -566,10 +566,10 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 <option value="exam">🟦 في انتظار الامتحان</option>
                 <option value="scoring">✅ تم الامتحان (في التصحيح)</option>
                 <option value="aggregation">🔵 في التجميع</option>
-                <option value="sheet">🟣 كتابة الكشف</option>
                 <option value="review">🟡 في المراجعة</option>
-                <option value="announcement">📢 إعلان النتيجة</option>
-                <option value="ceremony">🟢 تم الحفل</option>
+                <option value="sheet">🟣 كتابة الكشف (تمت المراجعة)</option>
+                <option value="announcement">📢 إعلان النتيجة (تم الاعتماد)</option>
+                <option value="ceremony">🎉 في انتظار الحفل (تم الإعلان)</option>
               </select>
             </div>
           </div>

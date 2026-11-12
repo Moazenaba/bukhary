@@ -149,6 +149,9 @@ export function examsRouter(pool: Pool) {
       const { rows } = await db.query(`${LIST_SQL} WHERE e.id = $1;`, [req.params.id]);
       if (!rows[0]) throw notFound('الامتحان غير موجود');
       await db.query('DELETE FROM exams WHERE id = $1;', [req.params.id]);
+      // Nobody keeps access to an exam that no longer exists.
+      await db.query('UPDATE app_users SET allowed_exam_ids = allowed_exam_ids - $1::text WHERE allowed_exam_ids ? $1;', [req.params.id]);
+      await db.query('UPDATE permission_profiles SET allowed_exam_ids = allowed_exam_ids - $1::text WHERE allowed_exam_ids ? $1;', [req.params.id]);
       await audit(db, req, 'exam.delete', 'exam', req.params.id, examFromRow(rows[0]), null);
     });
     res.json({ success: true });

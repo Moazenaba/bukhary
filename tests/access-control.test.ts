@@ -203,11 +203,12 @@ describe('exam allow-lists (API-06, API-13)', () => {
     const h = await userWithToken(t, { role: 'committee_head', allExams: false, allowedExamIds: ['exam-allow-a'] });
     expect((await t.api().get('/api/exams/exam-allow-a/file').set(h.auth)).status).toBe(200);
     expect((await t.api().get('/api/exams/exam-allow-b/file').set(h.auth)).status).toBe(403);
+    // Exams not chosen for them are not listed at all (not even their title), so nothing of B leaks.
     const list = await t.api().get('/api/exams').set(h.auth);
-    const b = list.body.exams.find((e: any) => e.id === 'exam-allow-b');
-    expect(b.sampleQuestions).toEqual([]);
-    expect(b.notes).toBeUndefined();
-    expect(b.canOpen).toBe(false);
+    expect(list.body.exams.map((e: any) => e.id)).toContain('exam-allow-a');
+    expect(list.body.exams.find((e: any) => e.id === 'exam-allow-b')).toBeUndefined();
+    expect(JSON.stringify(list.body)).not.toContain('exam-allow-b');
+    expect((await t.api().get('/api/exams/exam-allow-b').set(h.auth)).status).toBe(404);
   });
 
   it('sheikhs never see exams or sample questions', async () => {
