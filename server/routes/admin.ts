@@ -195,7 +195,7 @@ export function ocrRouter(config: AppConfig) {
     } catch {
       throw badRequest('تعذر قراءة الجدول من الصورة، جرّب صورة أوضح');
     }
-    const rows = z.object({ rows: z.array(z.record(z.unknown())).max(2000) }).safeParse(parsed);
+    const rows = z.object({ rows: z.array(z.record(z.string(), z.unknown())).max(2000) }).safeParse(parsed);
     if (!rows.success) throw badRequest('تعذر قراءة الجدول من الصورة، جرّب صورة أوضح');
     res.json({ success: true, data: rows.data });
   }));

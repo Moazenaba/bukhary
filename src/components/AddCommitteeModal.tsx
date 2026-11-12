@@ -198,10 +198,9 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
           completed: isInitialCeremony,
           completedAt: isInitialCeremony ? currentFormattedTime : undefined,
         },
-        ceremony: {
-          completed: isInitialCeremony,
-          completedAt: isInitialCeremony ? currentFormattedTime : undefined,
-        },
+        // «في انتظار الحفل»: everything up to the announcement is done; the ceremony itself is
+        // recorded later, on or after its day (the server refuses it before).
+        ceremony: { completed: false },
       },
       createdDate: todayISO(),
       createdAtTime: currentFormattedTime.split(' - ')[1] || '',
@@ -262,6 +261,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               </label>
               <input
                 type="text"
+                aria-label="اسم اللجنة"
                 placeholder=""
                 value={committeeName}
                 onChange={(e) => setCommitteeName(e.target.value)}

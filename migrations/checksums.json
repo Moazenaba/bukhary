@@ -1,0 +1,20 @@
+{
+  "001_baseline.sql": "492269846bf4b6843654b10860773fae296453a06962c61488ea43c968ca1a70",
+  "002_columns_source_of_truth.sql": "6182edc7b0b47b72c62585bb01401626f8adc529de885c10d7c0866f1b3850db",
+  "003_integrity.sql": "80c5a8de01ac25bafd19b3783727fe55ce1e728bbd616e9ab922e2d3726248b6",
+  "004_shared_settings.sql": "2c23a91c2b8891ef9147b7f20b9a266459918879bef27d7d1deeb438f7dd8f8a",
+  "005_committee_number_unique.sql": "c9a415f67983f11797df27ac0b2a48a5b35ee29bc75f7669fa1843d866c779ec",
+  "006_real_dates.sql": "64fa4603a154fd5ad6d64dd29d4bc26a185412751bc567af50f555577d3afcc6",
+  "007_disable_legacy_accounts.sql": "c9836af96a24842205e2264feaa3785acd079724f92c94f7b3b539e50c6b3263",
+  "008_lock_public_schema.sql": "60d2ed2a76de972603d4e5f1eb2f94ee668c53208e8c6a1b4d61c9bf8f42b47f",
+  "009_user_access_columns.sql": "b1eba001a0497cd8754bae291843377c752245a969aa522878ae0da81455905f",
+  "010_sessions.sql": "71e8af8167d006f3d7cd042f550c8f6e200ffd68f858b90abc41413f249e2925",
+  "011_integrity.sql": "4230bb7b996dc5ba9d3c1f4c851db4ee23ac5f551ca0cc25b821ea52acfd6f2d",
+  "012_idempotency.sql": "f2c7453de582a7cee81bb491174f14315197952d2d0260ee0566b6ec7478b158",
+  "013_device_tokens.sql": "45a8b2772247ca7fdbffadaba4c7868b9bdebf33b0b4b6488783f154a80489be",
+  "014_login_failures_phone_form.sql": "126f1467c0fb51324cbc1d88967b8853dcf4ec811cb2916e014edaab0550aeb4",
+  "015_people_roles.sql": "790e65954b4d2f8cd4f74c58b9cce62210009e27f3eb725c28d54beb1f4a6cab",
+  "016_clear_old_notifications.sql": "c4edbd4250934d200347a7a6ae4411fb46cb2e73a654e02ab9ec22116dd093f2",
+  "017_unlock_all_accounts.sql": "6803be36269000a0cfa71a1eeca6d0de4fae819be45209b3415b2e0baea2348f",
+  "018_remove_national_id.sql": "b67819bd92169bea50c613e1e05ffb56faa11efef8bce54bcfd52ba01eae4e47"
+}

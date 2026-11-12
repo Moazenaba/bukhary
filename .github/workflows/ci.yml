@@ -44,8 +44,60 @@ jobs:
           if git grep -nE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY'; then echo "A private key is committed"; exit 1; fi
       - run: npm ci
       - run: npm run lint
-      - run: npm test
+      - name: Unit + component tests (no database)
+        run: npm run test:unit
+      - name: All tests — unit, component, integration, migration, contract (see docs/TEST_PLAN.md)
+        run: npm test
       - run: npm run build
+
+  e2e:
+    name: E2E (browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Disposable database and secrets for this run only.
+      DATABASE_URL: postgresql://postgres@localhost:5432/bukhari_e2e
+      DATABASE_SSL: disable
+      NODE_ENV: development
+      JWT_SECRET: ci_only_secret_that_is_long_enough_for_tests_0123456789
+      ENFORCE_PASSWORD_CHANGE: 'false'
+      E2E_BASE_URL: http://localhost:3000
+      E2E_PHONE: '01000000000'
+      E2E_PASSWORD: E2e-pass-1234
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create the database and the test account
+        run: |
+          psql -h localhost -U postgres -c 'CREATE DATABASE bukhari_e2e;'
+          npm run migrate
+          ADMIN_NAME='مدير الاختبار' ADMIN_PHONE="$E2E_PHONE" ADMIN_PASSWORD="$E2E_PASSWORD" npm run create-admin
+      - name: Install the browser
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Start the server
+        run: |
+          nohup npm run dev > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/api/ready && break; sleep 2; done
+          curl -sf http://localhost:3000/api/ready
+      - name: Browser tests (desktop and phone)
+        run: npm run test:e2e
+      - name: Server log
+        if: failure()
+        run: tail -n 200 server.log
 
   audit:
     name: Dependency audit

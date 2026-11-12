@@ -16,7 +16,10 @@
     "lint": "tsc --noEmit",
     "clean": "node -e \"for (const d of ['dist','dist-server']) require('fs').rmSync(d,{recursive:true,force:true})\"",
     "backup": "node scripts/backup.mjs",
-    "publish:android": "node scripts/publish-android.mjs"
+    "publish:android": "node scripts/publish-android.mjs",
+    "test:unit": "vitest run -c vitest.unit.config.ts",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "migrations:lock": "node scripts/migrations-lock.mjs"
   },
   "dependencies": {
     "@fontsource/cairo": "5.3.0",
@@ -32,7 +35,7 @@
     "material-symbols": "0.47.5",
     "pg": "^8.23.1",
     "sql.js": "^1.13.0",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

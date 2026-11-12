@@ -56,6 +56,9 @@ Release order, rollout switches and operator checks: [docs/RELEASE.md](docs/RELE
    `npm run create-admin` — it ignores those legacy accounts.
 
 ## Tests
+The full test strategy (unit, component, integration, migration, contract, E2E) and how CI gates
+merges: [docs/TEST_PLAN.md](docs/TEST_PLAN.md).
+
 Tests need a throwaway PostgreSQL; they drop and recreate databases whose names end in `_test`.
 ```bash
 # example: a private cluster on port 55432
