@@ -773,6 +773,10 @@ export default function App() {
                 const target = committees.find((c) => c.id === committeeId);
                 if (target) handleSaveCommittee({ ...target, courseId });
               }}
+              onUpdateCommitteeFields={(committeeId, patch) => {
+                const target = latestCommittee(committeeId);
+                return target ? handleSaveCommittee({ ...target, ...patch }) : false;
+              }}
               onAddCourse={handleAddCourse}
               onNavigateToCommittees={() => setActiveTab('committees')}
               onOpenCommitteeDetails={handleOpenRowDetails}
@@ -970,11 +974,11 @@ export default function App() {
                 }}
                 onExportExamInProgress={() => {
                   const n = exportExamInProgressToExcel(committees);
-                  if (n === 0) toast.info('لا توجد لجان في مرحلة «جاري الامتحان الآن» حالياً');
+                  if (n === 0) toast.info('لا توجد لجان في مرحلة «في انتظار الامتحان» حالياً');
                   else toast.success(`تم تصدير كشف ${n} لجنة جاري امتحانها الآن`);
                 }}
                 onPrintExamInProgress={() => {
-                  if (printExamInProgress(committees) === 0) toast.info('لا توجد لجان في مرحلة «جاري الامتحان الآن» حالياً');
+                  if (printExamInProgress(committees) === 0) toast.info('لا توجد لجان في مرحلة «في انتظار الامتحان» حالياً');
                 }}
               />
 
@@ -1079,6 +1083,11 @@ export default function App() {
           onOpenSidebar={() => setIsMobileSidebarOpen(true)}
           currentUser={currentUser}
           pendingAssistantsCount={pendingAssistantsCount}
+          onAddCommittee={
+            can('committees.create') && ['committees', 'summer_course', 'home'].includes(activeTab)
+              ? () => setIsAddCommitteeOpen(true)
+              : undefined
+          }
         />
 
         {/* Footer */}

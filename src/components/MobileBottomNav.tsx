@@ -9,6 +9,8 @@ interface MobileBottomNavProps {
   onOpenSidebar: () => void;
   currentUser: AppUser;
   pendingAssistantsCount?: number;
+  /** Shown as a floating «+ لجنة» button on phones, where the top bar's button does not fit. */
+  onAddCommittee?: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -17,6 +19,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenSidebar,
   currentUser,
   pendingAssistantsCount = 0,
+  onAddCommittee,
 }) => {
 
   // Determine which tabs to display in the bottom app bar
@@ -55,6 +58,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const visibleItems = items.filter((item) => item.visible);
 
   return (
+    <>
+    {onAddCommittee && (
+      <button
+        type="button"
+        onClick={onAddCommittee}
+        aria-label="إضافة لجنة جديدة"
+        className="lg:hidden fixed left-4 bottom-20 z-40 inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-brand text-white text-sm font-black shadow-xl active:scale-95 transition-all cursor-pointer safe-area-bottom"
+      >
+        <span className="material-symbols-outlined text-xl">add_circle</span>
+        <span>لجنة</span>
+      </button>
+    )}
     <nav 
       aria-label="شريط التنقل السفلي للهواتف" 
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-2xl px-2 py-1.5 flex items-center justify-around text-center safe-area-bottom"
@@ -113,5 +128,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         </span>
       </button>
     </nav>
+    </>
   );
 };

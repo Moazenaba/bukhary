@@ -232,7 +232,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-100 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-base">download</span>
-            <span>تصدير كشف «جاري الامتحان الآن» Excel ({stageCounts.exam || 0} لجنة)</span>
+            <span>تصدير كشف «في انتظار الامتحان» Excel ({stageCounts.exam || 0} لجنة)</span>
           </button>
           {onPrintExamInProgress && (
             <button

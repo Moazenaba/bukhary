@@ -521,10 +521,10 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 />
               </div>
 
-              {/* البلد التي منها الشيخ */}
+              {/* مكان الشيخ (المسجد / القاعة / البلد) */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  البلد التي منها الشيخ
+                  مكان الشيخ (المسجد / القاعة / البلد)
                 </label>
                 <input
                   type="text"
@@ -563,8 +563,8 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 onChange={(e) => setInitialStage(e.target.value as StageKey)}
                 className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
               >
-                <option value="exam">🟦 جاري الامتحان الآن</option>
-                <option value="scoring">🟠 في التصحيح</option>
+                <option value="exam">🟦 في انتظار الامتحان</option>
+                <option value="scoring">✅ تم الامتحان (في التصحيح)</option>
                 <option value="aggregation">🔵 في التجميع</option>
                 <option value="sheet">🟣 كتابة الكشف</option>
                 <option value="review">🟡 في المراجعة</option>

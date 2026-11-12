@@ -3,7 +3,8 @@ import { todayISO } from '../utils/stageUtils';
 import { Committee, ScheduleTask, AppUser, StageKey } from '../types';
 import { AuthService } from '../services/AuthService';
 import { AttendeePicker, MyCeremonies } from './CeremonyAttendees';
-import { CeremonyPeriod, ceremonyRows, exportCeremoniesToExcel, periodRange } from '../utils/reportExport';
+import { CeremonyPeriod, ceremonyRows, ceremoniesPdfTable, exportCeremoniesToExcel, periodRange } from '../utils/reportExport';
+import { downloadFile, shareFile, tableToPdf } from '../utils/pdf';
 import { toast } from './Toasts';
 
 interface CeremoniesViewProps {
@@ -104,6 +105,46 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
     const n = exportCeremoniesToExcel(committees, scheduleTasks, exportPeriod, exportAnchor || todayISO());
     if (n === 0) toast.info('لا توجد حفلات مجدولة في هذه الفترة');
     else toast.success(`تم تصدير كشف ${n} حفل`);
+  };
+
+  // PDF: «تصدير» saves the file on the device; «مشاركة» sends it through the phone's share sheet.
+  const [pdfBusy, setPdfBusy] = useState<'export' | 'share' | null>(null);
+  const makeCeremoniesPdf = async () => {
+    const { count, filename, table } = ceremoniesPdfTable(committees, scheduleTasks, exportPeriod, exportAnchor || todayISO());
+    if (count === 0) {
+      toast.info('لا توجد حفلات مجدولة في هذه الفترة');
+      return null;
+    }
+    return { blob: await tableToPdf(table), filename, title: table.title, count };
+  };
+  const handleExportCeremoniesPdf = async () => {
+    setPdfBusy('export');
+    try {
+      const pdf = await makeCeremoniesPdf();
+      if (!pdf) return;
+      downloadFile(pdf.blob, pdf.filename);
+      toast.success(`تم تصدير كشف ${pdf.count} حفل PDF`);
+    } catch {
+      toast.error('تعذر إنشاء ملف PDF');
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+  const handleShareCeremoniesPdf = async () => {
+    setPdfBusy('share');
+    try {
+      const pdf = await makeCeremoniesPdf();
+      if (!pdf) return;
+      const result = await shareFile(pdf.blob, pdf.filename, pdf.title);
+      if (result === 'unsupported') {
+        downloadFile(pdf.blob, pdf.filename);
+        toast.info('المشاركة غير متاحة في هذا المتصفح؛ تم تنزيل ملف PDF لترسله بنفسك');
+      }
+    } catch {
+      toast.error('تعذرت مشاركة ملف PDF');
+    } finally {
+      setPdfBusy(null);
+    }
   };
 
 
@@ -286,10 +327,10 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
         <div className="lg:flex-1">
           <h2 id="ceremonies-export" className="text-sm font-black text-slate-900 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-base text-brand">download</span>
-            تصدير كشف الحفلات (Excel)
+            تصدير ومشاركة كشف الحفلات (Excel / PDF)
           </h2>
           <p className="text-slate-500 mt-1">
-            الموعد والمكان واسم الشيخ والبلد وعدد الطلاب المكرمين والمشايخ والمدعوين ومراقبي اللجنة — من {exportRange.from}
+            الموعد والمكان واسم الشيخ ومكانه وعدد الطلاب المكرمين والمشايخ والمدعوين ومراقبي اللجنة — من {exportRange.from}
             {exportRange.to !== exportRange.from && <> إلى {exportRange.to}</>}
           </p>
         </div>
@@ -322,7 +363,27 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand text-white font-black hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-base">table_view</span>
-          <span>تصدير ({exportCount} حفل)</span>
+          <span>Excel ({exportCount} حفل)</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleExportCeremoniesPdf}
+          disabled={exportCount === 0 || pdfBusy !== null}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-700 text-white font-black hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          title="تنزيل كشف الحفلات ملف PDF على الجهاز"
+        >
+          <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+          <span>{pdfBusy === 'export' ? 'جاري الإنشاء...' : 'تصدير PDF'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleShareCeremoniesPdf}
+          disabled={exportCount === 0 || pdfBusy !== null}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          title="مشاركة كشف الحفلات PDF (واتساب وغيره)"
+        >
+          <span className="material-symbols-outlined text-base">share</span>
+          <span>{pdfBusy === 'share' ? 'جاري التجهيز...' : 'مشاركة PDF'}</span>
         </button>
       </section>
 

@@ -579,7 +579,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
             </div>
 
             <div>
-              <span className="text-muted block font-semibold mb-0.5">البلد التي منها الشيخ:</span>
+              <span className="text-muted block font-semibold mb-0.5">مكان الشيخ (المسجد / القاعة / البلد):</span>
               <span className="font-bold text-ink">
                 {sheikhCountry || 'غير محدد'}
               </span>
@@ -1721,7 +1721,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
                 <div className="sm:col-span-2 lg:col-span-4">
                   <label className="block text-xs font-bold text-ink mb-1">
-                    البلد التي منها الشيخ
+                    مكان الشيخ (المسجد / القاعة / البلد)
                   </label>
                   <input
                     type="text"

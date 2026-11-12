@@ -80,20 +80,22 @@ export const calculateCurrentStage = (
     };
   }
 
+  // The exam is done and correction has not been recorded yet: its own visible state «تم الامتحان».
+  // (Counted with the correction stage, which is the next work to be done.)
   if (stages.exam?.completed) {
     return {
       key: 'scoring',
-      label: 'في التصحيح',
-      emoji: '🟠',
-      badgeClass: 'bg-amber-50 text-amber-700 border-amber-300 font-semibold',
-      dotColor: 'bg-amber-500',
+      label: 'تم الامتحان',
+      emoji: '✅',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold',
+      dotColor: 'bg-emerald-500',
     };
   }
 
   // If exam has not completed yet
   return {
     key: 'exam',
-    label: 'جاري الامتحان الآن',
+    label: 'في انتظار الامتحان',
     emoji: '🟦',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-300 font-semibold',
     dotColor: 'bg-blue-500',

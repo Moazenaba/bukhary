@@ -1,6 +1,6 @@
 export type StageKey =
   | 'registration'   // 1. التسجيل (تم تلقائياً)
-  | 'exam'           // 2. جاري الامتحان الآن
+  | 'exam'           // 2. في انتظار الامتحان
   | 'scoring'        // 3. التصحيح
   | 'aggregation'    // 4. تجميع الدرجات
   | 'review'         // 5. المراجعة (قبل كتابة الكشف)
@@ -32,7 +32,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'exam',
     label: 'الامتحان',
-    activeLabel: 'جاري الامتحان الآن',
+    activeLabel: 'في انتظار الامتحان',
     emoji: '🟦',
     colorClass: 'text-blue-700 bg-blue-50 border-blue-200',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -41,7 +41,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'scoring',
     label: 'التصحيح',
-    activeLabel: 'في التصحيح',
+    activeLabel: 'تم الامتحان / التصحيح',
     emoji: '🟠',
     colorClass: 'text-amber-700 bg-amber-50 border-amber-200',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',

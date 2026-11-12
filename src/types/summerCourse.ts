@@ -29,6 +29,7 @@ export type CourseFilterStatus =
   | 'reviewed'
   | 'announced'
   | 'ceremony'
+  | 'no_ceremony'
   | 'uncertain'
   | 'struck_out';
 

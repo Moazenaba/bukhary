@@ -48,6 +48,9 @@ export function isCommitteeCeremony(c: Committee): boolean {
   return Boolean(c.stages.ceremony?.completed);
 }
 
+/** «المكان» of a committee in the sheet: the sheikh's place as stored on the committee, else its branch. */
+export const committeePlace = (c: Committee): string => (c.sheikhCountry || c.branch || '').trim();
+
 export const ROW_STAGE: Record<'delivered' | 'corrected' | 'reviewed' | 'announced' | 'ceremony', StageKey> = {
   delivered: 'exam',
   corrected: 'scoring',
@@ -84,10 +87,12 @@ export function mergeRowsWithCommittees(savedRows: SummerCourseRow[], committees
     return {
       ...r,
       number: c.committeeNumber,
-      sheikh_name: r.sheikh_name || c.sheikhName || c.committeeName,
-      place: r.place || c.branch || '',
-      book: r.book || c.competitionBook || '',
-      students_count: r.students_count || c.studentsCount || 0,
+      // The committee holds the data people edit (details window, committees screen, phone app), so
+      // its values win; the row's own copy is only a fallback and is never deleted.
+      sheikh_name: c.sheikhName || r.sheikh_name || c.committeeName,
+      place: committeePlace(c) || r.place || '',
+      book: c.competitionBook || r.book || '',
+      students_count: c.studentsCount || r.students_count || 0,
       courseId: c.courseId,
       courseName: c.courseName,
       ...committeeFlags(c),
@@ -100,7 +105,7 @@ export function mergeRowsWithCommittees(savedRows: SummerCourseRow[], committees
       virtual: true,
       number: c.committeeNumber,
       sheikh_name: c.sheikhName || c.committeeName,
-      place: c.branch || '',
+      place: committeePlace(c),
       book: c.competitionBook || '',
       students_count: c.studentsCount || 0,
       struck_out: false,

@@ -66,7 +66,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
                 منظومة لجان الاختبار والتصحيح لمتون العقيدة
               </h2>
               <p className="text-sm text-teal-50 leading-relaxed mb-4">
-                متابعة فورية ومباشرة لمراحل الاختبار: جاري الامتحان، التصحيح، تجميع الدرجات، المراجعة، كتابة الكشوفات، الاعتمادية، إعلان النتيجة، والحفل والتكريم.
+                متابعة فورية ومباشرة لمراحل الاختبار: في انتظار الامتحان، التصحيح، تجميع الدرجات، المراجعة، كتابة الكشوفات، الاعتمادية، إعلان النتيجة، والحفل والتكريم.
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <button
@@ -266,7 +266,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             <span className="text-2xl font-bold font-mono text-blue-700">{examCount}</span>
           </div>
           <h3 className="font-bold text-sm text-ink group-hover:text-blue-700 transition-colors">
-            جاري الامتحان الآن
+            في انتظار الامتحان
           </h3>
           <p className="text-xs text-muted mt-1">لجان الطلاب فيها قيد أداء الاختبار</p>
         </div>

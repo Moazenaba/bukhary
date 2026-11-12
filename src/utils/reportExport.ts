@@ -25,7 +25,7 @@ function writeSheet(rows: Record<string, string | number>[], widths: number[], s
   XLSX.writeFile(book, `${filename}.xlsx`);
 }
 
-/** Committees whose current stage is «جاري الامتحان الآن», ordered by committee number. */
+/** Committees whose current stage is «في انتظار الامتحان», ordered by committee number. */
 export const examInProgressCommittees = (committees: Committee[]) =>
   committees
     .filter((c) => calculateCurrentStage(c.stages).key === 'exam')
@@ -38,7 +38,7 @@ export function examInProgressRows(committees: Committee[]) {
     'رقم اللجنة': c.committeeNumber,
     'اسم اللجنة': c.committeeName,
     'اسم الشيخ': c.sheikhName || '-',
-    'البلد': c.sheikhCountry || '-',
+    'المكان': c.sheikhCountry || '-',
     'عدد الطلاب': c.studentsCount || 0,
     'المراقبون': joinNames(c.members),
     'عدد المراقبين': c.members.filter((m) => m.trim()).length,
@@ -52,7 +52,7 @@ export function examInProgressRows(committees: Committee[]) {
       'رقم اللجنة': '',
       'اسم اللجنة': `الإجمالي (${list.length} لجنة)`,
       'اسم الشيخ': '',
-      'البلد': '',
+      'المكان': '',
       'عدد الطلاب': list.reduce((sum, c) => sum + (c.studentsCount || 0), 0),
       'المراقبون': '',
       'عدد المراقبين': list.reduce((sum, c) => sum + c.members.filter((m) => m.trim()).length, 0),
@@ -64,11 +64,11 @@ export function examInProgressRows(committees: Committee[]) {
   return rows;
 }
 
-/** Downloads the «جاري الامتحان الآن» sheet; returns how many committees it holds. */
+/** Downloads the «في انتظار الامتحان» sheet; returns how many committees it holds. */
 export function exportExamInProgressToExcel(committees: Committee[]): number {
   const rows = examInProgressRows(committees);
   if (rows.length === 0) return 0;
-  writeSheet(rows, [5, 10, 24, 24, 16, 11, 40, 12, 24, 20, 10], 'جاري الامتحان الآن', `كشف_جاري_الامتحان_الآن_${todayISO()}`);
+  writeSheet(rows, [5, 10, 24, 24, 16, 11, 40, 12, 24, 20, 10], 'في انتظار الامتحان', `كشف_في_انتظار_الامتحان_${todayISO()}`);
   return rows.length - 1;
 }
 
@@ -112,7 +112,7 @@ export function ceremonyRows(committees: Committee[], tasks: ScheduleTask[], per
       'رقم اللجنة': c.committeeNumber,
       'اسم اللجنة': c.committeeName,
       'اسم الشيخ': c.sheikhName || '-',
-      'البلد': c.sheikhCountry || '-',
+      'مكان الشيخ': c.sheikhCountry || '-',
       'عدد الطلاب المكرمين': d?.honoredStudentsCount || c.studentsCount || 0,
       'المشايخ الحاضرون': joinNames(d?.attendingSheikhs),
       'المدعوون للحفل': joinNames(d?.attendees?.map((a) => a.name)),
@@ -141,23 +141,23 @@ export function exportCeremoniesToExcel(committees: Committee[], tasks: Schedule
 const escapeHtml = (v: unknown) =>
   String(v ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
-/** Print-ready page of the «جاري الامتحان الآن» sheet (the print dialog saves it as PDF). */
+/** Print-ready page of the «في انتظار الامتحان» sheet (the print dialog saves it as PDF). */
 export function examInProgressHtml(committees: Committee[], date = todayISO()): string {
   const rows = examInProgressRows(committees);
-  const columns = ['م', 'رقم اللجنة', 'اسم اللجنة', 'اسم الشيخ', 'البلد', 'عدد الطلاب', 'المراقبون', 'عدد المراقبين'];
+  const columns = ['م', 'رقم اللجنة', 'اسم اللجنة', 'اسم الشيخ', 'المكان', 'عدد الطلاب', 'المراقبون', 'عدد المراقبين'];
   const body = rows
     .map((r, i) => `<tr${i === rows.length - 1 ? ' class="total"' : ''}>${columns.map((c) => `<td>${escapeHtml(r[c])}</td>`).join('')}</tr>`)
     .join('');
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف جاري الامتحان الآن ${date}</title><style>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف في انتظار الامتحان ${date}</title><style>
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;margin:24px;color:#0f172a}
 h1{font-size:18px;text-align:center;margin:0 0 4px}p{text-align:center;margin:0 0 16px;font-size:12px;color:#475569}
 table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #94a3b8;padding:6px 8px;text-align:right;vertical-align:top}
 th{background:#e2e8f0}tr.total td{font-weight:bold;background:#f1f5f9}@page{size:A4 landscape;margin:12mm}
-</style></head><body><h1>كشف لجان «جاري الامتحان الآن» — مسابقات مسجد الإمام البخاري</h1><p>${date} — ${rows.length - 1} لجنة</p>
+</style></head><body><h1>كشف لجان «في انتظار الامتحان» — مسابقات مسجد الإمام البخاري</h1><p>${date} — ${rows.length - 1} لجنة</p>
 <table><thead><tr>${columns.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></body></html>`;
 }
 
-/** Opens the print dialog for the «جاري الامتحان الآن» sheet; returns how many committees it holds. */
+/** Opens the print dialog for the «في انتظار الامتحان» sheet; returns how many committees it holds. */
 export function printExamInProgress(committees: Committee[]): number {
   const count = examInProgressCommittees(committees).length;
   if (count === 0) return 0;
@@ -175,4 +175,26 @@ export function printExamInProgress(committees: Committee[]): number {
     setTimeout(() => frame.remove(), 1000);
   }, 100);
   return count;
+}
+
+/** The ceremonies sheet of the period as a PDF table (the columns that fit on an A4 landscape page). */
+export function ceremoniesPdfTable(committees: Committee[], tasks: ScheduleTask[], period: CeremonyPeriod, anchor: string) {
+  const rows = ceremonyRows(committees, tasks, period, anchor);
+  const { from, to } = periodRange(period, anchor);
+  const columns = [
+    'م', 'التاريخ', 'اليوم', 'الوقت', 'مكان الحفل', 'رقم اللجنة', 'اسم الشيخ', 'مكان الشيخ',
+    'عدد الطلاب المكرمين', 'المشايخ الحاضرون', 'المدعوون للحفل', 'الكتاب / المسابقة', 'الحالة',
+  ] as const;
+  const span = from === to ? from : `من ${from} إلى ${to}`;
+  return {
+    count: rows.length,
+    // Latin file name: some phones and browsers drop an Arabic name when saving or sharing a file.
+    filename: `Bukhari-ceremonies-${period}-${from === to ? from : `${from}_to_${to}`}.pdf`,
+    table: {
+      title: `كشف الحفلات (${PERIOD_LABELS[period]}) — مسابقات مسجد الإمام البخاري`,
+      subtitle: `${span} — ${rows.length} حفل`,
+      columns: [...columns],
+      rows: rows.map((r) => columns.map((c) => r[c] as string | number)),
+    },
+  };
 }

@@ -62,6 +62,8 @@ interface SummerCourseTrackerViewProps {
   onSetCommitteeStage?: (committeeId: string, stageKey: StageKey, completed: boolean) => unknown;
   onAddCommitteeFromRow?: (newComm: Committee) => Promise<Committee | undefined>;
   onUpdateCommitteeCourse?: (committeeId: string, courseId: string, courseName: string) => void;
+  /** Saves edited fields on the committee itself (sheikh name, place, book, students). */
+  onUpdateCommitteeFields?: (committeeId: string, patch: Partial<Committee>) => Promise<boolean> | unknown;
   onAddCourse?: (newCourse: Omit<Course, 'id' | 'createdAt'>) => Promise<Course | undefined>;
   onNavigateToCommittees?: () => void;
   onOpenCommitteeDetails?: (row: SummerCourseRow) => void;
@@ -76,6 +78,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   onSetCommitteeStage,
   onAddCommitteeFromRow,
   onUpdateCommitteeCourse,
+  onUpdateCommitteeFields,
   onAddCourse,
   onNavigateToCommittees,
   onOpenCommitteeDetails,
@@ -291,6 +294,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
       // Status filter
       if (statusFilter === 'not_delivered' && r.delivered) return false;
+      if (statusFilter === 'no_ceremony' && r.ceremony) return false;
       if (statusFilter === 'delivered' && !r.delivered) return false;
       if (statusFilter === 'corrected' && !r.corrected) return false;
       if (statusFilter === 'reviewed' && !r.reviewed) return false;
@@ -381,6 +385,26 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   const updateRowField = async <K extends keyof SummerCourseRow>(id: string, field: K, value: SummerCourseRow[K]) => {
     const row = rows.find((r) => r.id === id);
     if (!row) return;
+    await saveRowToDb({ ...row, [field]: value });
+  };
+
+  /**
+   * Edits a text/number cell. On a row linked to a committee the committee itself is updated, so the
+   * same data shows everywhere (committee details, ceremonies, phone app). Nothing is deleted.
+   */
+  const editRowField = async (row: SummerCourseRow, field: 'sheikh_name' | 'place' | 'book' | 'students_count', value: string | number) => {
+    if (row[field] === value) return;
+    const committee = row.committeeId ? committees.find((c) => c.id === row.committeeId) : undefined;
+    if (committee && onUpdateCommitteeFields && AuthService.can('committees.update')) {
+      const text = typeof value === 'string' ? value.trim() : value;
+      const patch: Partial<Committee> =
+        field === 'sheikh_name' ? { sheikhName: (text as string) || undefined }
+        : field === 'place' ? { sheikhCountry: (text as string) || undefined }
+        : field === 'book' ? { competitionBook: text as string }
+        : { studentsCount: Number(text) || 0 };
+      await onUpdateCommitteeFields(committee.id, patch);
+      return;
+    }
     await saveRowToDb({ ...row, [field]: value });
   };
 
@@ -996,7 +1020,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                 : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
             }`}
           >
-            لم يُسلّم بعد ({rows.filter((r) => !r.delivered).length})
+            في انتظار الامتحان ({rows.filter((r) => !r.delivered).length})
           </button>
 
           <button
@@ -1045,6 +1069,18 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
             }`}
           >
             تم الإعلان ({stats.announcedCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('no_ceremony')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+              statusFilter === 'no_ceremony'
+                ? 'bg-orange-600 text-white'
+                : 'bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-200'
+            }`}
+          >
+            لم يتم الحفل ({rows.length - stats.ceremonyCount})
           </button>
 
           <button
@@ -1289,12 +1325,10 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
                       {/* 2) Sheikh Name */}
                       <td className="py-2.5 px-3">
-                        <input
-                          type="text"
+                        <CellInput
                           value={row.sheikh_name}
-                          onChange={(e) =>
-                            updateRowField(row.id, 'sheikh_name', e.target.value)
-                          }
+                          onCommit={(v) => editRowField(row, 'sheikh_name', v)}
+                          disabled={!canEdit}
                           placeholder="اسم الشيخ الفاضل..."
                           className={`w-full py-1 px-2 rounded-lg bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-emerald-500 font-semibold outline-none transition-all ${
                             isStruck ? 'line-through text-slate-400' : 'text-slate-900'
@@ -1304,12 +1338,10 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
                       {/* 3) Place */}
                       <td className="py-2.5 px-3">
-                        <input
-                          type="text"
+                        <CellInput
                           value={row.place}
-                          onChange={(e) =>
-                            updateRowField(row.id, 'place', e.target.value)
-                          }
+                          onCommit={(v) => editRowField(row, 'place', v)}
+                          disabled={!canEdit}
                           placeholder="المسجد / القاعة..."
                           className={`w-full py-1 px-2 rounded-lg bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-emerald-500 text-slate-700 outline-none transition-all ${
                             isStruck ? 'line-through text-slate-400' : ''
@@ -1319,12 +1351,10 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
                       {/* 4) Book */}
                       <td className="py-2.5 px-3">
-                        <input
-                          type="text"
+                        <CellInput
                           value={row.book}
-                          onChange={(e) =>
-                            updateRowField(row.id, 'book', e.target.value)
-                          }
+                          onCommit={(v) => editRowField(row, 'book', v)}
+                          disabled={!canEdit}
                           placeholder="الكتاب أو المتن المقرر..."
                           className={`w-full py-1 px-2 rounded-lg bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-emerald-500 text-emerald-950 font-medium outline-none transition-all ${
                             isStruck ? 'line-through text-slate-400' : ''
@@ -1335,14 +1365,11 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                       {/* 4.5) Students Count (عدد الطلاب) */}
                       <td className="py-2.5 px-2 text-center bg-slate-50/40 border-x border-slate-100">
                         <div className="inline-flex items-center justify-center">
-                          <input
+                          <CellInput
                             type="number"
-                            min="0"
-                            value={row.students_count !== undefined && row.students_count !== null ? row.students_count : ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                              updateRowField(row.id, 'students_count', val);
-                            }}
+                            value={String(row.students_count ?? '')}
+                            onCommit={(v) => editRowField(row, 'students_count', Math.max(0, parseInt(v, 10) || 0))}
+                            disabled={!canEdit}
                             placeholder="0"
                             className={`w-16 py-1 px-1.5 text-center rounded-lg bg-white border border-slate-200 hover:border-slate-300 focus:border-emerald-500 font-mono font-bold text-slate-800 text-xs outline-none transition-all shadow-2xs ${
                               isStruck ? 'line-through text-slate-400' : ''
@@ -1936,3 +1963,56 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     </div>
   );
 };
+
+/**
+ * A sheet cell that saves when the person leaves it (or presses Enter), not on every key press,
+ * so a half-typed name is never sent and each edit is one save.
+ */
+function CellInput({
+  value,
+  onCommit,
+  type = 'text',
+  disabled,
+  ...rest
+}: {
+  value: string;
+  onCommit: (value: string) => unknown;
+  type?: 'text' | 'number';
+  disabled?: boolean;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
+  const [draft, setDraft] = useState(value ?? '');
+  const focused = React.useRef(false);
+  useEffect(() => {
+    if (!focused.current) setDraft(value ?? '');
+  }, [value]);
+  const cancelled = React.useRef(false);
+  const commit = () => {
+    focused.current = false;
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
+    if (draft.trim() !== (value ?? '').trim()) onCommit(draft);
+  };
+  return (
+    <input
+      {...rest}
+      type={type}
+      min={type === 'number' ? 0 : undefined}
+      inputMode={type === 'number' ? 'numeric' : undefined}
+      value={draft}
+      readOnly={disabled}
+      onFocus={() => (focused.current = true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') {
+          setDraft(value ?? '');
+          cancelled.current = true;
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+    />
+  );
+}
