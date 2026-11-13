@@ -189,7 +189,8 @@ export interface Committee {
   // البيانات الجديدة للشيخ واللجنة والطلاب
   sheikhName?: string;           // اسم الشيخ المرسل إليه
   sheikhPhone?: string;          // رقم هاتف الشيخ
-  sheikhCountry?: string;        // البلد التي منها الشيخ
+  sheikhCountry?: string;        // مكان الشيخ (العمود في قاعدة البيانات اسمه sheikh_country)
+  examDate?: string | null;      // ميعاد امتحان اللجنة YYYY-MM-DD (null = يُمسح)
   studentsCount?: number;        // عدد الطلاب في اللجنة
   isWomenCommittee?: boolean;    // اختيار لجنة نسائية أو لا (true: نسائية / false: رجال)
 
@@ -463,5 +464,9 @@ export interface ExamItem {
   questionsCount?: number;       // عدد الأسئلة
   /** Whether the current user may open the file and see the content (server-evaluated). */
   canOpen?: boolean;
+  /** When the paper may be downloaded (ISO); empty = as soon as it is uploaded. */
+  opensAt?: string;
+  /** For this user: the paper stays locked until this time (ISO). */
+  lockedUntil?: string;
   updatedAt?: string;
 }

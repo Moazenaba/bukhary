@@ -44,6 +44,8 @@ const committeeInput = z.object({
   sheikhName: optionalText(200),
   sheikhPhone: optionalText(50),
   sheikhCountry: optionalText(200),
+  /** The day the committee sits its exam (YYYY-MM-DD). */
+  examDate: dateOnly.optional(),
   studentsCount: nonNegativeInt.default(0),
   isWomenCommittee: z.boolean().default(false),
   excelUrl: optionalText(2000),
@@ -71,6 +73,9 @@ const patchInput = z
   .refine((v) => Object.keys(v).some((k) => k !== 'expectedUpdatedAt'), 'لا توجد تعديلات');
 
 
+/** A DATE column as YYYY-MM-DD (node-postgres reads it as a local Date). */
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export function committeeFromRow(r: any) {
   return {
     id: r.id,
@@ -86,6 +91,7 @@ export function committeeFromRow(r: any) {
     sheikhName: r.sheikh_name ?? undefined,
     sheikhPhone: r.sheikh_phone ?? undefined,
     sheikhCountry: r.sheikh_country ?? undefined,
+    examDate: r.exam_date ? (r.exam_date instanceof Date ? isoDay(r.exam_date) : String(r.exam_date).slice(0, 10)) : undefined,
     studentsCount: r.students_count ?? 0,
     isWomenCommittee: Boolean(r.is_women_committee),
     excelUrl: r.stages?.sheet?.excelUrl ?? r.data?.excelUrl ?? undefined,
@@ -201,8 +207,8 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
        id, committee_number, committee_name, association_name, members, branch, competition_book,
        general_notes, course_id, course_name, sheikh_name, sheikh_phone, sheikh_country, students_count,
        is_women_committee, stages, scoring_details, aggregation_details, ceremony_details,
-       created_date, created_at_time, data, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
+       created_date, created_at_time, data, exam_date, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW())
      ON CONFLICT (id) DO UPDATE SET
        committee_number = EXCLUDED.committee_number, committee_name = EXCLUDED.committee_name,
        association_name = EXCLUDED.association_name, members = EXCLUDED.members, branch = EXCLUDED.branch,
@@ -214,7 +220,7 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
        aggregation_details = EXCLUDED.aggregation_details, ceremony_details = EXCLUDED.ceremony_details,
        created_date = COALESCE(committees.created_date, EXCLUDED.created_date),
        created_at_time = COALESCE(committees.created_at_time, EXCLUDED.created_at_time),
-       data = EXCLUDED.data, updated_at = NOW()
+       data = EXCLUDED.data, exam_date = EXCLUDED.exam_date, updated_at = NOW()
      RETURNING *;`,
     [
       c.id, c.committeeNumber, c.committeeName, c.associationName, JSON.stringify(c.members), c.branch,
@@ -228,6 +234,8 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
           : existing?.ceremony_details ?? {}
       ),
       c.createdDate, c.createdAtTime, JSON.stringify(committeeData),
+      // A client that does not send it (older app) keeps the stored date.
+      c.examDate !== undefined ? c.examDate : existing?.exam_date ?? null,
     ]
   );
   if (existing && existing.committee_number !== c.committeeNumber) {

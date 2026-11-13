@@ -44,6 +44,7 @@ const EXPECTED: Record<Action, [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1]> = {
   'summerRows.write':     [1, 0, 1, 0, 0],
   'scoring.read':         [1, 1, 1, 0, 0],
   'scoring.write':        [1, 1, 1, 0, 0],
+  'settings.write':       [1, 0, 0, 0, 0],
   'notifications.create': [1, 0, 0, 0, 0],
   'audit.read':           [0, 0, 0, 0, 0],
   'stats.read':           [1, 0, 1, 0, 0],

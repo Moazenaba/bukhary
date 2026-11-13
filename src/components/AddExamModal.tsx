@@ -26,6 +26,8 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [questionsCount, setQuestionsCount] = useState<number>(5);
   const [notes, setNotes] = useState('');
+  /** «datetime-local» value; the paper opens a set number of hours before this time. */
+  const [opensAt, setOpensAt] = useState('');
   const [fileError, setFileError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -70,6 +72,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
       // Set by the server (WEB-01); the display format used before was rejected.
       uploadedAt: '',
       notes: notes.trim(),
+      opensAt: opensAt ? new Date(opensAt).toISOString() : undefined,
     };
     setIsSaving(true);
     const saved = await onAddExam(newExam, pdfFile ?? undefined);
@@ -162,6 +165,20 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
                 onChange={(e) => setTotalMarks(parseInt(e.target.value) || 100)}
                 className="w-full bg-canvas border border-line rounded-xl px-2.5 py-2 text-xs font-mono font-bold outline-none focus:border-brand text-center"
               />
+            </div>
+
+            <div className="col-span-full">
+              <label className="block font-bold text-ink mb-1" htmlFor="exam-opens-at">
+                موعد الامتحان (الورقة تُتاح قبله بساعات يحددها الأدمن، وقبل ذلك للأدمن فقط)
+              </label>
+              <input
+                id="exam-opens-at"
+                type="datetime-local"
+                value={opensAt}
+                onChange={(e) => setOpensAt(e.target.value)}
+                className="w-full bg-canvas border border-line rounded-xl px-2.5 py-2 text-xs font-mono outline-none focus:border-brand"
+              />
+              <span className="text-[11px] text-muted">اتركه فارغاً لتكون الورقة متاحة فور رفعها.</span>
             </div>
 
             <div>

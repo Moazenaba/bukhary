@@ -41,6 +41,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   const [sheikhName, setSheikhName] = useState<string>('');
   const [sheikhPhone, setSheikhPhone] = useState<string>('');
   const [sheikhCountry, setSheikhCountry] = useState<string>('');
+  const [examDate, setExamDate] = useState<string>('');
   const [studentsCount, setStudentsCount] = useState<number | ''>('');
   const [questionsCount, setQuestionsCount] = useState<number>(5);
 
@@ -209,6 +210,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
       sheikhName: sheikhName.trim() || undefined,
       sheikhPhone: sheikhPhone.trim() || undefined,
       sheikhCountry: sheikhCountry.trim() || undefined,
+      examDate: examDate || undefined,
       studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
       isWomenCommittee,
       scoringDetails: {
@@ -532,6 +534,19 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                   value={sheikhCountry}
                   onChange={(e) => setSheikhCountry(e.target.value)}
                   className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs text-ink outline-none focus:border-brand"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-ink mb-1" htmlFor="new-committee-exam-date">
+                  ميعاد امتحان اللجنة
+                </label>
+                <input
+                  id="new-committee-exam-date"
+                  type="date"
+                  value={examDate}
+                  onChange={(e) => setExamDate(e.target.value)}
+                  className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs text-ink outline-none focus:border-brand font-mono"
                 />
               </div>
             </div>

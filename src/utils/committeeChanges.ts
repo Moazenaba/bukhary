@@ -26,7 +26,7 @@ export const STAGE_ACTION: Record<StageKey, string> = {
 
 export const BASE_COMMITTEE_FIELDS = [
   'committeeNumber', 'committeeName', 'associationName', 'members', 'branch', 'competitionBook', 'generalNotes',
-  'courseId', 'sheikhName', 'sheikhPhone', 'sheikhCountry', 'studentsCount', 'isWomenCommittee',
+  'courseId', 'sheikhName', 'sheikhPhone', 'sheikhCountry', 'studentsCount', 'isWomenCommittee', 'examDate',
 ] as const;
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Committee, StageKey, STAGES_LIST, AppUser } from '../types';
 import { calculateCurrentStage } from '../utils/stageUtils';
+import { EXAM_DATE_TONE_CLASS, examDateStatus } from '../utils/examDate';
 import { AuthService } from '../services/AuthService';
 
 interface CommitteeCardProps {
@@ -41,6 +42,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
     }
   };
   const currentStatus = calculateCurrentStage(committee.stages);
+  const examStatus = examDateStatus(committee);
 
   // Count how many stages are completed
   const completedStagesCount = Object.values(committee.stages).filter((s) => s.completed).length;
@@ -94,6 +96,12 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
               <span>{currentStatus.emoji}</span>
               <span>{currentStatus.label}</span>
             </span>
+            {examStatus && (
+              <span className={`inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-bold border ${EXAM_DATE_TONE_CLASS[examStatus.tone]}`}>
+                <span>📅</span>
+                <span>{examStatus.label}</span>
+              </span>
+            )}
           </div>
         </div>
 

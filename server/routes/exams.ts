@@ -1,10 +1,12 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { can } from '../auth.ts';
-import { type Principal, canAccessExam, isAllowed } from '../policy.ts';
+import { type Principal, canAccessExam, isAdminRole, isAllowed } from '../policy.ts';
+import { getSetting } from './systemSettings.ts';
+import { watermarkPdf } from '../watermark.ts';
 import { audit } from '../audit.ts';
 import { type Pool, withTransaction } from '../db.ts';
-import { badRequest, forbidden, notFound, route } from '../http.ts';
+import { HttpError, badRequest, forbidden, notFound, route } from '../http.ts';
 import { id, nonNegativeInt, optionalText } from '../schemas.ts';
 
 export const MAX_EXAM_FILE_BYTES = 20 * 1024 * 1024;
@@ -18,6 +20,8 @@ const examInput = z.object({
   durationMinutes: nonNegativeInt.default(60),
   questionsCount: nonNegativeInt.nullish(),
   sampleQuestions: z.array(z.string().max(2000)).max(100).optional(),
+  /** When the paper may be downloaded (ISO time); empty = available as soon as it is uploaded. */
+  opensAt: z.string().datetime({ offset: true }).nullish(),
   // Ignored: the server records when a file is uploaded (WEB-01). Kept so older clients still validate.
   uploadedAt: z.string().max(100).nullish(),
   notes: optionalText(5000),
@@ -27,8 +31,20 @@ const examInput = z.object({
  * Sample questions and notes are exam content: only people who may open the exam file see them
  * (API-13). Everyone else sees the title, book and file metadata.
  */
-export function examFromRow(r: any, viewer?: Principal) {
+/** The moment the paper becomes downloadable for people other than admins (opens_at minus the setting). */
+export function availableFrom(opensAt: unknown, hoursBefore: number): Date | null {
+  if (!opensAt) return null;
+  const t = new Date(opensAt as string).getTime();
+  return Number.isNaN(t) ? null : new Date(t - hoursBefore * 3_600_000);
+}
+
+const cairo = (d: Date) =>
+  new Intl.DateTimeFormat('ar-EG', { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).format(d);
+
+export function examFromRow(r: any, viewer?: Principal, hoursBefore = 24) {
   const content = !viewer || canAccessExam(viewer, r.id);
+  const from = availableFrom(r.opens_at, hoursBefore);
+  const locked = Boolean(viewer && from && !isAdminRole(viewer.role) && Date.now() < from.getTime());
   return {
     id: r.id,
     title: r.title,
@@ -40,7 +56,10 @@ export function examFromRow(r: any, viewer?: Principal) {
     sampleQuestions: content ? r.data?.sampleQuestions ?? [] : [],
     uploadedAt: r.uploaded_at ?? '',
     notes: content ? r.notes ?? undefined : undefined,
-    canOpen: viewer ? canAccessExam(viewer, r.id) : undefined,
+    canOpen: viewer ? canAccessExam(viewer, r.id) && !locked : undefined,
+    opensAt: r.opens_at instanceof Date ? r.opens_at.toISOString() : r.opens_at ?? undefined,
+    /** Until when the paper stays locked for this viewer (absent when it is open to them). */
+    lockedUntil: locked ? from!.toISOString() : undefined,
     // File metadata only; the content is served by GET /api/exams/:id/file to allowed roles.
     hasFile: Boolean(r.file_name),
     pdfFileName: r.file_name ?? undefined,
@@ -51,7 +70,7 @@ export function examFromRow(r: any, viewer?: Principal) {
 
 const LIST_SQL = `
   SELECT e.id, e.title, e.book, e.branch, e.total_marks, e.duration_minutes, e.questions_count,
-         e.uploaded_at, e.notes, e.data, e.updated_at, f.file_name, f.size_bytes
+         e.uploaded_at, e.notes, e.data, e.updated_at, e.opens_at, f.file_name, f.size_bytes
   FROM exams e LEFT JOIN exam_files f ON f.exam_id = e.id`;
 
 export function examsRouter(pool: Pool) {
@@ -62,13 +81,14 @@ export function examsRouter(pool: Pool) {
 
   r.get('/', can('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} ORDER BY e.updated_at DESC;`);
-    res.json({ success: true, exams: rows.filter((r) => visible(req.user!, r.id)).map((r) => examFromRow(r, req.user)) });
+    const hours = await getSetting(pool, 'exam_open_hours_before');
+    res.json({ success: true, exams: rows.filter((r) => visible(req.user!, r.id)).map((r) => examFromRow(r, req.user, hours)) });
   }));
 
   r.get('/:id', can('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} WHERE e.id = $1;`, [req.params.id]);
     if (!rows[0] || !visible(req.user!, rows[0].id)) throw notFound('الامتحان غير موجود');
-    res.json({ success: true, exam: examFromRow(rows[0], req.user) });
+    res.json({ success: true, exam: examFromRow(rows[0], req.user, await getSetting(pool, 'exam_open_hours_before')) });
   }));
 
   r.post('/', can('exams.write'), route(async (req, res) => {
@@ -76,15 +96,17 @@ export function examsRouter(pool: Pool) {
     const row = await withTransaction(pool, async (db) => {
       const { rows: before } = await db.query(`${LIST_SQL} WHERE e.id = $1;`, [e.id]);
       await db.query(
-        `INSERT INTO exams (id, title, book, branch, total_marks, duration_minutes, questions_count, uploaded_at, notes, data, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+        `INSERT INTO exams (id, title, book, branch, total_marks, duration_minutes, questions_count, uploaded_at, notes, data, opens_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
          ON CONFLICT (id) DO UPDATE SET
            title = EXCLUDED.title, book = EXCLUDED.book, branch = EXCLUDED.branch,
            total_marks = EXCLUDED.total_marks, duration_minutes = EXCLUDED.duration_minutes,
            questions_count = EXCLUDED.questions_count, notes = EXCLUDED.notes,
-           data = EXCLUDED.data, updated_at = NOW();`,
+           data = EXCLUDED.data, opens_at = EXCLUDED.opens_at, updated_at = NOW();`,
         [e.id, e.title, e.book, e.branch, e.totalMarks, e.durationMinutes, e.questionsCount ?? null,
-          before[0]?.uploaded_at ?? new Date().toISOString(), e.notes, JSON.stringify({ sampleQuestions: e.sampleQuestions ?? before[0]?.data?.sampleQuestions ?? [] })]
+          before[0]?.uploaded_at ?? new Date().toISOString(), e.notes, JSON.stringify({ sampleQuestions: e.sampleQuestions ?? before[0]?.data?.sampleQuestions ?? [] }),
+          // A client that does not send it (older app) keeps the stored opening time.
+          e.opensAt !== undefined ? e.opensAt : before[0]?.opens_at ?? null]
       );
       const { rows } = await db.query(`${LIST_SQL} WHERE e.id = $1;`, [e.id]);
       await audit(db, req, before[0] ? 'exam.update' : 'exam.create', 'exam', e.id, before[0] ? examFromRow(before[0]) : null, examFromRow(rows[0]));
@@ -127,18 +149,39 @@ export function examsRouter(pool: Pool) {
 
   r.get('/:id/file', can('exams.file'), route(async (req, res) => {
     // The per-user exam allow-list is enforced here, not only in the UI (API-06).
-    if (!canAccessExam(req.user!, req.params.id)) throw forbidden('هذا الامتحان غير متاح لك');
+    const user = req.user!;
+    if (!canAccessExam(user, req.params.id)) throw forbidden('هذا الامتحان غير متاح لك');
+    // Locked until shortly before the exam, for everyone but admins and super admins.
+    const { rows: ex } = await pool.query('SELECT opens_at FROM exams WHERE id = $1;', [req.params.id]);
+    const from = availableFrom(ex[0]?.opens_at, await getSetting(pool, 'exam_open_hours_before'));
+    if (from && !isAdminRole(user.role) && Date.now() < from.getTime()) {
+      throw new HttpError(403, `ورقة الامتحان تُتاح ${cairo(from)} (بتوقيت القاهرة)`, 'exam_not_open_yet');
+    }
     const { rows } = await pool.query('SELECT file_name, mime_type, content FROM exam_files WHERE exam_id = $1;', [req.params.id]);
     if (!rows[0]) throw notFound('لا يوجد ملف مرفوع لهذا الامتحان');
+    // Each copy carries who downloaded it and when, so a leaked paper can be traced. A super admin
+    // may ask for the untouched original (?clean=1).
+    const clean = req.query.clean === '1' && user.role === 'super_admin';
+    let content: Buffer = rows[0].content;
+    let watermarked = false;
+    if (!clean) {
+      const { rows: me } = await pool.query('SELECT phone FROM app_users WHERE id = $1;', [user.id]);
+      const marked = await watermarkPdf(content, { phone: me[0]?.phone ?? '', userId: user.id, at: new Date() });
+      if (marked) {
+        content = marked;
+        watermarked = true;
+      }
+    }
     // Every download is recorded (who, when, from which app), so a leaked paper can be traced.
     await audit(pool, req, 'exam.file_download', 'exam', req.params.id, null, {
       fileName: rows[0].file_name,
       client: req.get('X-App-Version-Code') ? 'android' : 'web',
+      watermarked,
     });
     res.setHeader('Content-Type', rows[0].mime_type);
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(rows[0].file_name)}`);
     res.setHeader('Cache-Control', 'private, no-store');
-    res.send(rows[0].content);
+    res.send(content);
   }));
 
   r.delete('/:id/file', can('exams.write'), route(async (req, res) => {

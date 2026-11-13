@@ -67,7 +67,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   const filteredExams = exams.filter((e) => {
     // Editors see every exam; others see the ones they may open.
-    if (!canWriteExams && e.canOpen === false) return false;
+    // (A paper locked until its exam is still listed, with the time it opens.)
+    if (!canWriteExams && e.canOpen === false && !e.lockedUntil) return false;
     if (selectedBook !== 'all' && e.book !== selectedBook) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -372,6 +373,14 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     </p>
                   )}
                 </div>
+
+                {(exam.lockedUntil || exam.opensAt) && (
+                  <p className={`text-xs font-bold rounded-lg px-2.5 py-1.5 border ${exam.lockedUntil ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                    {exam.lockedUntil
+                      ? `🔒 مقفول — تُتاح الورقة ${new Date(exam.lockedUntil).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}`
+                      : `🕒 موعد الامتحان: ${new Date(exam.opensAt!).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}`}
+                  </p>
+                )}
 
                 {/* Actions */}
                 <div className="pt-3 border-t border-line/30 flex items-center justify-between gap-2">

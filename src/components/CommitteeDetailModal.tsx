@@ -89,6 +89,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   const [sheikhName, setSheikhName] = useState<string>(committee.sheikhName || '');
   const [sheikhPhone, setSheikhPhone] = useState<string>(committee.sheikhPhone || '');
   const [sheikhCountry, setSheikhCountry] = useState<string>(committee.sheikhCountry || '');
+  const [examDate, setExamDate] = useState<string>(committee.examDate || '');
   const [studentsCount, setStudentsCount] = useState<number | ''>(committee.studentsCount ?? '');
   const [members, setMembers] = useState<string[]>(committee.members || []);
   const [newMemberInput, setNewMemberInput] = useState('');
@@ -182,6 +183,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
       sheikhName: sheikhName.trim() || undefined,
       sheikhPhone: sheikhPhone.trim() || undefined,
       sheikhCountry: sheikhCountry.trim() || undefined,
+      // null clears it on the server (undefined would keep the stored date).
+      examDate: examDate || null,
       members: members.map((m) => m.trim()).filter(Boolean),
       studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
       isWomenCommittee,
@@ -1701,6 +1704,14 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                     type="text" value={branch} aria-label="الفرع"
                     onChange={(e) => setBranch(e.target.value)}
                     className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-xs font-bold text-ink mb-1">ميعاد امتحان اللجنة</span>
+                  <input
+                    type="date" value={examDate} aria-label="ميعاد امتحان اللجنة"
+                    onChange={(e) => setExamDate(e.target.value)}
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:border-brand"
                   />
                 </label>
                 <label className="block">
