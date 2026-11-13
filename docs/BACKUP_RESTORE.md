@@ -104,8 +104,12 @@ DB Browser for SQLite) أو ترجّع بيانات لجنة واحدة يدوي
 2. اعمل قاعدة جديدة فاضية (مشروع Supabase جديد، أو قاعدة جديدة في نفس السيرفر).
 3. رجّع النسخة فيها:
    ```bash
-   pg_restore --no-owner --no-privileges --dbname="<رابط القاعدة الجديدة>" backups\bukhari-....dump
+   pg_restore --list bukhari.dump | grep -vE " (SCHEMA|COMMENT) - (SCHEMA )?public( |$)" > restore.list
+   pg_restore --no-owner --no-privileges --exit-on-error --use-list=restore.list --dbname="<رابط القاعدة الجديدة>" bukhari.dump
    ```
+   (السطر الأول بيشيل خطوة «إنشاء قسم public» لأن أي قاعدة جديدة فيها القسم ده أصلاً. على ويندوز
+   شغّلهم من Git Bash.) النسخة فيها بيانات التطبيق بس (قسم `public`: كل الجداول وملفات الامتحانات)،
+   مش أقسام Supabase الداخلية (auth وstorage وvault...) لأنها موجودة في أي مشروع Supabase جديد.
 4. **اتأكد** (الخطوة الجاية) إن الأعداد منطقية.
 5. غيّر `DATABASE_URL` في إعدادات السيرفر (Vercel ← Settings ← Environment Variables) للقاعدة الجديدة
    واعمل Redeploy. لو النسخة أقدم من الكود الحالي، شغّل `npm run migrate:prod` بعدها (بيكمّل أي

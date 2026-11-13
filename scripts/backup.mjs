@@ -43,7 +43,9 @@ if (caPath && !isLocal) {
 
 const result = spawnSync(
   process.env.PG_DUMP || 'pg_dump',
-  ['-w', '--format=custom', '--no-owner', '--no-privileges', `--dbname=${dbUrlWithoutPassword}`, `--file=${file}`],
+  // Only the app's data (schema public); Supabase's own schemas and extensions exist in every project
+  // and cannot be restored elsewhere (see docs/BACKUP_RESTORE.md).
+  ['-w', '--format=custom', '--no-owner', '--no-privileges', '--schema=public', `--dbname=${dbUrlWithoutPassword}`, `--file=${file}`],
   { env, stdio: 'inherit', timeout: 15 * 60 * 1000 }
 );
 if (result.error || result.status !== 0) {

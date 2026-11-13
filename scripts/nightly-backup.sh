@@ -37,7 +37,11 @@ mkdir -p "$work/backup/csv" "$OUT_DIR"
 
 echo "::group::Dump"
 pg_dump --version
-pg_dump --format=custom --no-owner --no-privileges --dbname="$SOURCE_DATABASE_URL" --file="$work/backup/bukhari.dump"
+# Only the app's own data (schema "public": every table, exam PDFs, migrations). Supabase adds its
+# own schemas and extensions (auth, storage, vault, ...) that every Supabase project already has
+# and that cannot be restored anywhere else, so they are left out; so are backup_* copies made
+# from the SQL Editor (docs/sql), which are copies of these same tables.
+pg_dump --format=custom --no-owner --no-privileges --schema=public --dbname="$SOURCE_DATABASE_URL" --file="$work/backup/bukhari.dump"
 echo "dump size: $(du -h "$work/backup/bukhari.dump" | cut -f1)"
 echo "::endgroup::"
 
@@ -60,7 +64,9 @@ done
 echo "::endgroup::"
 
 echo "::group::Restore into a throwaway database and compare"
-pg_restore --no-owner --no-privileges --exit-on-error --dbname="$VERIFY_DATABASE_URL" "$work/backup/bukhari.dump"
+# Every database already has a "public" schema: skip creating it (and its comment), restore the rest.
+pg_restore --list "$work/backup/bukhari.dump" | grep -vE ' (SCHEMA|COMMENT) - (SCHEMA )?public( |$)' > "$work/restore.list"
+pg_restore --no-owner --no-privileges --exit-on-error --use-list="$work/restore.list" --dbname="$VERIFY_DATABASE_URL" "$work/backup/bukhari.dump"
 psql "$VERIFY_DATABASE_URL" -X -At -c "$count_sql" > "$work/restored-counts.txt"
 if ! diff -u "$work/backup/counts.txt" "$work/restored-counts.txt"; then
   echo "The restored copy does not match the source (counts above). The backup is NOT trustworthy." >&2
