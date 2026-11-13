@@ -12,6 +12,8 @@ export const SETTINGS = {
   exam_open_hours_before: { schema: z.coerce.number().int().min(0).max(720), fallback: 24 },
   /** Exam observers offered when staffing a committee (names only, not accounts). */
   observers: { schema: z.array(z.string().trim().min(1).max(200)).max(500), fallback: [] as string[] },
+  /** Sheikhs offered when choosing who attends a ceremony (names only). */
+  ceremony_sheikhs: { schema: z.array(z.string().trim().min(1).max(200)).max(500), fallback: [] as string[] },
   /** Days a stage may wait before the committee shows as late. */
   overdue_days: { schema: z.coerce.number().int().min(1).max(90), fallback: 3 },
   /** The website's font. */

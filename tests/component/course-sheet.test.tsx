@@ -6,6 +6,7 @@ import { SummerCourseTrackerView } from '../../src/components/SummerCourseTracke
 import { DataService } from '../../src/services/DataService';
 import type { Committee, Course } from '../../src/types';
 import { grant } from './setup';
+import { toast } from '../../src/components/Toasts';
 
 const course: Course = { id: 'crs', name: 'sheetta', year: '', startDate: '', endDate: '', status: 'active', isDefault: true, createdAt: '' };
 const stages = (n: number) =>
@@ -90,15 +91,17 @@ describe('course sheet screen', () => {
     expect(onUpdateCommitteeFields).toHaveBeenCalledWith('c1', { studentsCount: 0 });
   });
 
-  it('without the right to edit committees, a linked row edit does not touch the committee', async () => {
+  it('without the right to edit committees, a linked row edit is refused with a clear message (nothing saved)', async () => {
     grant(['summerRows.read', 'summerRows.write']);
     vi.spyOn(DataService, 'saveSummerCourseRow').mockImplementation(async (r: any) => r);
+    const errors = vi.spyOn(toast, 'error');
     const { onUpdateCommitteeFields } = renderSheet([committee(1, { sheikhName: 'الشيخ' })]);
     const input = (await screen.findByDisplayValue('الشيخ')) as HTMLInputElement;
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'آخر' } });
     fireEvent.blur(input);
     expect(onUpdateCommitteeFields).not.toHaveBeenCalled();
-    await waitFor(() => expect(DataService.saveSummerCourseRow).toHaveBeenCalledTimes(1));
+    expect(DataService.saveSummerCourseRow).not.toHaveBeenCalled();
+    expect(errors).toHaveBeenCalledWith(expect.stringMatching(/صلاحية تعديل اللجان/));
   });
 });

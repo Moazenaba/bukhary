@@ -190,6 +190,19 @@ await test('committees: every card has an «تعديل» button', async () => {
   assert.ok(n >= 2, `only ${n} edit buttons`);
 });
 
+await test('«إعدادات النظام»: an admin edits the observers list and it is saved for everyone', async () => {
+  await open(page, 'committees');
+  await page.getByRole('button', { name: 'إعدادات النظام' }).first().click();
+  const box = page.getByRole('textbox', { name: 'مراقبو الامتحانات' });
+  await box.waitFor();
+  await box.fill(`مراقب تجربة ${RUN}\nمراقب آخر`);
+  await box.blur();
+  await page.waitForTimeout(1000);
+  const settings = (await api('GET', '/settings')).settings;
+  assert.deepEqual(settings.observers.slice(0, 2), [`مراقب تجربة ${RUN}`, 'مراقب آخر']);
+  await page.keyboard.press('Escape');
+});
+
 // ---------------------------------------------------------------- phone
 console.log('Phone (Pixel 7)');
 const phone = await browser.newContext({ ...devices['Pixel 7'], acceptDownloads: true });

@@ -402,7 +402,12 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   const editRowField = async (row: SummerCourseRow, field: 'sheikh_name' | 'place' | 'book' | 'students_count', value: string | number) => {
     if (row[field] === value) return;
     const committee = row.committeeId ? committees.find((c) => c.id === row.committeeId) : undefined;
-    if (committee && onUpdateCommitteeFields && AuthService.can('committees.update')) {
+    // A row linked to a committee shows the committee's data, which lives in one place: the committee.
+    if (committee && !AuthService.canOnCommittee('committees.update', committee)) {
+      toast.error('بيانات هذه اللجنة تُعدَّل من اللجنة نفسها، وتحتاج صلاحية تعديل اللجان');
+      return;
+    }
+    if (committee && onUpdateCommitteeFields) {
       const text = typeof value === 'string' ? value.trim() : value;
       const patch: Partial<Committee> =
         field === 'sheikh_name' ? { sheikhName: (text as string) || undefined }

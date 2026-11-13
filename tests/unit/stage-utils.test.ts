@@ -19,8 +19,15 @@ describe('current stage of a committee', () => {
   });
 
   it.each([
-    [prefix(1), 'exam', 'في انتظار الامتحان'],
-    [prefix(2), 'scoring', 'تم الامتحان'],
+    [0, 'registration', 'في انتظار الامتحان'],
+    [prefix(1), 'registration', 'في انتظار الامتحان'],
+    [prefix(2), 'exam', 'تم الامتحان'],
+    [prefix(3), 'scoring', 'تم التصحيح'],
+    [prefix(4), 'aggregation', 'تم التجميع'],
+    [prefix(5), 'review', 'تمت المراجعة'],
+    [prefix(6), 'sheet', 'تمت كتابة الكشف'],
+    [prefix(7), 'accreditation', 'تم الاعتماد'],
+    [prefix(8), 'announcement', 'تم إعلان النتيجة'],
     [prefix(9), 'ceremony', 'تم الحفل'],
   ])('mask %i → %s «%s»', (mask, key, label) => {
     const s = calculateCurrentStage(stagesFrom(mask));
@@ -41,6 +48,28 @@ describe('current stage of a committee', () => {
     for (let mask = 0; mask < 1 << KEYS.length; mask++) {
       const isCeremony = calculateCurrentStage(stagesFrom(mask)).label === 'تم الحفل';
       expect(isCeremony).toBe(Boolean(mask & (1 << KEYS.indexOf('ceremony'))));
+    }
+  });
+});
+
+describe('every state tells the truth', () => {
+  it('each state has its own key and label (no two states share a filter)', () => {
+    const seen = new Map<string, string>();
+    for (let n = 1; n <= KEYS.length; n++) {
+      const s = calculateCurrentStage(stagesFrom(prefix(n)));
+      if (seen.has(s.key)) expect(seen.get(s.key)).toBe(s.label);
+      seen.set(s.key, s.label);
+    }
+    expect(new Set(seen.values()).size).toBe(seen.size);
+    expect(seen.size).toBe(KEYS.length); // one state per stage (nothing done = «في انتظار الامتحان», like registered only)
+  });
+
+  it('a label says «تم X» only when X is really completed', () => {
+    for (let n = 2; n <= KEYS.length; n++) {
+      const stages = stagesFrom(prefix(n));
+      const s = calculateCurrentStage(stages);
+      expect(s.label.startsWith('تم')).toBe(true);
+      expect(stages[s.key].completed).toBe(true);
     }
   });
 });

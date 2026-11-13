@@ -22,6 +22,7 @@ import {
 import { STAGE_ACTION } from '../utils/committeeChanges';
 import { AuthService } from '../services/AuthService';
 import { CommitteeStaffPanel } from './StaffAssignment';
+import { useSettings } from '../data/queries';
 
 interface CommitteeDetailModalProps {
   committee: Committee | null;
@@ -61,6 +62,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   startInEdit = false,
 }) => {
   useEscapeKey(onClose);
+  // Suggested names come from «إعدادات النظام» (they used to be written in this file).
+  const { settings } = useSettings();
   const editSectionRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (startInEdit) editSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1246,27 +1249,11 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                               <span className="text-[11px] font-bold text-slate-600 block">
                                 اختر من المشايخ والفضلاء الأساسيين للحفل (انقر للاختيار أو الإلغاء):
                               </span>
+                              {settings.ceremony_sheikhs.length === 0 && (
+                                <span className="text-[11px] text-slate-500 block">لا توجد أسماء مقترحة بعد؛ يضيفها الأدمن من «إعدادات النظام».</span>
+                              )}
                               <div className="flex items-center gap-1.5 flex-wrap max-h-40 overflow-y-auto p-1.5 bg-white rounded-xl border border-slate-200">
-                                {[
-                                  'مهندس محمود مجدي',
-                                  'الشيخ أشرف مازن',
-                                  'الشيخ ناصر الضليل',
-                                  'الشيخ محمد فرحات',
-                                  'الشيخ سمير أبو علفة',
-                                  'الشيخ رضا أبو جندي',
-                                  'الشيخ هيثم سعيد',
-                                  'الشيخ إبراهيم أبو موسى',
-                                  'دكتور إبراهيم أبو صقر',
-                                  'دكتور محمد رويشد',
-                                  'الشيخ محمود الضليل',
-                                  'الشيخ أحمد صابح',
-                                  'الشيخ أحمد الضليل',
-                                  'الشيخ هاني صبري',
-                                  'الشيخ عبد الله سيد أحمد',
-                                  'الشيخ أدهم مقلد',
-                                  'الشيخ وليد عبد السلام',
-                                  'الشيخ علاء عبد الجليل',
-                                ].map((sheikhName) => {
+                                {settings.ceremony_sheikhs.map((sheikhName) => {
                                   const isSelected = ceremonyDetails.attendingSheikhs.includes(sheikhName);
                                   return (
                                     <button
@@ -1813,43 +1800,11 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
                   <span className="text-[11px] font-bold text-slate-600 block">
                     اختر من أعضاء ومراقبي الامتحانات (انقر للاختيار أو الإلغاء):
                   </span>
+                  {settings.observers.length === 0 && (
+                    <span className="text-[11px] text-slate-500 block">لا توجد أسماء مقترحة بعد؛ يضيفها الأدمن من «إعدادات النظام».</span>
+                  )}
                   <div className="flex items-center gap-1.5 flex-wrap max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-line/50">
-                    {[
-                      'أحمد المخزنجي',
-                      'أحمد سلامة الهلباوي',
-                      'أحمد عبد الخالق',
-                      'أحمد ماهر',
-                      'أسامة عكاشة',
-                      'إبراهيم أبو صقر',
-                      'إبراهيم أبو موسى 2',
-                      'رشاد',
-                      'رضا أبو جندي 2',
-                      'سلامة البنا',
-                      'سلامة زلابية',
-                      'سمير أبو علفة',
-                      'شيخ احمد صابح',
-                      'شيخ ايمن احمد البرانيه',
-                      'عبد الله سيد أحمد',
-                      'علاء عبد الجليل',
-                      'عمر محمود مجدي',
-                      'مجاهد السروي',
-                      'محمد سلامة',
-                      'محمد فرحات',
-                      'محمود عبده عيد',
-                      'هاني صبري 2',
-                      'وليد عبد السلام',
-                      'ياسر سلامة',
-                      'يوسف المخزنجي',
-                      'أدهم مقلد',
-                      'محمد النحاس',
-                      'محمد ضياء',
-                      'معاذ أبو عنبة',
-                      'محمد عماد',
-                      'أحمد عطا',
-                      'محمود الحراني',
-                      'محمود المسلماني',
-                      'بكر خالد',
-                    ].map((name) => {
+                    {settings.observers.map((name) => {
                       const isAdded = members.includes(name);
                       return (
                         <button

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { ApiError } from '../services/api';
 import { AuthService } from '../services/AuthService';
 import { DataService } from '../services/DataService';
+import { DEFAULT_SETTINGS, type SystemSettings } from '../types';
 
 /** Every server-data query starts with this key, so logout can clear all of it at once. */
 export const DATA_ROOT_KEY = ['bukhari-data'] as const;
@@ -96,4 +97,16 @@ export function useLiveRefresh(enabled: boolean, intervalMs = 30_000) {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [enabled, intervalMs, queryClient]);
+}
+
+/** Shared settings (font, name lists, exam window, late days), with defaults until they load. */
+export function useSettings(enabled = true) {
+  const q = useQuery({
+    queryKey: [...DATA_ROOT_KEY, 'settings'],
+    queryFn: () => DataService.getSettings(),
+    enabled,
+    retry: retryPolicy,
+    staleTime: 60_000,
+  });
+  return { settings: { ...DEFAULT_SETTINGS, ...(q.data ?? {}) } as SystemSettings, query: q };
 }

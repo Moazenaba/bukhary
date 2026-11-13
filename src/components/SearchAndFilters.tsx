@@ -194,7 +194,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           </button>
 
           {/* Dynamic Stages from STAGES_LIST */}
-          {STAGES_LIST.slice(1).map((stg) => {
+          {STAGES_LIST.map((stg) => {
             const isSelected = selectedStage === stg.key;
             const count = stageCounts[stg.key] || 0;
 
@@ -228,17 +228,17 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           <button
             type="button"
             onClick={onExportExamInProgress}
-            disabled={!stageCounts.exam}
+            disabled={!stageCounts.registration}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-100 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-base">download</span>
-            <span>تصدير كشف «في انتظار الامتحان» Excel ({stageCounts.exam || 0} لجنة)</span>
+            <span>تصدير كشف «في انتظار الامتحان» Excel ({stageCounts.registration || 0} لجنة)</span>
           </button>
           {onPrintExamInProgress && (
             <button
               type="button"
               onClick={onPrintExamInProgress}
-              disabled={!stageCounts.exam}
+              disabled={!stageCounts.registration}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-base">print</span>

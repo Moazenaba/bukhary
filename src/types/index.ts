@@ -12,6 +12,7 @@ export type StageKey =
 export interface StageMeta {
   key: StageKey;
   label: string;
+  /** The committee's state when this is the last stage it completed (registration: nothing done yet). */
   activeLabel: string;
   emoji: string;
   colorClass: string;
@@ -23,7 +24,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'registration',
     label: 'التسجيل',
-    activeLabel: 'تم التسجيل',
+    activeLabel: 'في انتظار الامتحان',
     emoji: '📝',
     colorClass: 'text-slate-700 bg-slate-100 border-slate-300',
     badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
@@ -32,7 +33,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'exam',
     label: 'الامتحان',
-    activeLabel: 'في انتظار الامتحان',
+    activeLabel: 'تم الامتحان',
     emoji: '🟦',
     colorClass: 'text-blue-700 bg-blue-50 border-blue-200',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -41,7 +42,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'scoring',
     label: 'التصحيح',
-    activeLabel: 'تم الامتحان / التصحيح',
+    activeLabel: 'تم التصحيح',
     emoji: '🟠',
     colorClass: 'text-amber-700 bg-amber-50 border-amber-200',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -50,7 +51,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'aggregation',
     label: 'تجميع الدرجات',
-    activeLabel: 'في التجميع',
+    activeLabel: 'تم التجميع',
     emoji: '🔵',
     colorClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
     badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
@@ -59,7 +60,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'review',
     label: 'المراجعة',
-    activeLabel: 'في المراجعة والتدقيق',
+    activeLabel: 'تمت المراجعة',
     emoji: '🟡',
     colorClass: 'text-yellow-800 bg-yellow-50 border-yellow-300',
     badgeClass: 'bg-yellow-50 text-yellow-800 border-yellow-300',
@@ -68,7 +69,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'sheet',
     label: 'كتابة الكشف',
-    activeLabel: 'كتابة الكشف',
+    activeLabel: 'تمت كتابة الكشف',
     emoji: '🟣',
     colorClass: 'text-purple-700 bg-purple-50 border-purple-200',
     badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -77,7 +78,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'accreditation',
     label: 'الاعتمادية',
-    activeLabel: 'قيد الاعتمادية',
+    activeLabel: 'تم الاعتماد',
     emoji: '📜',
     colorClass: 'text-emerald-800 bg-emerald-50 border-emerald-300',
     badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300',
@@ -86,7 +87,7 @@ export const STAGES_LIST: StageMeta[] = [
   {
     key: 'announcement',
     label: 'إعلان النتيجة',
-    activeLabel: 'إعلان النتيجة',
+    activeLabel: 'تم إعلان النتيجة',
     emoji: '📢',
     colorClass: 'text-cyan-700 bg-cyan-50 border-cyan-200',
     badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-200',
@@ -470,3 +471,20 @@ export interface ExamItem {
   lockedUntil?: string;
   updatedAt?: string;
 }
+
+/** Shared settings (GET /api/settings); admins change them in «إعدادات النظام». */
+export interface SystemSettings {
+  exam_open_hours_before: number;
+  observers: string[];
+  ceremony_sheikhs: string[];
+  overdue_days: number;
+  font_family: 'cairo' | 'tajawal' | 'ibm-plex-sans-arabic' | 'noto-naskh-arabic';
+}
+
+export const DEFAULT_SETTINGS: SystemSettings = {
+  exam_open_hours_before: 24,
+  observers: [],
+  ceremony_sheikhs: [],
+  overdue_days: 3,
+  font_family: 'cairo',
+};

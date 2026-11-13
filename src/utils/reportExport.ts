@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Committee, ScheduleTask } from '../types';
-import { calculateCurrentStage, todayISO } from './stageUtils';
+import { calculateCurrentStage, isAwaitingExam, todayISO } from './stageUtils';
 
 export type CeremonyPeriod = 'day' | 'week' | 'month';
 
@@ -28,7 +28,7 @@ function writeSheet(rows: Record<string, string | number>[], widths: number[], s
 /** Committees whose current stage is «في انتظار الامتحان», ordered by committee number. */
 export const examInProgressCommittees = (committees: Committee[]) =>
   committees
-    .filter((c) => calculateCurrentStage(c.stages).key === 'exam')
+    .filter((c) => isAwaitingExam(c.stages))
     .sort((a, b) => a.committeeNumber - b.committeeNumber);
 
 export function examInProgressRows(committees: Committee[]) {

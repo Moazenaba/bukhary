@@ -5,102 +5,21 @@ export const getStageMeta = (key: StageKey): StageMeta => {
 };
 
 /**
- * Calculates current active status of a committee based on its completed stages
+ * The committee's state = the last stage it really completed, so every label tells the truth:
+ * «في انتظار الامتحان» (only registered), «تم الامتحان», «تم التصحيح», … «تم الحفل». Each state has
+ * its own key, so «تم الامتحان» and «تم التصحيح» are separate filters. (Stages are always
+ * completed in order on the server, so the last completed stage is unambiguous.)
  */
 export const calculateCurrentStage = (
   stages: Committee['stages']
 ): { key: StageKey; label: string; emoji: string; badgeClass: string; dotColor: string } => {
-  if (stages.ceremony?.completed) {
-    return {
-      key: 'ceremony',
-      label: 'تم الحفل',
-      emoji: '🟢',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold',
-      dotColor: 'bg-emerald-500',
-    };
-  }
-
-  if (stages.announcement?.completed) {
-    return {
-      key: 'announcement',
-      label: 'إعلان النتيجة',
-      emoji: '📢',
-      badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-300 font-semibold',
-      dotColor: 'bg-cyan-500',
-    };
-  }
-
-  if (stages.accreditation?.completed) {
-    return {
-      key: 'accreditation',
-      label: 'الاعتمادية',
-      emoji: '📜',
-      badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold',
-      dotColor: 'bg-emerald-600',
-    };
-  }
-
-  if (stages.sheet?.completed) {
-    return {
-      key: 'sheet',
-      label: 'كتابة الكشف',
-      emoji: '🟣',
-      badgeClass: 'bg-purple-50 text-purple-700 border-purple-300 font-semibold',
-      dotColor: 'bg-purple-500',
-    };
-  }
-
-  if (stages.review?.completed) {
-    return {
-      key: 'review',
-      label: 'في المراجعة والتدقيق',
-      emoji: '🟡',
-      badgeClass: 'bg-yellow-50 text-yellow-800 border-yellow-300 font-semibold',
-      dotColor: 'bg-yellow-500',
-    };
-  }
-
-  if (stages.aggregation?.completed) {
-    return {
-      key: 'aggregation',
-      label: 'في التجميع',
-      emoji: '🔵',
-      badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-300 font-semibold',
-      dotColor: 'bg-indigo-500',
-    };
-  }
-
-  if (stages.scoring?.completed) {
-    return {
-      key: 'scoring',
-      label: 'في التصحيح',
-      emoji: '🟠',
-      badgeClass: 'bg-amber-50 text-amber-700 border-amber-300 font-semibold',
-      dotColor: 'bg-amber-500',
-    };
-  }
-
-  // The exam is done and correction has not been recorded yet: its own visible state «تم الامتحان».
-  // (Counted with the correction stage, which is the next work to be done.)
-  if (stages.exam?.completed) {
-    return {
-      key: 'scoring',
-      label: 'تم الامتحان',
-      emoji: '✅',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold',
-      dotColor: 'bg-emerald-500',
-    };
-  }
-
-  // If exam has not completed yet
-  return {
-    key: 'exam',
-    label: 'في انتظار الامتحان',
-    emoji: '🟦',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-300 font-semibold',
-    dotColor: 'bg-blue-500',
-  };
+  let meta = STAGES_LIST[0];
+  for (const s of STAGES_LIST) if (stages?.[s.key]?.completed) meta = s;
+  return { key: meta.key, label: meta.activeLabel, emoji: meta.emoji, badgeClass: meta.badgeClass, dotColor: meta.dotColor };
 };
+
+/** Committees still waiting for their exam (nothing after registration done). */
+export const isAwaitingExam = (stages: Committee['stages']) => calculateCurrentStage(stages).key === 'registration';
 
 /**
  * Returns a formatted Arabic date & time string: "2026/09/25 - 10:30 ص"

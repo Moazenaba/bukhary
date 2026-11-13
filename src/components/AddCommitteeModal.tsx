@@ -579,12 +579,12 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
                 className="w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
               >
                 <option value="exam">🟦 في انتظار الامتحان</option>
-                <option value="scoring">✅ تم الامتحان (في التصحيح)</option>
-                <option value="aggregation">🔵 في التجميع</option>
-                <option value="review">🟡 في المراجعة</option>
-                <option value="sheet">🟣 كتابة الكشف (تمت المراجعة)</option>
-                <option value="announcement">📢 إعلان النتيجة (تم الاعتماد)</option>
-                <option value="ceremony">🎉 في انتظار الحفل (تم الإعلان)</option>
+                <option value="scoring">✅ تم الامتحان</option>
+                <option value="aggregation">🔵 تم التصحيح</option>
+                <option value="review">🟡 تم التجميع</option>
+                <option value="sheet">🟣 تمت المراجعة</option>
+                <option value="announcement">📜 تم الاعتماد</option>
+                <option value="ceremony">🎉 تم إعلان النتيجة (في انتظار الحفل)</option>
               </select>
             </div>
           </div>

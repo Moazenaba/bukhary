@@ -39,6 +39,7 @@ import { HomeOverviewView } from './components/HomeOverviewView';
 const StatisticsView = lazy(() => import('./components/StatisticsView').then((m) => ({ default: m.StatisticsView })));
 const SummerCourseTrackerView = lazy(() => import('./components/SummerCourseTrackerView').then((m) => ({ default: m.SummerCourseTrackerView })));
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { SystemSettingsModal } from './components/SystemSettingsModal';
 const DailyAlertsView = lazy(() => import('./components/DailyAlertsView').then((m) => ({ default: m.DailyAlertsView })));
 const CeremoniesView = lazy(() => import('./components/CeremoniesView').then((m) => ({ default: m.CeremoniesView })));
 import { Footer } from './components/Footer';
@@ -249,6 +250,7 @@ export default function App() {
   const [isAddCommitteeOpen, setIsAddCommitteeOpen] = useState(false);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
   const [isAddBookOpen, setIsAddBookOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
   // ---------------- Committees ----------------
@@ -701,6 +703,7 @@ export default function App() {
         todaysTasksCount={todaysTasksCount}
         ceremoniesCount={committees.filter((c) => c.stages.ceremony?.completed).length}
         onOpenNewCommittee={() => setIsAddCommitteeOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         currentUser={currentUser}
       />
 
@@ -1111,6 +1114,7 @@ export default function App() {
       </div>
 
       {/* Modals */}
+      {isSettingsOpen && <SystemSettingsModal onClose={() => setIsSettingsOpen(false)} />}
       <CommitteeDetailModal
         committee={selectedCommitteeForDetails}
         startInEdit={detailStartsInEdit}

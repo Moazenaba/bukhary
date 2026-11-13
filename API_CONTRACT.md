@@ -55,6 +55,16 @@
 | `courses.startDate/endDate`, `committees.createdDate`, `tasks.date` | `date` | `YYYY-MM-DD` (يُقبل `YYYY/MM/DD` ويُحوَّل). أي قيمة أخرى ⇒ 400. |
 | `createdAt`, `approvedAt`, `uploadedAt`, `completedAt`, `updatedAt` | `timestamptz` | ISO 8601 بتوقيت UTC، مثل `2026-10-16T11:49:12.882Z`. وقت إتمام المرحلة ووقت رفع ملف الامتحان يضعهما الخادم؛ ما يرسله العميل يُتجاهل. |
 | `committees.createdAtTime`, `tasks.time` | نص | وقت للعرض فقط، مثل `08:00 ص`. |
+| `committees.examDate` | `date` أو `null` | ميعاد امتحان اللجنة. `null` يمسحه؛ عدم إرساله يُبقي القيمة المخزنة (للتطبيقات القديمة). |
+| `exams.opensAt` | ISO مع المنطقة الزمنية أو `null` | موعد الامتحان. الورقة تُتاح قبله بـ `exam_open_hours_before` ساعة (إعداد)؛ قبل ذلك 403 `exam_not_open_yet` لغير الأدمن. الرد فيه `lockedUntil` لمن هي مقفولة عليه. |
+
+**`committees.sheikhCountry` = مكان الشيخ** (المسجد / القاعة / البلد). اسم الحقل قديم وبقي كما هو حتى لا تتعطل
+التطبيقات المنشورة؛ كل الشاشات تعرضه «مكان الشيخ». صفوف الكشف المربوطة بلجنة تعرض اسم الشيخ والمكان والكتاب وعدد
+الطلاب **من اللجنة** (والمكان = `sheikhCountry` وإلا `branch`)، ولا يغيّرها حفظ الصف (migration 021).
+
+**`GET /api/sync/state`**: بصمة قصيرة لكل البيانات (`version`)؛ العميل يعيد التحميل الكامل فقط لو تغيّرت.
+**`GET /api/settings`** (كل مستخدم) و**`PUT /api/settings/:key`** (`settings.write`): `exam_open_hours_before`،
+`observers`، `ceremony_sheikhs`، `overdue_days`، `font_family` — مفاتيح محددة بقيم مُتحقق منها.
 
 ### الترقيم (Pagination)
 

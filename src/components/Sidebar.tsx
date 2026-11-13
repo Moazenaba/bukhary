@@ -19,6 +19,8 @@ interface SidebarProps {
   todaysTasksCount?: number;
   ceremoniesCount?: number;
   onOpenNewCommittee: () => void;
+  /** Opens «إعدادات النظام» (admins). */
+  onOpenSettings?: () => void;
   currentUser: AppUser;
 }
 
@@ -37,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   todaysTasksCount = 0,
   ceremoniesCount = 0,
   onOpenNewCommittee,
+  onOpenSettings,
   currentUser,
 }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
@@ -319,6 +322,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <span className="material-symbols-outlined text-lg">add_circle</span>
                 <span>+ إضافة لجنة جديدة</span>
+              </button>
+            </div>
+          )}
+
+          {onOpenSettings && AuthService.can('settings.write') && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenSettings();
+                  setIsOpenMobile(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">settings</span>
+                <span>إعدادات النظام</span>
               </button>
             </div>
           )}

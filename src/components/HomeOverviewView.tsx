@@ -35,12 +35,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'admin';
   const total = committees.length;
   const ceremonyCount = committees.filter((c) => c.stages.ceremony?.completed).length;
-  const examCount = committees.filter(
-    (c) => calculateCurrentStage(c.stages).key === 'exam'
-  ).length;
-  const scoringCount = committees.filter(
-    (c) => calculateCurrentStage(c.stages).key === 'scoring'
-  ).length;
+  // «في انتظار الامتحان» = only registered; «تم الامتحان» = waiting for correction.
+  const examCount = committees.filter((c) => calculateCurrentStage(c.stages).key === 'registration').length;
+  const scoringCount = committees.filter((c) => calculateCurrentStage(c.stages).key === 'exam').length;
 
   // Today's tasks for quick overview
   const todayIso = todayISO();
@@ -256,7 +253,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       {/* 4 Quick Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
-          onClick={() => onNavigateCommittees('exam')}
+          onClick={() => onNavigateCommittees('registration')}
           className="bg-white p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-2">
@@ -272,7 +269,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         </div>
 
         <div
-          onClick={() => onNavigateCommittees('scoring')}
+          onClick={() => onNavigateCommittees('exam')}
           className="bg-white p-4 rounded-xl border border-line/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between mb-2">
@@ -282,7 +279,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             <span className="text-2xl font-bold font-mono text-amber-700">{scoringCount}</span>
           </div>
           <h3 className="font-bold text-sm text-ink group-hover:text-amber-700 transition-colors">
-            في مرحلة التصحيح
+            تم الامتحان (في انتظار التصحيح)
           </h3>
           <p className="text-xs text-muted mt-1">لجان يجري تصحيح أوراقها حالياً</p>
         </div>

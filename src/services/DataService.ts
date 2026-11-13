@@ -86,6 +86,9 @@ const enc = encodeURIComponent;
 
 export const DataService = {
   // ---- Committees ----
+  getSettings: async () => (await api<{ settings: import('../types').SystemSettings }>('/settings')).settings,
+  saveSetting: async <K extends keyof import('../types').SystemSettings>(key: K, value: import('../types').SystemSettings[K]) =>
+    (await api<{ value: import('../types').SystemSettings[K] }>(`/settings/${key}`, { method: 'PUT', body: { value } })).value,
   /** Short fingerprint of all server data; changes whenever anything visible changes. */
   getSyncVersion: async () => (await api<{ version: string }>('/sync/state')).version,
   getCommittees: async () => (await api<{ committees: Committee[] }>('/committees')).committees,

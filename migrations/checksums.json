@@ -18,5 +18,7 @@
   "017_unlock_all_accounts.sql": "6803be36269000a0cfa71a1eeca6d0de4fae819be45209b3415b2e0baea2348f",
   "018_remove_national_id.sql": "b67819bd92169bea50c613e1e05ffb56faa11efef8bce54bcfd52ba01eae4e47",
   "019_rate_limits_and_head_permissions.sql": "5ce340de69c43474a05ed57bb77537b581a9236e8f341edb3e3e1f5d652e5ff4",
-  "020_exam_dates.sql": "89f912c5a9e787c8a91b6a918f58bb9fd2cf3d5b0319bbb5f78d4cd7d62d16f5"
+  "020_exam_dates.sql": "89f912c5a9e787c8a91b6a918f58bb9fd2cf3d5b0319bbb5f78d4cd7d62d16f5",
+  "021_sheet_values_to_committees.sql": "e564ab08ae6a7202b19db6b3cfea541ae02d0ac42ca334732d134892eebdd49a",
+  "022_name_lists_to_settings.sql": "2f67c146f06d856a3e3a84194430ba7a2132d1b1c4fa4d00e70bfb5a6b531d46"
 }
