@@ -1,8 +1,8 @@
 {
-  "versionCode": 11,
-  "versionName": "1.1.9",
-  "apk": "app/Bukhari-1.1.9.apk",
-  "sha256": "b1d4795f8b39eb197189586f31aa545d12eb200a41480d3e743d52671e8b1790",
-  "size": 3268730,
-  "notes": "تحسينات الحالات وميعاد الامتحان واللجان المتأخرة"
+  "versionCode": 12,
+  "versionName": "1.1.10",
+  "apk": "app/Bukhari-1.1.10.apk",
+  "sha256": "d84822e843f370dcae8c207219fb097b1d91ca1ce1efef7342f61c78fa60819a",
+  "size": 3334294,
+  "notes": "كمنكمن"
 }
