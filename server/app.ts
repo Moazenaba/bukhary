@@ -8,6 +8,7 @@ import { idempotency } from './idempotency.ts';
 import { requestLog } from './requestLog.ts';
 import { pendingMigrations } from './migrate.ts';
 import { auditLogsRouter, databaseRouter, ocrRouter } from './routes/admin.ts';
+import { syncRouter } from './routes/sync.ts';
 import { authRouter } from './routes/authRoutes.ts';
 import { committeesRouter } from './routes/committees.ts';
 import { coursesRouter } from './routes/courses.ts';
@@ -97,6 +98,7 @@ export function createApp(config: AppConfig, pool: Pool) {
   app.use('/api/audit-logs', authed, auditLogsRouter(pool));
   app.use('/api/database', authed, databaseRouter(pool));
   app.use('/api/extract-table', authed, ocrRouter(config));
+  app.use('/api/sync', authed, syncRouter(pool));
 
   // Unknown API routes get JSON, never the SPA's index.html.
   app.use('/api', (_req, _res, next) => next(notFound('المسار غير موجود')));

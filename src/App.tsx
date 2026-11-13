@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { DATA_ROOT_KEY, useCacheSetter, useServerData } from './data/queries';
+import { DATA_ROOT_KEY, useCacheSetter, useServerData, useLiveRefresh } from './data/queries';
 import {
   Committee,
   StageKey,
@@ -140,6 +140,8 @@ export default function App() {
   // their old names and call sites, but they write to the cache, so every screen reads one copy.
   const queryClient = useQueryClient();
   const server = useServerData(currentUser?.id);
+  // Changes made elsewhere (another phone, another admin) appear without reloading the page.
+  useLiveRefresh(Boolean(currentUser) && !currentUser?.mustChangePassword);
   // Every course stands alone: all screens show only the current course's data. The raw lists
   // (all courses) are used only to keep the cache, to place people on committees and to list courses.
   const allCommittees = server.queries.committees.data ?? NO_COMMITTEES;

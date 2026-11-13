@@ -86,6 +86,8 @@ const enc = encodeURIComponent;
 
 export const DataService = {
   // ---- Committees ----
+  /** Short fingerprint of all server data; changes whenever anything visible changes. */
+  getSyncVersion: async () => (await api<{ version: string }>('/sync/state')).version,
   getCommittees: async () => (await api<{ committees: Committee[] }>('/committees')).committees,
   saveCommittee: async (c: Committee) =>
     (await api<{ committee: Committee }>('/committees', { method: 'POST', body: { ...c, expectedUpdatedAt: c.updatedAt } })).committee,

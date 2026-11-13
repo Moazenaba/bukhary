@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { ApiError } from '../services/api';
 import { AuthService } from '../services/AuthService';
@@ -61,4 +61,39 @@ export function useCacheSetter<T>(queryKey: QueryKey, empty: T) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [queryClient, keyString, empty]
   );
+}
+
+/**
+ * Keeps an open page current: every `intervalMs` while the tab is visible (and when it becomes
+ * visible again) it asks the server for its short data fingerprint, and reloads the lists only when
+ * that changed — so changes made on another device show up without reloading the page.
+ */
+export function useLiveRefresh(enabled: boolean, intervalMs = 30_000) {
+  const queryClient = useQueryClient();
+  const last = useRef<string | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let running = false;
+    const tick = async () => {
+      if (running || document.visibilityState !== 'visible') return;
+      running = true;
+      try {
+        const version = await DataService.getSyncVersion();
+        if (last.current !== null && version !== last.current) await queryClient.invalidateQueries({ queryKey: DATA_ROOT_KEY });
+        last.current = version;
+      } catch {
+        // Offline or signed out: try again on the next tick.
+      } finally {
+        running = false;
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, intervalMs);
+    const onVisible = () => void tick();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [enabled, intervalMs, queryClient]);
 }
