@@ -28,6 +28,8 @@ interface CeremoniesViewProps {
   onDeleteTask: (taskId: string) => void;
   onToggleTaskComplete: (taskId: string) => void;
   onOpenCommitteeDetails?: (committee: Committee) => void;
+  /** Opens the committee's data form (edit what was entered when it was added). */
+  onEditCommittee?: (committee: Committee) => void;
   onNavigateToDailyAlerts?: () => void;
   onNavigateToCalendar?: () => void;
 }
@@ -73,6 +75,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   onDeleteTask,
   onToggleTaskComplete,
   onOpenCommitteeDetails,
+  onEditCommittee,
   onNavigateToDailyAlerts,
   onNavigateToCalendar,
 }) => {
@@ -719,6 +722,18 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                       <span className="material-symbols-outlined text-sm">workspace_premium</span>
                       <span>كشف التكريم والشهادات</span>
                     </button>
+
+                    {onEditCommittee && AuthService.canOnCommittee('committees.update', comm) && (
+                      <button
+                        type="button"
+                        onClick={() => onEditCommittee(comm)}
+                        aria-label={`تعديل بيانات لجنة ${comm.committeeNumber}`}
+                        className="text-xs font-bold text-brand hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        <span>تعديل بيانات اللجنة</span>
+                      </button>
+                    )}
 
                     {onOpenCommitteeDetails && (
                       <button

@@ -167,6 +167,29 @@ await test('course sheet: filter «لم يتم الحفل» then PDF exports tha
   assert.match(name, /^Bukhari-sheet-/);
 });
 
+await test('ceremonies: «تعديل بيانات اللجنة» edits what was entered when adding the committee', async () => {
+  await open(page, 'ceremonies');
+  await page.getByRole('button', { name: `تعديل بيانات لجنة ${c2.committeeNumber}` }).first().click();
+  const section = page.locator('#committee-edit-section');
+  await section.waitFor();
+  await section.getByRole('textbox', { name: 'اسم اللجنة' }).fill('لجنة 2 بعد التعديل');
+  await section.getByRole('textbox', { name: 'الكتاب المقرر' }).fill('الأربعين النووية');
+  await section.getByRole('textbox', { name: 'الفرع' }).fill('فرع طنطا');
+  await page.getByRole('button', { name: /حفظ التعديلات/ }).click();
+  await page.waitForTimeout(1500);
+  const saved = (await api('GET', `/committees/${c2.id}`)).committee;
+  assert.equal(saved.committeeName, 'لجنة 2 بعد التعديل');
+  assert.equal(saved.competitionBook, 'الأربعين النووية');
+  assert.equal(saved.branch, 'فرع طنطا');
+  await page.keyboard.press('Escape');
+});
+
+await test('committees: every card has an «تعديل» button', async () => {
+  await open(page, 'committees');
+  const n = await page.getByRole('button', { name: /^تعديل بيانات لجنة \d+$/ }).count();
+  assert.ok(n >= 2, `only ${n} edit buttons`);
+});
+
 // ---------------------------------------------------------------- phone
 console.log('Phone (Pixel 7)');
 const phone = await browser.newContext({ ...devices['Pixel 7'], acceptDownloads: true });

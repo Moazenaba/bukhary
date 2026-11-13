@@ -234,7 +234,16 @@ export default function App() {
     () => committees.find((c) => c.id === selectedCommitteeId) ?? null,
     [committees, selectedCommitteeId]
   );
-  const setSelectedCommitteeForDetails = (c: Committee | null) => setSelectedCommitteeId(c?.id ?? null);
+  // «تعديل» buttons open the same details window, scrolled to the data form.
+  const [detailStartsInEdit, setDetailStartsInEdit] = useState(false);
+  const setSelectedCommitteeForDetails = (c: Committee | null) => {
+    setDetailStartsInEdit(false);
+    setSelectedCommitteeId(c?.id ?? null);
+  };
+  const openCommitteeEditor = (c: Committee) => {
+    setDetailStartsInEdit(true);
+    setSelectedCommitteeId(c.id);
+  };
   const [isAddCommitteeOpen, setIsAddCommitteeOpen] = useState(false);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
   const [isAddBookOpen, setIsAddBookOpen] = useState(false);
@@ -870,6 +879,7 @@ export default function App() {
               onDeleteTask={handleDeleteScheduleTask}
               onToggleTaskComplete={handleToggleTaskComplete}
               onOpenCommitteeDetails={(c) => setSelectedCommitteeForDetails(c)}
+              onEditCommittee={openCommitteeEditor}
               onNavigateToDailyAlerts={() => setActiveTab('daily_alerts')}
               onNavigateToCalendar={() => setActiveTab('calendar')}
             />
@@ -996,6 +1006,7 @@ export default function App() {
                       onReceiveCommittee={handleReceiveCommittee}
                       onApproveExamReadiness={handleApproveExamReadiness}
                       onViewDetails={(c) => setSelectedCommitteeForDetails(c)}
+                      onEditCommittee={openCommitteeEditor}
                       onQuickToggleStage={handleQuickToggleStage}
                       onDeleteCommittee={can('committees.delete') ? handleDeleteCommittee : undefined}
                     />
@@ -1100,6 +1111,7 @@ export default function App() {
       {/* Modals */}
       <CommitteeDetailModal
         committee={selectedCommitteeForDetails}
+        startInEdit={detailStartsInEdit}
         currentUser={currentUser}
         courses={courses}
         onReceiveCommittee={handleReceiveCommittee}

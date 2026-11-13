@@ -34,6 +34,8 @@ interface CommitteeDetailModalProps {
   onApproveExamReadiness?: (committeeId: string, revoke?: boolean) => unknown;
   /** The server returned a newer committee (staff added or removed). */
   onCommitteeChanged?: (committee: Committee) => void;
+  /** Opened from an «تعديل» button: scroll straight to the data form. */
+  startInEdit?: boolean;
 }
 
 /** Server times are ISO; older records may hold display text, shown as it is. */
@@ -56,8 +58,13 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   onReceiveCommittee,
   onApproveExamReadiness,
   onCommitteeChanged,
+  startInEdit = false,
 }) => {
   useEscapeKey(onClose);
+  const editSectionRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (startInEdit) editSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [startInEdit]);
 
   // Controls follow what the server will accept: the action and this committee's scope (WEB-09).
   const can = (action: string) => AuthService.canOnCommittee(action, committee);
@@ -70,10 +77,11 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
   // Local state for stages and notes
   const [stages, setStages] = useState(committee.stages);
   const [generalNotes, setGeneralNotes] = useState(committee.generalNotes || '');
-  const [committeeName] = useState(committee.committeeName);
-  const [branch] = useState(committee.branch);
-  const [associationName] = useState(committee.associationName || '');
-  const [competitionBook] = useState(committee.competitionBook);
+  const [committeeNumber, setCommitteeNumber] = useState<number | ''>(committee.committeeNumber);
+  const [committeeName, setCommitteeName] = useState(committee.committeeName);
+  const [branch, setBranch] = useState(committee.branch);
+  const [associationName, setAssociationName] = useState(committee.associationName || '');
+  const [competitionBook, setCompetitionBook] = useState(committee.competitionBook);
   const [courseId, setCourseId] = useState<string>(
     committee.courseId || courses.find((c) => c.isDefault)?.id || ''
   );
@@ -163,7 +171,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     const selCourse = courses.find((c) => c.id === courseId);
     return {
       ...committee,
-      committeeName,
+      committeeNumber: typeof committeeNumber === 'number' && committeeNumber > 0 ? committeeNumber : committee.committeeNumber,
+      committeeName: committeeName.trim() || committee.committeeName,
       branch,
       associationName: associationName.trim() || undefined,
       competitionBook,
@@ -1650,15 +1659,58 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
 
           {/* Section: Sheikh, Students & Committee Type Edit */}
           {canEditBase && (
-            <div className="bg-canvas p-4 rounded-xl border border-line/40 space-y-3">
+            <div ref={editSectionRef} id="committee-edit-section" className={`bg-canvas p-4 rounded-xl border space-y-3 scroll-mt-4 ${startInEdit ? 'border-brand ring-2 ring-brand/20' : 'border-line/40'}`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-brand flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-base">person_pin</span>
-                  <span>تعديل بيانات الشيخ المرسل إليه، عدد الطلاب، ونوع اللجنة:</span>
+                  <span className="material-symbols-outlined text-base">edit</span>
+                  <span>تعديل بيانات اللجنة (كما أُدخلت عند الإضافة):</span>
                 </span>
                 <span className="text-xs text-muted">
                   (اضغط حفظ بالأسفل لاعتماد التعديلات)
                 </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <label className="block">
+                  <span className="block text-xs font-bold text-ink mb-1">رقم اللجنة</span>
+                  <input
+                    type="number" min={1} value={committeeNumber} aria-label="رقم اللجنة"
+                    onChange={(e) => setCommitteeNumber(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono outline-none focus:border-brand"
+                  />
+                </label>
+                <label className="block sm:col-span-1 lg:col-span-3">
+                  <span className="block text-xs font-bold text-ink mb-1">اسم اللجنة</span>
+                  <input
+                    type="text" value={committeeName} aria-label="اسم اللجنة"
+                    onChange={(e) => setCommitteeName(e.target.value)}
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="block text-xs font-bold text-ink mb-1">الكتاب المقرر / المسابقة</span>
+                  <input
+                    type="text" value={competitionBook} aria-label="الكتاب المقرر"
+                    onChange={(e) => setCompetitionBook(e.target.value)}
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-xs font-bold text-ink mb-1">الفرع</span>
+                  <input
+                    type="text" value={branch} aria-label="الفرع"
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-xs font-bold text-ink mb-1">الجمعية (اختياري)</span>
+                  <input
+                    type="text" value={associationName} aria-label="الجمعية"
+                    onChange={(e) => setAssociationName(e.target.value)}
+                    className="w-full bg-white border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                </label>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

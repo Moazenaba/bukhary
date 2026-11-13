@@ -6,6 +6,8 @@ import { AuthService } from '../services/AuthService';
 interface CommitteeCardProps {
   committee: Committee;
   onViewDetails: (committee: Committee) => void;
+  /** Opens the details on the data form (number, name, sheikh, place, book, students...). */
+  onEditCommittee?: (committee: Committee) => void;
   onQuickToggleStage: (committeeId: string, stageKey: StageKey) => void;
   onDeleteCommittee?: (committeeId: string) => void;
   currentUser?: AppUser;
@@ -18,6 +20,7 @@ interface CommitteeCardProps {
 export const CommitteeCard: React.FC<CommitteeCardProps> = ({
   committee,
   onViewDetails,
+  onEditCommittee,
   onQuickToggleStage,
   onDeleteCommittee,
   onReceiveCommittee,
@@ -289,6 +292,19 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           <span className="material-symbols-outlined text-base">visibility</span>
           <span>عرض التفاصيل وسجل المراحل</span>
         </button>
+
+        {onEditCommittee && AuthService.canOnCommittee('committees.update', committee) && (
+          <button
+            type="button"
+            onClick={() => onEditCommittee(committee)}
+            aria-label={`تعديل بيانات لجنة ${committee.committeeNumber}`}
+            title="تعديل بيانات اللجنة"
+            className="inline-flex items-center gap-1 py-2.5 px-3 rounded-xl border border-brand/40 text-brand hover:bg-emerald-50 text-xs font-extrabold transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">edit</span>
+            <span>تعديل</span>
+          </button>
+        )}
 
         {/* More options button */}
         <div className="relative">
