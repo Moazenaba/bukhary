@@ -5,6 +5,7 @@ import { AuthService } from '../services/AuthService';
 import { AttendeePicker, MyCeremonies } from './CeremonyAttendees';
 import { CEREMONY_STATUS_LABEL, CeremonyPeriod, CeremonyStatus, ceremonyRows, ceremoniesPdfTable, ceremonyStatusPdfTable, exportCeremoniesToExcel, periodRange } from '../utils/reportExport';
 import { deliverPdf } from '../utils/pdf';
+import { ceremonyInvitation, waLink } from '../utils/whatsapp';
 import { toast } from './Toasts';
 
 interface CeremoniesViewProps {
@@ -657,6 +658,26 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
                       </span>
                     </div>
 
+                    {/* WhatsApp invitations: opens a chat with the text ready; the person sends it. */}
+                    {(() => {
+                      const task = getLinkedCeremonyTask(comm);
+                      const phones = new Map(AuthService.getUsers().map((u) => [u.id, u.phone]));
+                      const links = [
+                        comm.sheikhPhone ? { who: `الشيخ ${comm.sheikhName || ''}`.trim(), href: waLink(comm.sheikhPhone, ceremonyInvitation(comm, task, comm.sheikhName ? `الشيخ ${comm.sheikhName}` : undefined)) } : null,
+                        ...(comm.ceremonyDetails?.attendees ?? []).map((a) => ({ who: a.name, href: waLink(phones.get(a.id), ceremonyInvitation(comm, task, a.name)) })),
+                      ].filter((x): x is { who: string; href: string } => Boolean(x?.href));
+                      return links.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5" aria-label="دعوات واتساب">
+                          {links.map((l) => (
+                            <a key={l.who} href={l.href} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#25D366]/10 text-[#075E54] border border-[#25D366]/40 text-[11px] font-bold hover:bg-[#25D366]/20">
+                              <span aria-hidden>💬</span>
+                              <span>دعوة {l.who} على واتساب</span>
+                            </a>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                     {comm.ceremonyDetails?.attendees && comm.ceremonyDetails.attendees.length > 0 && (
                       <p className="text-xs text-slate-600">
                         <span className="text-slate-400">المدعوون: </span>

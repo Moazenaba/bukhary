@@ -147,6 +147,40 @@ async function presenterFor(db: Queryable, user: Principal) {
   };
 }
 
+const IGNORED_CHANGES = new Set(['updatedAt', 'staff', 'createdAtTime']);
+
+/** Field-level changes between two saved versions (stages compared one by one). */
+export function committeeChanges(before: any, after: any) {
+  const out: { field: string; before: unknown; after: unknown }[] = [];
+  if (!before || !after) return out;
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (IGNORED_CHANGES.has(key)) continue;
+    if (key === 'stages') {
+      for (const stage of new Set([...Object.keys(before.stages ?? {}), ...Object.keys(after.stages ?? {})])) {
+        const a = Boolean(before.stages?.[stage]?.completed);
+        const b = Boolean(after.stages?.[stage]?.completed);
+        if (a !== b) out.push({ field: `stages.${stage}`, before: a, after: b });
+      }
+      continue;
+    }
+    if (JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null)) {
+      out.push({ field: key, before: before[key] ?? null, after: after[key] ?? null });
+    }
+  }
+  return out;
+}
+
+function historyEntry(r: any, showAdmins: boolean) {
+  const byAdmin = r.user_role === 'super_admin' || r.user_role === 'admin';
+  return {
+    at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+    by: byAdmin && !showAdmins ? 'الإدارة' : r.user_name ?? '',
+    action: r.action,
+    detail: r.details ?? '',
+    changes: committeeChanges(r.before_data, r.after_data),
+  };
+}
+
 /** Whether `user` may see the committee: in scope, or invited to its ceremony. */
 function canSeeCommittee(user: Principal, row: any) {
   if (isCommitteeInScope(user, row.id)) return true;
@@ -629,6 +663,23 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       return updated[0];
     });
     res.json({ success: true, committeeId: row.id, committee: (await presenterFor(pool, req.user!)).present(row) });
+  }));
+
+  /**
+   * What changed in this committee, who changed it and when (from the audit log), for anyone who
+   * may see the committee. Admin accounts appear as «الإدارة» except to super admins, as everywhere.
+   */
+  r.get('/:id/history', can('committees.read'), route(async (req, res) => {
+    const user = req.user!;
+    const { rows: cs } = await pool.query('SELECT * FROM committees WHERE id = $1;', [req.params.id]);
+    if (!cs[0] || !canSeeCommittee(user, cs[0])) throw notFound('اللجنة غير موجودة');
+    const { rows } = await pool.query(
+      `SELECT action, user_name, user_role, details, before_data, after_data, created_at
+       FROM audit_logs WHERE entity = 'committee' AND entity_id = $1 ORDER BY created_at DESC LIMIT 200;`,
+      [req.params.id]
+    );
+    const showAdmins = isAllowed(user, 'users.admins');
+    res.json({ success: true, history: rows.map((r) => historyEntry(r, showAdmins)) });
   }));
 
   r.delete('/:id', route(async (req, res) => {

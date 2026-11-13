@@ -1,8 +1,11 @@
 import { AuthService } from '../services/AuthService';
 import { MyCeremonies } from './CeremonyAttendees';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Committee, STAGES_LIST, AppUser, Course, ScheduleTask } from '../types';
 import { calculateCurrentStage, todayISO } from '../utils/stageUtils';
+import { overdueCommittees } from '../utils/overdue';
+import { OverduePanel } from './OverduePanel';
+import { useSettings } from '../data/queries';
 import { NavTab } from './Sidebar';
 
 interface HomeOverviewViewProps {
@@ -35,6 +38,11 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'admin';
   const total = committees.length;
   const ceremonyCount = committees.filter((c) => c.stages.ceremony?.completed).length;
+  const { settings } = useSettings();
+  const overdue = useMemo(
+    () => overdueCommittees(committees, { overdueDays: settings.overdue_days, tasks: scheduleTasks }),
+    [committees, settings.overdue_days, scheduleTasks]
+  );
   // «في انتظار الامتحان» = only registered; «تم الامتحان» = waiting for correction.
   const examCount = committees.filter((c) => calculateCurrentStage(c.stages).key === 'registration').length;
   const scoringCount = committees.filter((c) => calculateCurrentStage(c.stages).key === 'exam').length;
@@ -49,6 +57,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   return (
     <div className="space-y-6 text-right">
       <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenDetails} />
+      <OverduePanel items={overdue} overdueDays={settings.overdue_days} onOpen={onOpenDetails} onShowAll={() => onNavigateCommittees('late')} />
       {/* Welcome Banner tailored to User Role */}
       <div className="bg-gradient-to-l from-brand via-[#0f766e] to-brand rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl">

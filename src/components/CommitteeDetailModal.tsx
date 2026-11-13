@@ -23,6 +23,7 @@ import { STAGE_ACTION } from '../utils/committeeChanges';
 import { AuthService } from '../services/AuthService';
 import { CommitteeStaffPanel } from './StaffAssignment';
 import { useSettings } from '../data/queries';
+import { CommitteeHistory } from './CommitteeHistory';
 
 interface CommitteeDetailModalProps {
   committee: Committee | null;
@@ -1646,6 +1647,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
               })}
             </div>
           </div>
+
+          <CommitteeHistory committeeId={committee.id} />
 
           {/* Section: Sheikh, Students & Committee Type Edit */}
           {canEditBase && (

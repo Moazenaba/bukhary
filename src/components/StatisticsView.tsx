@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
-import { Committee, STAGES_LIST } from '../types';
+import { Committee, Course, STAGES_LIST } from '../types';
+import { StatsBreakdown } from './StatsBreakdown';
 import { calculateCurrentStage } from '../utils/stageUtils';
 
 interface StatisticsViewProps {
   committees: Committee[];
+  /** Every course's committees and the courses, for «مقارنة الدورات». */
+  allCommittees?: Committee[];
+  courses?: Course[];
+  currentCourseId?: string;
 }
 
-export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) => {
+export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees, allCommittees, courses, currentCourseId }) => {
   const total = committees.length;
 
   // Selected period tab: 'all' (سنوي) | 'month' (شهري) | 'week' (أسبوعي)
@@ -358,6 +363,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ committees }) =>
           </div>
         </div>
       </div>
+      <StatsBreakdown committees={committees} allCommittees={allCommittees} courses={courses} currentCourseId={currentCourseId} />
     </div>
   );
 };

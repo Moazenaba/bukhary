@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { DATA_ROOT_KEY, useCacheSetter, useServerData, useLiveRefresh } from './data/queries';
+import { DATA_ROOT_KEY, useCacheSetter, useServerData, useLiveRefresh, useSettings } from './data/queries';
+import { overdueCommittees } from './utils/overdue';
 import {
   Committee,
   StageKey,
@@ -217,7 +218,7 @@ export default function App() {
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStage, setSelectedStage] = useState<'all' | StageKey>('all');
+  const [selectedStage, setSelectedStage] = useState<'all' | 'late' | StageKey>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'committeeNumber' | 'book'>('newest');
   const [assistantOnlyFilter, setAssistantOnlyFilter] = useState(false);
   const [needsScoringFilter, setNeedsScoringFilter] = useState(false);
@@ -578,6 +579,12 @@ export default function App() {
 
   // ---------------- Derived values ----------------
 
+  // Late committees (the «متأخرة» filter): same rules as the home page and daily alerts.
+  const { settings: appSettings } = useSettings(Boolean(currentUser));
+  const lateIds = useMemo(
+    () => new Set(overdueCommittees(committees, { overdueDays: appSettings.overdue_days, tasks: scheduleTasks }).map((x) => x.committee.id)),
+    [committees, appSettings.overdue_days, scheduleTasks]
+  );
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { all: committees.length };
     STAGES_LIST.forEach((s) => {
@@ -587,15 +594,17 @@ export default function App() {
       const status = calculateCurrentStage(c.stages);
       counts[status.key] = (counts[status.key] || 0) + 1;
     });
+    counts.late = lateIds.size;
     return counts;
-  }, [committees]);
+  }, [committees, lateIds]);
 
   const activeCommitteesCount = useMemo(() => committees.filter((c) => !c.stages.ceremony?.completed).length, [committees]);
   const completedCeremonyCount = useMemo(() => committees.filter((c) => c.stages.ceremony?.completed).length, [committees]);
 
   const filteredCommittees = useMemo(() => {
     let list = [...committees];
-    if (selectedStage !== 'all') list = list.filter((c) => calculateCurrentStage(c.stages).key === selectedStage);
+    if (selectedStage === 'late') list = list.filter((c) => lateIds.has(c.id));
+    else if (selectedStage !== 'all') list = list.filter((c) => calculateCurrentStage(c.stages).key === selectedStage);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -622,7 +631,7 @@ export default function App() {
     else if (sortBy === 'oldest' || sortBy === 'committeeNumber') list.sort((a, b) => a.committeeNumber - b.committeeNumber);
     else if (sortBy === 'book') list.sort((a, b) => a.competitionBook.localeCompare(b.competitionBook, 'ar'));
     return list;
-  }, [committees, selectedStage, searchQuery, sortBy, assistantOnlyFilter, needsScoringFilter, currentUser, genderFilter]);
+  }, [committees, selectedStage, searchQuery, sortBy, assistantOnlyFilter, needsScoringFilter, currentUser, genderFilter, lateIds]);
 
   const totalPages = Math.ceil(filteredCommittees.length / ITEMS_PER_PAGE) || 1;
   const paginatedCommittees = useMemo(() => {
@@ -766,7 +775,7 @@ export default function App() {
               onNavigateCommittees={(stageFilter) => {
                 setActiveTab('committees');
                 if (stageFilter && stageFilter !== 'all') {
-                  setSelectedStage(stageFilter as StageKey);
+                  setSelectedStage(stageFilter as StageKey | 'late');
                 } else {
                   setSelectedStage('all');
                 }
@@ -869,7 +878,9 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'stats' && <StatisticsView committees={committees} />}
+          {activeTab === 'stats' && (
+            <StatisticsView committees={committees} allCommittees={allCommittees} courses={courses} currentCourseId={currentCourseId} />
+          )}
 
           {activeTab === 'audit' && <AuditLogView />}
 

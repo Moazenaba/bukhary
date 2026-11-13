@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { todayISO } from '../utils/stageUtils';
+import { overdueCommittees } from '../utils/overdue';
+import { OverduePanel } from './OverduePanel';
+import { useSettings } from '../data/queries';
 import { ScheduleTask, Committee, AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
 import { AssigneeSelect, CommitteeSelect } from './AssigneeSelect';
@@ -45,6 +48,11 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
 }) => {
   // Current active operational date based on real time
   const primaryTodayISO = todayISO();
+  const { settings } = useSettings();
+  const overdue = useMemo(
+    () => overdueCommittees(committees, { overdueDays: settings.overdue_days, tasks }),
+    [committees, settings.overdue_days, tasks]
+  );
 
   // Selected date filter (Defaults to Today)
   const [selectedDate, setSelectedDate] = useState<string>(primaryTodayISO);
@@ -220,6 +228,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
+      <OverduePanel items={overdue} overdueDays={settings.overdue_days} onOpen={onOpenCommitteeDetails} limit={20} />
       {/* Header Banner */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3.5">

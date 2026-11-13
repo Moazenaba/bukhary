@@ -27,6 +27,15 @@ export interface DatabaseStatus {
  * Workflow intents (server/workflow.ts). The server decides the resulting state, stamps who and
  * when, enforces the stage order, and owns the ceremony's calendar task.
  */
+/** One change of a committee, from the server's audit log. */
+export interface CommitteeHistoryEntry {
+  at: string;
+  by: string;
+  action: string;
+  detail: string;
+  changes: { field: string; before: unknown; after: unknown }[];
+}
+
 export type CommitteeAction =
   | { type: 'receive'; status?: 'received' | 'in_delivery'; phone?: string | null; notes?: string | null }
   | { type: 'cancelReception' }
@@ -86,6 +95,8 @@ const enc = encodeURIComponent;
 
 export const DataService = {
   // ---- Committees ----
+  getCommitteeHistory: async (id: string) =>
+    (await api<{ history: CommitteeHistoryEntry[] }>(`/committees/${encodeURIComponent(id)}/history`)).history,
   getSettings: async () => (await api<{ settings: import('../types').SystemSettings }>('/settings')).settings,
   saveSetting: async <K extends keyof import('../types').SystemSettings>(key: K, value: import('../types').SystemSettings[K]) =>
     (await api<{ value: import('../types').SystemSettings[K] }>(`/settings/${key}`, { method: 'PUT', body: { value } })).value,

@@ -203,6 +203,19 @@ await test('«إعدادات النظام»: an admin edits the observers list a
   await page.keyboard.press('Escape');
 });
 
+await test('home shows the «لجان متأخرة» panel', async () => {
+  await open(page, 'home');
+  await page.getByRole('region', { name: 'لجان متأخرة' }).waitFor({ timeout: 10_000 });
+});
+
+await test('committee details: «سجل التعديلات» lists the edit made from the ceremonies screen', async () => {
+  await open(page, 'committees');
+  await page.getByRole('button', { name: `تعديل بيانات لجنة ${c2.committeeNumber}` }).first().click();
+  await page.getByRole('button', { name: /سجل التعديلات/ }).click();
+  await page.getByText(/اسم اللجنة: .* ← لجنة 2 بعد التعديل/).first().waitFor({ timeout: 10_000 });
+  await page.keyboard.press('Escape');
+});
+
 // ---------------------------------------------------------------- phone
 console.log('Phone (Pixel 7)');
 const phone = await browser.newContext({ ...devices['Pixel 7'], acceptDownloads: true });

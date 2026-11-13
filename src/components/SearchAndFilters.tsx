@@ -4,8 +4,8 @@ import { StageKey, STAGES_LIST } from '../types';
 interface SearchAndFiltersProps {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  selectedStage: 'all' | StageKey;
-  setSelectedStage: (s: 'all' | StageKey) => void;
+  selectedStage: 'all' | 'late' | StageKey;
+  setSelectedStage: (s: 'all' | 'late' | StageKey) => void;
   stageCounts: Record<string, number>;
   sortBy: 'newest' | 'oldest' | 'committeeNumber' | 'book';
   setSortBy: (sort: 'newest' | 'oldest' | 'committeeNumber' | 'book') => void;
@@ -192,6 +192,20 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
               {stageCounts.all || 0}
             </span>
           </button>
+
+          {(stageCounts.late || 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedStage('late')}
+              className={`px-4 py-2 rounded-full text-[13px] font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                selectedStage === 'late' ? 'bg-rose-600 text-white shadow-xs' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:border-rose-400'
+              }`}
+            >
+              <span>⏰</span>
+              <span>متأخرة</span>
+              <span className={`px-2 py-0.5 text-xs rounded-full ${selectedStage === 'late' ? 'bg-black/10' : 'bg-white text-rose-900'}`}>{stageCounts.late}</span>
+            </button>
+          )}
 
           {/* Dynamic Stages from STAGES_LIST */}
           {STAGES_LIST.map((stg) => {
