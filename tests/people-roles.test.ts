@@ -140,7 +140,10 @@ describe('committee heads', () => {
   });
 
   it('a head creates a committee, which becomes theirs, but cannot delete it without the permission', async () => {
-    const head = await userWithToken(t, { role: 'committee_head' });
+    // «إضافة لجنة جديدة» decides whether a head may add committees.
+    const without = await userWithToken(t, { role: 'committee_head' });
+    expect((await t.api().post('/api/committees').set(without.auth).send(committeeBody({ committeeNumber: 12 }))).status).toBe(403);
+    const head = await userWithToken(t, { role: 'committee_head', permissions: ['add_new_committee'] });
     const body = committeeBody({ committeeNumber: 13 });
     expect((await t.api().post('/api/committees').set(head.auth).send(body)).status).toBe(200);
     expect(ids((await t.api().get('/api/committees').set(head.auth)).body.committees)).toEqual([body.id]);

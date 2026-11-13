@@ -83,7 +83,13 @@ export async function createUser(
   return { id, phone };
 }
 
+/** Tests share one address (127.0.0.1): each test starts without earlier tests' wrong attempts. */
+export async function resetRateLimits(pool: pg.Pool) {
+  await pool.query('DELETE FROM rate_limits;').catch(() => {});
+}
+
 export async function login(t: TestApp, phone: string, password = PASSWORD) {
+  await resetRateLimits(t.pool);
   const res = await t.api().post('/api/auth/login').send({ identifier: phone, password });
   if (res.status !== 200) throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
   return res.body as { token: string; refreshToken: string; user: any };

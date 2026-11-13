@@ -47,7 +47,8 @@ const HEADS: readonly Role[] = ['committee_head'];
 
 export const ACTIONS = {
   'committees.read': { roles: EVERYONE, description: 'عرض اللجان (الشيخ ورئيس اللجنة يريان لجانهما وحفلاتهما فقط)' },
-  'committees.create': { roles: MANAGERS, grantedToRoles: HEADS, description: 'إضافة لجنة' },
+  // «إضافة لجنة جديدة» decides it for committee heads (migration 019 kept it for existing heads).
+  'committees.create': { roles: MANAGERS, anyPermission: ['add_new_committee'], description: 'إضافة لجنة' },
   'committees.update': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'تعديل بيانات اللجنة' },
   'committees.delete': { roles: MANAGERS, anyPermission: ['manage_committees'], committeeScoped: true, description: 'حذف لجنة' },
   'committees.members': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'إضافة الشيوخ للجنة وإزالتهم' },
@@ -73,8 +74,9 @@ export const ACTIONS = {
   'exams.delete': { roles: ADMIN_ROLES, description: 'حذف الامتحانات' },
   'exams.file': { roles: EVERYONE, anyPermission: ['exams_pdf'], grantedToRoles: HEADS, description: 'تنزيل ملف أسئلة الامتحان' },
   'tasks.read': { roles: EVERYONE, description: 'عرض المهام (الشيخ يرى مهامه ومهام لجانه فقط)' },
-  'tasks.write': { roles: MANAGERS, grantedToRoles: HEADS, description: 'إضافة وتعديل المهام' },
-  'tasks.delete': { roles: MANAGERS, grantedToRoles: HEADS, description: 'حذف المهام' },
+  // «الجدول الزمني» decides it for committee heads (migration 019 kept it for existing heads).
+  'tasks.write': { roles: MANAGERS, anyPermission: ['calendar_schedule'], description: 'إضافة وتعديل المهام' },
+  'tasks.delete': { roles: MANAGERS, anyPermission: ['calendar_schedule'], description: 'حذف المهام' },
   'users.read': { roles: MANAGERS, grantedToRoles: HEADS, description: 'عرض الشيوخ' },
   'users.manage': { roles: MANAGERS, anyPermission: ['manage_assistants'], description: 'قبول ورفض طلبات الانضمام وتعديل بيانات الشيوخ' },
   'users.delete': { roles: ADMIN_ROLES, description: 'حذف المستخدمين' },

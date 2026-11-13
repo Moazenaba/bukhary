@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PASSWORD, createUser, login, setupApp, type TestApp } from './helpers.ts';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PASSWORD, createUser, login, resetRateLimits, setupApp, type TestApp } from './helpers.ts';
 
 let t: TestApp;
 beforeAll(async () => {
@@ -38,14 +38,26 @@ describe('login', () => {
     expect(good.body.code).toBe('account_pending');
   });
 
-  it('never locks an account: the right password works after any number of wrong ones', async () => {
+  it('10 wrong passwords from one device: that device waits two minutes, then signs in (no account lock)', async () => {
+    await resetRateLimits(t.pool);
     const u = await createUser(t.pool, { role: 'sheikh' });
-    for (let i = 0; i < 40; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
-    const ok = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
-    expect(ok.status).toBe(200);
+    for (let i = 0; i < 10; i++) {
+      expect((await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' })).status).toBe(401);
+    }
+    const waiting = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD });
+    expect(waiting.status).toBe(429);
+    expect(waiting.body.message).toMatch(/دقيقتين/);
+    expect(Number(waiting.headers['retry-after'])).toBeGreaterThan(100);
+    expect(Number(waiting.headers['retry-after'])).toBeLessThanOrEqual(120);
+    // Two minutes later (moved forward in the database instead of waiting).
+    await t.pool.query("UPDATE rate_limits SET blocked_until = NOW() - interval '1 second';");
+    expect((await t.api().post('/api/auth/login').send({ identifier: u.phone, password: PASSWORD })).status).toBe(200);
+    // The right password cleared the count: one more mistake is not a new wait.
+    expect((await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' })).status).toBe(401);
   });
 
   it('answers a wrong password like an unknown account (API-22)', async () => {
+    await resetRateLimits(t.pool);
     const u = await createUser(t.pool, { role: 'sheikh' });
     const res = await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const unknown = await t.api().post('/api/auth/login').send({ identifier: '0599999999', password: PASSWORD });
@@ -55,6 +67,7 @@ describe('login', () => {
   });
 
   it('records failed logins in the audit log (API-32)', async () => {
+    await resetRateLimits(t.pool);
     const u = await createUser(t.pool, { role: 'sheikh' });
     for (let i = 0; i < 3; i++) await t.api().post('/api/auth/login').send({ identifier: u.phone, password: 'wrong-pass1' });
     const { rows } = await t.pool.query("SELECT action FROM audit_logs WHERE entity = 'auth' AND entity_id = $1 ORDER BY created_at;", [u.id]);

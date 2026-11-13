@@ -181,7 +181,7 @@ describe('permission ids (API-34) and directory (API-08)', () => {
   });
 
   it('task assignee list is limited to the actor\'s committees (D-07)', async () => {
-    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [c1.id] });
+    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [c1.id], permissions: ['calendar_schedule'] });
     const colleague = await userWithToken(t, { role: 'sheikh', committeeIds: [c1.id], name: 'زميل' });
     const stranger = await userWithToken(t, { role: 'sheikh', committeeIds: [c3.id], name: 'غريب' });
     const res = await t.api().get('/api/users/assignable').set(asst.auth);

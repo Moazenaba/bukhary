@@ -5,6 +5,8 @@ import { logger } from './logger.ts';
 // app, what was sent and why it failed. Passwords, tokens and file contents are never printed.
 
 const SECRET_KEYS = /pass(word)?|token|secret|authorization|cookie|private_?key/i;
+// People's details stay out of the hosting provider's logs: the field is named, its value is not.
+const PERSONAL_KEYS = /^(phone|identifier|email|whatsapp|name|sheikhName|sheikhPhone|sheikh_name|studentName|assistantName|notes|members|attendingSheikhs|qualification|experience|availability|quranLevel|interviewNotes|rejectionReason)$/i;
 const BULKY_KEYS = /base64|image|file(data|content)?$|pdf|data_?url/i;
 const MAX_STRING = 200;
 const MAX_ITEMS = 20;
@@ -13,6 +15,7 @@ const MAX_DEPTH = 4;
 /** A copy of a request body that is safe and short enough to log. */
 export function redact(value: unknown, depth = 0, key = ''): unknown {
   if (key && SECRET_KEYS.test(key)) return value == null || value === '' ? value : '[hidden]';
+  if (key && PERSONAL_KEYS.test(key)) return value == null || value === '' ? value : '[personal]';
   if (typeof value === 'string') {
     if (key && BULKY_KEYS.test(key)) return `[${value.length} chars]`;
     return value.length > MAX_STRING ? `${value.slice(0, MAX_STRING)}… [${value.length} chars]` : value;

@@ -14,12 +14,20 @@ export type NotificationType = 'urgent' | 'info' | 'success';
 /** Creates a notification on the server (used by domain events). target = null means everyone. */
 export async function notify(
   db: Queryable,
-  n: { title: string; description: string; type?: NotificationType; committeeId?: string | null; targetUserId?: string | null }
+  n: {
+    title: string;
+    description: string;
+    type?: NotificationType;
+    committeeId?: string | null;
+    targetUserId?: string | null;
+    /** Server-side tags (e.g. to group join-request notifications); never shown. */
+    data?: Record<string, unknown>;
+  }
 ) {
   await db.query(
     `INSERT INTO notifications (id, title, description, type, committee_id, target_user_id, created_at, data)
-     VALUES ($1,$2,$3,$4,$5,$6,NOW(),'{}'::jsonb);`,
-    [crypto.randomUUID(), n.title, n.description, n.type ?? 'info', n.committeeId ?? null, n.targetUserId ?? null]
+     VALUES ($1,$2,$3,$4,$5,$6,NOW(),$7::jsonb);`,
+    [crypto.randomUUID(), n.title, n.description, n.type ?? 'info', n.committeeId ?? null, n.targetUserId ?? null, JSON.stringify(n.data ?? {})]
   );
   // The same notification reaches the phones of the people it is for (no-op without FCM credentials).
   queuePush(n);

@@ -55,6 +55,16 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
   const reqId = (req as any).id;
   // The request log (requestLog.ts) prints why the request failed.
   res.locals.error = { message: err?.message, code: err?.code, name: err?.name };
+  // A committee number that already exists in the course: say so (not «a duplicate value»).
+  if (err?.code === '23505' && err?.constraint === 'uq_committees_course_number') {
+    const number = /=\(.*,\s*(\d+)\)/.exec(String(err.detail ?? ''))?.[1];
+    return res.status(409).json({
+      success: false,
+      message: number ? `رقم اللجنة ${number} موجود بالفعل في هذه الدورة؛ اختر رقماً آخر` : 'رقم اللجنة موجود بالفعل في هذه الدورة؛ اختر رقماً آخر',
+      code: 'committee_number_taken',
+      requestId: reqId,
+    });
+  }
   if (err instanceof ZodError) {
     const errors = err.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
     res.locals.error = { message: 'invalid input', errors };

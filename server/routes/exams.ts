@@ -130,6 +130,11 @@ export function examsRouter(pool: Pool) {
     if (!canAccessExam(req.user!, req.params.id)) throw forbidden('هذا الامتحان غير متاح لك');
     const { rows } = await pool.query('SELECT file_name, mime_type, content FROM exam_files WHERE exam_id = $1;', [req.params.id]);
     if (!rows[0]) throw notFound('لا يوجد ملف مرفوع لهذا الامتحان');
+    // Every download is recorded (who, when, from which app), so a leaked paper can be traced.
+    await audit(pool, req, 'exam.file_download', 'exam', req.params.id, null, {
+      fileName: rows[0].file_name,
+      client: req.get('X-App-Version-Code') ? 'android' : 'web',
+    });
     res.setHeader('Content-Type', rows[0].mime_type);
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(rows[0].file_name)}`);
     res.setHeader('Cache-Control', 'private, no-store');

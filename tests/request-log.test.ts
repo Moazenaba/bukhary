@@ -11,15 +11,18 @@ describe('request log', () => {
       refreshToken: 'abc',
       deviceToken: '',
       imageBase64: 'x'.repeat(5000),
-      notes: 'n'.repeat(300),
+      notes: 'ملاحظة فيها اسم ورقم',
+      title: 't'.repeat(300),
       nested: { newPassword: 'x', list: Array.from({ length: 25 }, (_, i) => i) },
     }) as any;
-    expect(out.identifier).toBe('01012345678');
+    // People's details are not written to the hosting provider's logs.
+    expect(out.identifier).toBe('[personal]');
     expect(out.password).toBe('[hidden]');
     expect(out.refreshToken).toBe('[hidden]');
     expect(out.deviceToken).toBe('');
     expect(out.imageBase64).toBe('[5000 chars]');
-    expect(out.notes).toMatch(/… \[300 chars\]$/);
+    expect(out.notes).toBe('[personal]');
+    expect(out.title).toMatch(/… \[300 chars\]$/);
     expect(out.nested.newPassword).toBe('[hidden]');
     expect(out.nested.list.at(-1)).toBe('… 5 more');
     expect(JSON.stringify(out)).not.toContain('Passw0rd');

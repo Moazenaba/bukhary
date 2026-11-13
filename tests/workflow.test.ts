@@ -147,7 +147,7 @@ describe('tasks (API-12, WEB-07, MOB-06)', () => {
     const mine = await committee({ committeeNumber: 21 });
     const theirs = await committee({ committeeNumber: 22 });
     await t.api().post('/api/tasks').set(admin.auth).send({ id: 'task-theirs', title: 'لهم', date: '2026-10-21', committeeId: theirs.id });
-    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [mine.id] });
+    const asst = await userWithToken(t, { role: 'committee_head', committeeIds: [mine.id], permissions: ['calendar_schedule'] });
     expect((await t.api().post('/api/tasks').set(asst.auth).send({ id: 'task-new', title: 'x', date: '2026-10-21', committeeId: theirs.id })).status).toBe(403);
     expect((await t.api().post('/api/tasks').set(asst.auth).send({ id: 'task-theirs', title: 'استيلاء', date: '2026-10-21', committeeId: mine.id })).status).toBe(403);
     expect((await t.api().post('/api/tasks').set(asst.auth).send({ id: 'task-mine', title: 'لي', date: '2026-10-21', committeeId: mine.id })).status).toBe(200);

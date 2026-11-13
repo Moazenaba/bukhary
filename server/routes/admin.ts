@@ -6,6 +6,14 @@ import type { AppConfig } from '../config.ts';
 import type { Pool } from '../db.ts';
 import { HttpError, badRequest, route } from '../http.ts';
 import { listMigrations, pendingMigrations } from '../migrate.ts';
+import { isAllowed, type Principal } from '../policy.ts';
+
+/**
+ * What an admin's backup leaves out (a super admin's backup has everything): sign-in secrets,
+ * sessions and device tokens, and the audit log, which only super admins may read.
+ */
+const SUPER_ONLY_TABLES = new Set(['sessions', 'refresh_tokens', 'idempotency_keys', 'login_failures', 'device_tokens', 'audit_logs', 'rate_limits']);
+const fullBackup = (user: Principal) => isAllowed(user, 'users.admins');
 
 export function auditLogsRouter(pool: Pool) {
   const r = Router();
@@ -101,8 +109,9 @@ export function databaseRouter(pool: Pool) {
   }
   const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
-  r.get('/backup/tables', can('database.backup'), route(async (_req, res) => {
+  r.get('/backup/tables', can('database.backup'), route(async (req, res) => {
     const tables = await backupTables();
+    if (!fullBackup(req.user!)) for (const t of SUPER_ONLY_TABLES) tables.delete(t);
     const { rows: counts } = await pool.query(
       `SELECT relname AS name, n_live_tup::bigint AS count FROM pg_stat_user_tables WHERE schemaname = 'public';`
     );
@@ -122,12 +131,16 @@ export function databaseRouter(pool: Pool) {
       })
       .parse(req.query);
     const columns = (await backupTables()).get(q.table);
+    const full = fullBackup(req.user!);
     // Only real table names are ever put into the query.
-    if (!columns) throw badRequest('جدول غير معروف');
+    if (!columns || (!full && SUPER_ONLY_TABLES.has(q.table))) throw badRequest('جدول غير معروف');
+    // Admins never see admin accounts (canSeeRole), nor anyone's password hash.
+    const hideAdmins = !full && q.table === 'app_users';
     const { rows } = await pool.query(
-      `SELECT * FROM ${quoteIdent(q.table)} ORDER BY ctid LIMIT $1 OFFSET $2;`,
+      `SELECT * FROM ${quoteIdent(q.table)} ${hideAdmins ? "WHERE role NOT IN ('super_admin', 'admin')" : ''} ORDER BY ctid LIMIT $1 OFFSET $2;`,
       [q.limit, q.offset]
     );
+    if (!full && q.table === 'app_users') for (const row of rows) row.password = null;
     // JSON-safe values: binary as base64, dates as ISO text, JSON columns as text.
     const out = rows.map((row) =>
       columns.map(({ name }) => {

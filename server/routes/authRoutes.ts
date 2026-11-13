@@ -21,6 +21,7 @@ import { evaluatedPermissions } from '../policy.ts';
 import { normalizePhone, optionalText, toAsciiDigits } from '../schemas.ts';
 import { emailSchema, passwordSchema, phoneSchema, userFromRow } from './users.ts';
 import { notify } from './notifications.ts';
+import { JOIN_LIMIT, LOGIN_LIMIT, assertNotBlocked, clearAttempts, countAttempt } from '../rateLimit.ts';
 
 // Hash of a random string, compared when the account does not exist so that
 // "unknown user" and "wrong password" take the same time.
@@ -116,6 +117,9 @@ export function authRouter(config: AppConfig, pool: Pool) {
 
   r.post('/login', route(async (req, res) => {
     const { identifier: raw, password } = loginInput.parse(req.body);
+    // Too many wrong passwords from this address: a two-minute wait (no account is locked).
+    const limitKey = `login:${req.ip}`;
+    await assertNotBlocked(pool, limitKey, LOGIN_LIMIT, res);
     // Phones are stored in one form (normalizePhone); an older row may still hold the form typed.
     const identifier = toAsciiDigits(raw).trim();
     const isPhone = /^\+?[\d\s\-()]+$/.test(identifier);
@@ -136,10 +140,12 @@ export function authRouter(config: AppConfig, pool: Pool) {
     // unknown account takes the same time.
     const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH);
     if (!user || !user.password || !ok) {
+      await countAttempt(pool, limitKey, LOGIN_LIMIT);
       if (user) await securityEvent(pool, req, 'auth.login_failed', user.id, 'wrong password');
       else await securityEvent(pool, req, 'auth.login_failed', null, `unknown identifier ${ident.slice(0, 3)}…`);
       throw new HttpError(401, INVALID_LOGIN, 'invalid_credentials');
     }
+    await clearAttempts(pool, limitKey);
     // Status is revealed only after the password is proven.
     if (user.status !== 'approved') {
       const message =
@@ -201,7 +207,10 @@ export function authRouter(config: AppConfig, pool: Pool) {
   }));
 
   r.post('/register', route(async (req, res) => {
+    const joinKey = `register:${req.ip}`;
+    await assertNotBlocked(pool, joinKey, JOIN_LIMIT, res);
     const input = registerInput.parse(req.body);
+    await countAttempt(pool, joinKey, JOIN_LIMIT);
     const id = `usr_${crypto.randomUUID()}`;
     const requestCode = newRequestCode();
     const { name, phone, email, roleKey, password, notes, ...profile } = input;
@@ -215,28 +224,36 @@ export function authRouter(config: AppConfig, pool: Pool) {
       );
     } catch (err: any) {
       if (err.code !== '23505') throw err;
-      // Say what to do next: a second request for the same number can never succeed.
-      const { rows: existing } = await pool.query(
-        'SELECT status FROM app_users WHERE phone = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)) LIMIT 1;',
-        [phone, email]
+      // One answer whatever the state of the existing account, so this public form never tells a
+      // stranger whether a phone number has an account (it used to say pending/active/rejected).
+      throw new HttpError(
+        409,
+        'لا يمكن إرسال طلب جديد بهذا الرقم أو البريد. لو عندك حساب سجّل الدخول، أو تابع طلبك برقم الطلب، أو تواصل مع المشرف.',
+        'join_request_exists'
       );
-      const status = existing[0]?.status;
-      if (status === 'pending') {
-        throw new HttpError(409, 'لديك طلب انضمام بهذا الرقم قيد المراجعة بالفعل، انتظر موافقة المشرف أو تابع حالته برقم الطلب', 'join_request_pending');
-      }
-      if (status === 'approved') {
-        throw new HttpError(409, 'هذا الرقم أو البريد مسجل بحساب مفعّل بالفعل، سجّل الدخول به بدلاً من إرسال طلب جديد', 'account_exists');
-      }
-      if (status === 'rejected') {
-        throw new HttpError(409, 'تم الاعتذار عن طلب سابق بهذا الرقم، تواصل مع المشرف العام', 'join_request_rejected');
-      }
-      throw conflict('يوجد حساب مسجل بنفس رقم الهاتف أو البريد الإلكتروني');
     }
     await audit(pool, req, 'user.register', 'user', id, null, { name, role: roleKey, requestCode });
     // Admins are told at once, in the app and on their phones.
     const { rows: admins } = await pool.query("SELECT id FROM app_users WHERE role IN ('super_admin', 'admin') AND status = 'approved';");
     for (const admin of admins) {
-      await notify(pool, { title: 'طلب انضمام جديد', description: `${name} — ${phone}`, type: 'info', targetUserId: admin.id });
+      // One unread «طلبات انضمام جديدة» notification per admin that keeps counting, instead of one
+      // notification (and one phone alert) per request.
+      const { rows: open } = await pool.query(
+        `SELECT n.id, n.data FROM notifications n
+         WHERE n.target_user_id = $1 AND n.data->>'kind' = 'join_requests'
+           AND NOT EXISTS (SELECT 1 FROM notification_reads r WHERE r.notification_id = n.id AND r.user_id = $1)
+         ORDER BY n.created_at DESC LIMIT 1;`,
+        [admin.id]
+      );
+      if (open[0]) {
+        const count = Number(open[0].data?.count ?? 1) + 1;
+        await pool.query(
+          `UPDATE notifications SET title = $2, description = $3, data = jsonb_set(data, '{count}', to_jsonb($4::int)) WHERE id = $1;`,
+          [open[0].id, `طلبات انضمام جديدة (${count})`, `آخرها: ${name}`, count]
+        );
+      } else {
+        await notify(pool, { title: 'طلب انضمام جديد', description: name, type: 'info', targetUserId: admin.id, data: { kind: 'join_requests', count: 1 } });
+      }
     }
     res.status(201).json({ success: true, requestCode, message: 'تم تسجيل طلب الانضمام وهو الآن قيد المراجعة' });
   }));

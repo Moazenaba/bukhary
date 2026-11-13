@@ -15,7 +15,7 @@ type Who = keyof typeof WHO;
 //                                      admin head headAll sheikh sheikhAll
 const EXPECTED: Record<Action, [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1]> = {
   'committees.read':      [1, 1, 1, 1, 1],
-  'committees.create':    [1, 1, 1, 0, 0],
+  'committees.create':    [1, 0, 1, 0, 0],
   'committees.update':    [1, 1, 1, 0, 0],
   'committees.delete':    [1, 0, 1, 0, 0],
   'committees.members':   [1, 1, 1, 0, 0],
@@ -29,8 +29,8 @@ const EXPECTED: Record<Action, [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1]> = {
   'exams.delete':         [1, 0, 0, 0, 0],
   'exams.file':           [1, 1, 1, 0, 1],
   'tasks.read':           [1, 1, 1, 1, 1],
-  'tasks.write':          [1, 1, 1, 0, 0],
-  'tasks.delete':         [1, 1, 1, 0, 0],
+  'tasks.write':          [1, 0, 1, 0, 0],
+  'tasks.delete':         [1, 0, 1, 0, 0],
   'users.read':           [1, 1, 1, 0, 0],
   'users.manage':         [1, 0, 1, 0, 0],
   'users.delete':         [1, 0, 0, 0, 0],
