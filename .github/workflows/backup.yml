@@ -1,0 +1,63 @@
+name: Nightly database backup
+
+# Every night: a full backup of the production database, restored into a throwaway database and
+# compared table by table (so we know it really restores), then locked with BACKUP_PASSPHRASE and
+# kept for 90 days. Run it now from the Actions tab: «Nightly database backup» → «Run workflow».
+# How to restore from it: docs/BACKUP_RESTORE.md («النسخة الليلية على GitHub»).
+on:
+  schedule:
+    - cron: '17 23 * * *' # 01:17 Cairo (winter) / 02:17 (summer)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Back up, verify and encrypt
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      verify:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: restore_check
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the secrets are set
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          missing=0
+          [ -n "$SOURCE_DATABASE_URL" ] || { echo "::error::Secret PROD_DATABASE_URL is not set (Settings → Secrets and variables → Actions)."; missing=1; }
+          [ -n "$BACKUP_PASSPHRASE" ] || { echo "::error::Secret BACKUP_PASSPHRASE is not set (Settings → Secrets and variables → Actions)."; missing=1; }
+          exit $missing
+      - name: Install PostgreSQL 17 client tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Back up, restore-check and encrypt
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          VERIFY_DATABASE_URL: postgresql://postgres@localhost:5432/restore_check
+          OUT_DIR: backup-out
+        run: ./scripts/nightly-backup.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bukhari-backup-${{ github.run_number }}
+          path: backup-out/*.tar.gpg
+          retention-days: 90
+          if-no-files-found: error
