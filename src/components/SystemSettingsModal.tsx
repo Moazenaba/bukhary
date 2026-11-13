@@ -6,6 +6,7 @@ import { errorMessage } from '../services/api';
 import { DataService } from '../services/DataService';
 import type { SystemSettings } from '../types';
 import { toast } from './Toasts';
+import { loadFont } from '../utils/fonts';
 
 export const FONT_OPTIONS: { value: SystemSettings['font_family']; label: string; sample: string }[] = [
   { value: 'cairo', label: 'القاهرة (Cairo)', sample: "'Cairo'" },
@@ -41,9 +42,19 @@ export const SystemSettingsModal: React.FC<{ onClose: () => void }> = ({ onClose
   const queryClient = useQueryClient();
   const { settings } = useSettings();
   const [saving, setSaving] = useState<string | null>(null);
+  // The chosen font shows as selected at once, before the save comes back.
+  const [pendingFont, setPendingFont] = useState<SystemSettings['font_family'] | null>(null);
+  const shownFont = pendingFont ?? settings.font_family;
+  // Real samples: every choosable font is loaded while this window is open (admins only).
+  useEffect(() => {
+    for (const f of FONT_OPTIONS) void loadFont(f.value);
+  }, []);
 
   const save = async <K extends keyof SystemSettings>(key: K, value: SystemSettings[K], done: string) => {
-    if (JSON.stringify(value) === JSON.stringify(settings[key])) return;
+    if (JSON.stringify(value) === JSON.stringify(settings[key])) {
+      if (key === 'font_family') setPendingFont(null);
+      return;
+    }
     setSaving(key);
     try {
       await DataService.saveSetting(key, value);
@@ -53,6 +64,7 @@ export const SystemSettingsModal: React.FC<{ onClose: () => void }> = ({ onClose
       toast.error(errorMessage(err));
     } finally {
       setSaving(null);
+      if (key === 'font_family') setPendingFont(null);
     }
   };
 
@@ -97,10 +109,13 @@ export const SystemSettingsModal: React.FC<{ onClose: () => void }> = ({ onClose
             <legend className="text-xs font-black text-ink mb-1">خط الموقع</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {FONT_OPTIONS.map((f) => (
-                <label key={f.value} className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer ${settings.font_family === f.value ? 'border-brand bg-emerald-50' : 'border-line hover:bg-slate-50'}`}>
+                <label key={f.value} className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer ${shownFont === f.value ? 'border-brand bg-emerald-50' : 'border-line hover:bg-slate-50'}`}>
                   <input
-                    type="radio" name="font_family" value={f.value} checked={settings.font_family === f.value}
-                    onChange={() => save('font_family', f.value, 'تم تغيير خط الموقع')}
+                    type="radio" name="font_family" value={f.value} checked={shownFont === f.value}
+                    onChange={() => {
+                      setPendingFont(f.value);
+                      void save('font_family', f.value, 'تم تغيير خط الموقع');
+                    }}
                   />
                   <span style={{ fontFamily: f.sample }} className="text-sm">{f.label} — بسم الله الرحمن الرحيم</span>
                 </label>

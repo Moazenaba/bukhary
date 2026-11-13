@@ -13,9 +13,15 @@
   --color-success: #1b6b51;
 }
 
+/* One font for the whole site, set by «إعدادات النظام» (src/utils/fonts.ts). */
+:root {
+  --app-font: 'IBM Plex Sans Arabic';
+}
+
 @layer base {
+  html,
   body {
-    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--app-font), -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif;
     background-color: var(--color-canvas);
     color: var(--color-ink);
   }

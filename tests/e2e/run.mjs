@@ -216,6 +216,16 @@ await test('committee details: «سجل التعديلات» lists the edit made
   await page.keyboard.press('Escape');
 });
 
+await test('«إعدادات النظام»: choosing a font changes the whole site', async () => {
+  await open(page, 'committees');
+  await page.getByRole('button', { name: 'إعدادات النظام' }).first().click();
+  await page.getByRole('radio', { name: /تجوّل/ }).check();
+  await page.waitForFunction(() => getComputedStyle(document.body).fontFamily.includes('Tajawal'), null, { timeout: 10_000 });
+  await page.getByRole('radio', { name: /آي بي إم/ }).check();
+  await page.waitForFunction(() => getComputedStyle(document.body).fontFamily.includes('IBM Plex'), null, { timeout: 10_000 });
+  await page.keyboard.press('Escape');
+});
+
 // ---------------------------------------------------------------- phone
 console.log('Phone (Pixel 7)');
 const phone = await browser.newContext({ ...devices['Pixel 7'], acceptDownloads: true });
@@ -233,6 +243,15 @@ for (const tab of ['home', 'summer_course', 'committees', 'ceremonies', 'calenda
     assert.ok(scroll <= width + 1, `page is ${scroll}px wide on a ${width}px screen`);
   });
 }
+
+await test('the top bar fits the phone: no button or menu cut off at the edge', async () => {
+  await open(mobile, 'committees');
+  const cut = await mobile.evaluate(() =>
+    [...document.querySelectorAll('header button, header select, header label')]
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < -1 || r.right > innerWidth + 1); })
+      .map((e) => (e.textContent || '').trim().slice(0, 30)));
+  assert.deepEqual(cut, []);
+});
 
 await test('«+ لجنة» opens the add-committee form on the phone, and a committee can be added', async () => {
   await open(mobile, 'committees');

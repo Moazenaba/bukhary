@@ -68,7 +68,8 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <header className="bg-white border-b border-line/50 shadow-xs sticky top-0 z-30">
-      <div className="w-full px-4 sm:px-6 py-2.5 flex items-center justify-between mx-auto">
+      {/* On a phone the bar wraps onto two lines instead of pushing buttons off the screen. */}
+      <div className="w-full px-3 sm:px-6 py-2 sm:py-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-2 mx-auto">
         {/* Right: Toggle button for sidebar (desktop & mobile) + Title */}
         <div className="flex items-center gap-3">
           <button
@@ -93,7 +94,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               <span className="text-[16px] sm:text-[18px] font-extrabold text-brand block leading-tight">
                 مسجد الإمام البخاري
               </span>
-              <span className="text-xs text-[#0f766e] block font-bold">
+              <span className="text-xs text-[#0f766e] hidden sm:block font-bold">
                 متابعة الدورات العلمية - المتون العلمية
               </span>
             </div>
@@ -188,7 +189,8 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           {AuthService.can('committees.create') && (
             <button
               onClick={onOpenNewCommittee}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer"
+              // Phones use the floating «+ لجنة» button instead (MobileBottomNav).
+              className="hidden lg:inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">add_circle</span>
               <span>إضافة لجنة</span>
@@ -215,7 +217,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               title={`يوجد ${todaysTasksCount} أعمال وتنبيهات مجدولة اليوم - اضغط لفتح شاشة التنبيهات والمهام اليومية`}
             >
               <span className="material-symbols-outlined text-sm text-amber-700">notifications_active</span>
-              <span className="font-mono text-xs font-black">{todaysTasksCount} مهام اليوم</span>
+              <span className="font-mono text-xs font-black">{todaysTasksCount}<span className="hidden sm:inline"> مهام اليوم</span></span>
             </button>
           )}
 

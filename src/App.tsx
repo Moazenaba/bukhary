@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from
 import { useQueryClient } from '@tanstack/react-query';
 import { DATA_ROOT_KEY, useCacheSetter, useServerData, useLiveRefresh, useSettings } from './data/queries';
 import { overdueCommittees } from './utils/overdue';
+import { applyFont } from './utils/fonts';
 import {
   Committee,
   StageKey,
@@ -142,6 +143,14 @@ export default function App() {
   // their old names and call sites, but they write to the cache, so every screen reads one copy.
   const queryClient = useQueryClient();
   const server = useServerData(currentUser?.id);
+  // The font chosen in «إعدادات النظام».
+  // Only once the real settings arrived: the defaults shown before must not replace the font this
+  // device remembers (that made it download two fonts).
+  const { query: settingsQuery } = useSettings(Boolean(currentUser));
+  const chosenFont = settingsQuery.data?.font_family;
+  useEffect(() => {
+    if (chosenFont) void applyFont(chosenFont);
+  }, [chosenFont]);
   // Changes made elsewhere (another phone, another admin) appear without reloading the page.
   useLiveRefresh(Boolean(currentUser) && !currentUser?.mustChangePassword);
   // Every course stands alone: all screens show only the current course's data. The raw lists
@@ -668,7 +677,7 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink-soft font-['IBM_Plex_Sans_Arabic']" role="status">
+      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink-soft" role="status">
         جارٍ التحقق من الجلسة...
       </div>
     );
@@ -695,7 +704,7 @@ export default function App() {
   }
 
   return (
-    <div className="bg-canvas text-ink min-h-screen flex font-['IBM_Plex_Sans_Arabic'] text-right selection:bg-brand-light selection:text-[#00201d]">
+    <div className="bg-canvas text-ink min-h-screen flex text-right selection:bg-brand-light selection:text-[#00201d]">
       {/* 1. Sidebar Navigation (التابات في الجنب) */}
       <Sidebar
         activeTab={activeTab}

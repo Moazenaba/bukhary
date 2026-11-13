@@ -17,7 +17,7 @@ export const SETTINGS = {
   /** Days a stage may wait before the committee shows as late. */
   overdue_days: { schema: z.coerce.number().int().min(1).max(90), fallback: 3 },
   /** The website's font. */
-  font_family: { schema: z.enum(['cairo', 'tajawal', 'ibm-plex-sans-arabic', 'noto-naskh-arabic']), fallback: 'cairo' },
+  font_family: { schema: z.enum(['cairo', 'tajawal', 'ibm-plex-sans-arabic', 'noto-naskh-arabic']), fallback: 'ibm-plex-sans-arabic' },
 } as const;
 export type SettingKey = keyof typeof SETTINGS;
 const isKey = (k: string): k is SettingKey => Object.prototype.hasOwnProperty.call(SETTINGS, k);

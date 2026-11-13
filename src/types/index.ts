@@ -486,5 +486,5 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   observers: [],
   ceremony_sheikhs: [],
   overdue_days: 3,
-  font_family: 'cairo',
+  font_family: 'ibm-plex-sans-arabic',
 };

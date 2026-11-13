@@ -126,7 +126,7 @@ describe('committee exam date', () => {
 describe('settings', () => {
   it('everyone reads them; admins change them; only known keys and valid values', async () => {
     const sheikh = await userWithToken(t, { role: 'sheikh' });
-    expect((await t.api().get('/api/settings').set(sheikh.auth)).body.settings).toMatchObject({ exam_open_hours_before: 24, overdue_days: 3, font_family: 'cairo', observers: [] });
+    expect((await t.api().get('/api/settings').set(sheikh.auth)).body.settings).toMatchObject({ exam_open_hours_before: 24, overdue_days: 3, font_family: 'ibm-plex-sans-arabic', observers: [] });
     expect((await t.api().put('/api/settings/overdue_days').set(head.auth).send({ value: 5 })).status).toBe(403);
     expect((await t.api().put('/api/settings/overdue_days').set(admin.auth).send({ value: 0 })).status).toBe(400);
     expect((await t.api().put('/api/settings/whatever').set(admin.auth).send({ value: 1 })).status).toBe(400);
