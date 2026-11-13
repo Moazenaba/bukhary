@@ -2,6 +2,9 @@
 //
 //   npm run publish:android -- path/to/app-release.apk ["ما الجديد"]
 //
+// Normally GitHub does this for you: bukharyApp > Actions > "Publish Android" > Run workflow builds
+// the signed APK, runs this script and pushes the result here.
+//
 // Copies the APK to public/app/ and writes public/app/android.json; both ship with the web app, so
 // the next deploy (push to main) hands the update to every phone. The APK must be the same app,
 // signed with the release key and newer than the version already published: anything else would
