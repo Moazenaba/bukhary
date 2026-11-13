@@ -14,10 +14,12 @@ describe('shared rules (web side)', () => {
     expect(STAGES_LIST.map((s) => s.key)).toEqual(rules.stageOrder);
   });
 
-  it.each(rules.stageStates.map((s: any) => [s.completed.join('+') || 'nothing', s]))('state after %s', (_n, s: any) => {
-    const stages = Object.fromEntries(rules.stageOrder.map((k: string) => [k, { completed: s.completed.includes(k) }]));
-    expect(calculateCurrentStage(stages as any)).toMatchObject({ key: s.key, label: s.label });
-  });
+  for (const s of rules.stageStates as { completed: string[]; key: string; label: string }[]) {
+    it(`state after ${s.completed.join('+') || 'nothing'}`, () => {
+      const stages = Object.fromEntries(rules.stageOrder.map((k: string) => [k, { completed: s.completed.includes(k) }]));
+      expect(calculateCurrentStage(stages as any)).toMatchObject({ key: s.key, label: s.label });
+    });
+  }
 
   it('«لم يتم الحفل» / «تم الحفل» report columns', () => {
     expect(ceremonyStatusPdfTable([], [], 'not_held').table.columns).toEqual(rules.ceremonyStatusColumns.not_held);
