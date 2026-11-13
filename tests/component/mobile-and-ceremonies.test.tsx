@@ -47,3 +47,23 @@ describe('ceremonies screen: PDF export and share', () => {
     expect(share.disabled).toBe(false);
   });
 });
+
+describe('ceremonies screen: «لم يتم الحفل» / «تم الحفل» PDF', () => {
+  const base = {
+    scheduleTasks: [], currentUser: { id: 'u1', role: 'super_admin' } as any,
+    onUpdateCommitteeCeremony: vi.fn(), onToggleCommitteeStage: vi.fn(), onAddTask: vi.fn(), onDeleteTask: vi.fn(), onToggleTaskComplete: vi.fn(),
+  };
+  const mk = (id: string, held: boolean): Committee => ({
+    id, committeeNumber: 1, committeeName: id, members: [], branch: '', competitionBook: '', generalNotes: '', courseId: 'crs',
+    stages: { ceremony: { completed: held } } as any, createdDate: '', createdAtTime: '',
+  });
+
+  it('shows the count of each state and disables the empty one', () => {
+    render(<CeremoniesView {...base} committees={[mk('a', false), mk('b', false)]} />);
+    expect(screen.getByText('لم يتم الحفل (2 لجنة)')).toBeTruthy();
+    expect(screen.getByText('تم الحفل (0 لجنة)')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'تصدير كشف لم يتم الحفل PDF' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'تصدير كشف تم الحفل PDF' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'مشاركة كشف تم الحفل PDF' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});

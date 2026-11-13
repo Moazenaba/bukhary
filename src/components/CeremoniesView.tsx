@@ -3,8 +3,8 @@ import { todayISO } from '../utils/stageUtils';
 import { Committee, ScheduleTask, AppUser, StageKey } from '../types';
 import { AuthService } from '../services/AuthService';
 import { AttendeePicker, MyCeremonies } from './CeremonyAttendees';
-import { CeremonyPeriod, ceremonyRows, ceremoniesPdfTable, exportCeremoniesToExcel, periodRange } from '../utils/reportExport';
-import { downloadFile, shareFile, tableToPdf } from '../utils/pdf';
+import { CEREMONY_STATUS_LABEL, CeremonyPeriod, CeremonyStatus, ceremonyRows, ceremoniesPdfTable, ceremonyStatusPdfTable, exportCeremoniesToExcel, periodRange } from '../utils/reportExport';
+import { deliverPdf } from '../utils/pdf';
 import { toast } from './Toasts';
 
 interface CeremoniesViewProps {
@@ -108,45 +108,33 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   };
 
   // PDF: «تصدير» saves the file on the device; «مشاركة» sends it through the phone's share sheet.
-  const [pdfBusy, setPdfBusy] = useState<'export' | 'share' | null>(null);
-  const makeCeremoniesPdf = async () => {
-    const { count, filename, table } = ceremoniesPdfTable(committees, scheduleTasks, exportPeriod, exportAnchor || todayISO());
-    if (count === 0) {
-      toast.info('لا توجد حفلات مجدولة في هذه الفترة');
-      return null;
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  type PdfJob = { count: number; filename: string; table: Parameters<typeof deliverPdf>[0] };
+  const runPdf = async (key: string, mode: 'export' | 'share', make: () => PdfJob, empty: string) => {
+    const job = make();
+    if (job.count === 0) {
+      toast.info(empty);
+      return;
     }
-    return { blob: await tableToPdf(table), filename, title: table.title, count };
-  };
-  const handleExportCeremoniesPdf = async () => {
-    setPdfBusy('export');
+    setPdfBusy(`${key}:${mode}`);
     try {
-      const pdf = await makeCeremoniesPdf();
-      if (!pdf) return;
-      downloadFile(pdf.blob, pdf.filename);
-      toast.success(`تم تصدير كشف ${pdf.count} حفل PDF`);
+      const result = await deliverPdf(job.table, job.filename, mode);
+      if (result === 'downloaded') toast.success(`تم تصدير «${job.table.title.split(' — ')[0]}» PDF (${job.count})`);
+      if (result === 'fallback') toast.info('المشاركة غير متاحة في هذا المتصفح؛ تم تنزيل ملف PDF لترسله بنفسك');
     } catch {
-      toast.error('تعذر إنشاء ملف PDF');
+      toast.error(mode === 'share' ? 'تعذرت مشاركة ملف PDF' : 'تعذر إنشاء ملف PDF');
     } finally {
       setPdfBusy(null);
     }
   };
-  const handleShareCeremoniesPdf = async () => {
-    setPdfBusy('share');
-    try {
-      const pdf = await makeCeremoniesPdf();
-      if (!pdf) return;
-      const result = await shareFile(pdf.blob, pdf.filename, pdf.title);
-      if (result === 'unsupported') {
-        downloadFile(pdf.blob, pdf.filename);
-        toast.info('المشاركة غير متاحة في هذا المتصفح؛ تم تنزيل ملف PDF لترسله بنفسك');
-      }
-    } catch {
-      toast.error('تعذرت مشاركة ملف PDF');
-    } finally {
-      setPdfBusy(null);
-    }
+  const periodPdf = () => ceremoniesPdfTable(committees, scheduleTasks, exportPeriod, exportAnchor || todayISO());
+  const handleExportCeremoniesPdf = () => runPdf('period', 'export', periodPdf, 'لا توجد حفلات مجدولة في هذه الفترة');
+  const handleShareCeremoniesPdf = () => runPdf('period', 'share', periodPdf, 'لا توجد حفلات مجدولة في هذه الفترة');
+  const statusCounts = {
+    not_held: committees.filter((c) => !c.stages.ceremony?.completed).length,
+    held: committees.filter((c) => c.stages.ceremony?.completed).length,
   };
-
+  const statusPdf = (status: CeremonyStatus) => () => ceremonyStatusPdfTable(committees, scheduleTasks, status, committees[0]?.courseName);
 
   // Certificate / Honor Roll Print Modal
   const [honorRollCommittee, setHonorRollCommittee] = useState<Committee | null>(null);
@@ -373,7 +361,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
           title="تنزيل كشف الحفلات ملف PDF على الجهاز"
         >
           <span className="material-symbols-outlined text-base">picture_as_pdf</span>
-          <span>{pdfBusy === 'export' ? 'جاري الإنشاء...' : 'تصدير PDF'}</span>
+          <span>{pdfBusy === 'period:export' ? 'جاري الإنشاء...' : 'تصدير PDF'}</span>
         </button>
         <button
           type="button"
@@ -383,8 +371,50 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
           title="مشاركة كشف الحفلات PDF (واتساب وغيره)"
         >
           <span className="material-symbols-outlined text-base">share</span>
-          <span>{pdfBusy === 'share' ? 'جاري التجهيز...' : 'مشاركة PDF'}</span>
+          <span>{pdfBusy === 'period:share' ? 'جاري التجهيز...' : 'مشاركة PDF'}</span>
         </button>
+      </section>
+
+      {/* «لم يتم الحفل» / «تم الحفل» reports, organised like the course sheets */}
+      <section aria-labelledby="ceremony-status-pdf" className="bg-white rounded-2xl border border-amber-200 p-4 shadow-2xs space-y-3 text-xs">
+        <div>
+          <h2 id="ceremony-status-pdf" className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base text-amber-600">picture_as_pdf</span>
+            كشف «لم يتم الحفل» و«تم الحفل» (PDF)
+          </h2>
+          <p className="text-slate-500 mt-1">بنفس بيانات الكشوفات: اسم الشيخ، المكان، الكتاب، عدد الطلاب، وموعد ومكان الحفل، مع الإجمالي.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {(['not_held', 'held'] as const).map((status) => (
+            <div key={status} className={`rounded-xl border p-3 flex flex-col gap-2 ${status === 'held' ? 'border-emerald-200 bg-emerald-50/40' : 'border-orange-200 bg-orange-50/40'}`}>
+              <span className="font-black text-slate-800">
+                {CEREMONY_STATUS_LABEL[status]} ({statusCounts[status]} لجنة)
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => runPdf(status, 'export', statusPdf(status), `لا توجد لجان «${CEREMONY_STATUS_LABEL[status]}»`)}
+                  disabled={statusCounts[status] === 0 || pdfBusy !== null}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-700 text-white font-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label={`تصدير كشف ${CEREMONY_STATUS_LABEL[status]} PDF`}
+                >
+                  <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+                  <span>{pdfBusy === `${status}:export` ? 'جاري الإنشاء...' : 'تصدير PDF'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runPdf(status, 'share', statusPdf(status), `لا توجد لجان «${CEREMONY_STATUS_LABEL[status]}»`)}
+                  disabled={statusCounts[status] === 0 || pdfBusy !== null}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white font-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label={`مشاركة كشف ${CEREMONY_STATUS_LABEL[status]} PDF`}
+                >
+                  <span className="material-symbols-outlined text-base">share</span>
+                  <span>{pdfBusy === `${status}:share` ? 'جاري التجهيز...' : 'مشاركة'}</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenCommitteeDetails} />

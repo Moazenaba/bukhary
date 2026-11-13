@@ -198,3 +198,74 @@ export function ceremoniesPdfTable(committees: Committee[], tasks: ScheduleTask[
     },
   };
 }
+
+export type CeremonyStatus = 'not_held' | 'held';
+export const CEREMONY_STATUS_LABEL: Record<CeremonyStatus, string> = { not_held: 'لم يتم الحفل', held: 'تم الحفل' };
+
+/**
+ * «لم يتم الحفل» / «تم الحفل» report: the committees in that state with the sheet's data (sheikh,
+ * place, book, students) and their ceremony details, ordered by committee number, with a total row.
+ */
+export function ceremonyStatusPdfTable(committees: Committee[], tasks: ScheduleTask[], status: CeremonyStatus, courseName?: string) {
+  const list = committees
+    .filter((c) => Boolean(c.stages.ceremony?.completed) === (status === 'held'))
+    .sort((a, b) => a.committeeNumber - b.committeeNumber);
+  const place = (c: Committee) => c.sheikhCountry?.trim() || c.branch?.trim() || '-';
+  const when = (c: Committee) => {
+    const task = ceremonyTask(c, tasks);
+    const date = (task?.date || c.ceremonyDetails?.ceremonyDate || '').slice(0, 10);
+    const time = task?.time || c.ceremonyDetails?.ceremonyTime || '';
+    return date ? `${date} (${ARABIC_DAYS[parseISO(date).getDay()]})${time ? ` ${time}` : ''}` : '';
+  };
+  const students = (c: Committee) => (status === 'held' ? c.ceremonyDetails?.honoredStudentsCount || c.studentsCount || 0 : c.studentsCount || 0);
+  const columns =
+    status === 'held'
+      ? ['م', 'رقم اللجنة', 'اسم الشيخ', 'المكان', 'الكتاب المقرر', 'عدد الطلاب المكرمين', 'تاريخ الحفل', 'مكان الحفل', 'المشايخ الحاضرون']
+      : ['م', 'رقم اللجنة', 'اسم الشيخ', 'المكان', 'الكتاب المقرر', 'عدد الطلاب', 'المرحلة الحالية', 'موعد الحفل', 'مكان الحفل'];
+  const rows: (string | number)[][] = list.map((c, i) =>
+    status === 'held'
+      ? [i + 1, c.committeeNumber, c.sheikhName || '-', place(c), c.competitionBook || '-', students(c), when(c) || '-',
+          c.ceremonyDetails?.ceremonyPlace || '-', joinNames(c.ceremonyDetails?.attendingSheikhs)]
+      : [i + 1, c.committeeNumber, c.sheikhName || '-', place(c), c.competitionBook || '-', students(c),
+          calculateCurrentStage(c.stages).label, when(c) || 'لم يُحدد بعد', c.ceremonyDetails?.ceremonyPlace || '-']
+  );
+  const total = list.reduce((sum, c) => sum + students(c), 0);
+  if (rows.length) rows.push(['', '', `الإجمالي: ${list.length} لجنة`, '', '', total, '', '', '']);
+  return {
+    count: list.length,
+    filename: `Bukhari-${status === 'held' ? 'ceremony-held' : 'ceremony-not-held'}-${todayISO()}.pdf`,
+    table: {
+      title: `كشف «${CEREMONY_STATUS_LABEL[status]}» — مسابقات مسجد الإمام البخاري`,
+      subtitle: `${courseName ? `${courseName} — ` : ''}${todayISO()} — ${list.length} لجنة — ${total} طالب`,
+      columns,
+      rows,
+      totalRows: rows.length ? [rows.length - 1] : [],
+    },
+  };
+}
+
+/** The course sheet rows shown on screen, as a PDF table (same columns as the sheet). */
+export function sheetRowsPdfTable(
+  rows: { number: number; sheikh_name: string; place: string; book: string; students_count?: number; delivered: boolean; corrected: boolean; reviewed: boolean; announced: boolean; ceremony: boolean }[],
+  filterLabel: string,
+  courseName?: string
+) {
+  const mark = (v: boolean) => (v ? '✓' : '—');
+  const total = rows.reduce((s, r) => s + (Number(r.students_count) || 0), 0);
+  const body: (string | number)[][] = rows.map((r) => [
+    r.number, r.sheikh_name || '-', r.place || '-', r.book || '-', r.students_count || 0,
+    mark(r.delivered), mark(r.corrected), mark(r.reviewed), mark(r.announced), mark(r.ceremony),
+  ]);
+  if (body.length) body.push(['', `الإجمالي: ${rows.length} لجنة`, '', '', total, '', '', '', '', '']);
+  return {
+    count: rows.length,
+    filename: `Bukhari-sheet-${todayISO()}.pdf`,
+    table: {
+      title: `كشف الدورة${filterLabel ? ` — ${filterLabel}` : ''} — مسابقات مسجد الإمام البخاري`,
+      subtitle: `${courseName ? `${courseName} — ` : ''}${todayISO()} — ${rows.length} لجنة — ${total} طالب`,
+      columns: ['م', 'اسم الشيخ', 'المكان', 'الكتاب المقرر', 'عدد الطلاب', 'تم الامتحان', 'تم التصحيح', 'تمت المراجعة', 'تم الإعلان', 'تم الحفل'],
+      rows: body,
+      totalRows: body.length ? [body.length - 1] : [],
+    },
+  };
+}

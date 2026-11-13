@@ -146,6 +146,27 @@ await test('a ceremony task has no delete button in the calendar', async () => {
   assert.ok(n <= tasks, `${n} delete buttons for ${tasks} deletable tasks`);
 });
 
+async function downloadPdf(page, click) {
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), click()]);
+  const bytes = (await import('node:fs')).readFileSync(await download.path());
+  assert.equal(bytes.subarray(0, 5).toString('latin1'), '%PDF-');
+  return { bytes, name: download.suggestedFilename() };
+}
+
+await test('ceremonies: «لم يتم الحفل» report downloads as PDF', async () => {
+  await open(page, 'ceremonies');
+  const { name } = await downloadPdf(page, () => page.getByRole('button', { name: 'تصدير كشف لم يتم الحفل PDF' }).click());
+  assert.match(name, /^Bukhari-ceremony-not-held-\d{4}-\d{2}-\d{2}\.pdf$/);
+  if (process.env.E2E_SAVE_DIR) (await import('node:fs')).writeFileSync(`${process.env.E2E_SAVE_DIR}/not-held.pdf`, (await downloadPdf(page, () => page.getByRole('button', { name: 'تصدير كشف لم يتم الحفل PDF' }).click())).bytes);
+});
+
+await test('course sheet: filter «لم يتم الحفل» then PDF exports that list', async () => {
+  await open(page, 'summer_course');
+  await page.getByText(/لم يتم الحفل \(\d+\)/).first().click();
+  const { name } = await downloadPdf(page, () => page.getByRole('button', { name: 'تصدير الكشف المعروض PDF' }).click());
+  assert.match(name, /^Bukhari-sheet-/);
+});
+
 // ---------------------------------------------------------------- phone
 console.log('Phone (Pixel 7)');
 const phone = await browser.newContext({ ...devices['Pixel 7'], acceptDownloads: true });

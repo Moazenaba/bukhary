@@ -49,6 +49,13 @@ import { errorMessage } from '../services/api';
 import { AuthService } from '../services/AuthService';
 import { toast } from './Toasts';
 import { ImageWorkbench } from './ImageWorkbench';
+import { sheetRowsPdfTable } from '../utils/reportExport';
+import { deliverPdf } from '../utils/pdf';
+
+const FILTER_LABEL: Record<CourseFilterStatus, string> = {
+  all: '', not_delivered: 'في انتظار الامتحان', delivered: 'تم الامتحان', corrected: 'تم التصحيح', reviewed: 'تمت المراجعة',
+  announced: 'تم الإعلان', no_ceremony: 'لم يتم الحفل', ceremony: 'تم الحفل', uncertain: 'يحتاج تدقيق', struck_out: 'صفوف مشطوبة',
+};
 
 
 interface SummerCourseTrackerViewProps {
@@ -585,6 +592,27 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
     }
   };
 
+  // PDF of the rows on screen (after search and filters): pick «لم يتم الحفل» or «تم الحفل» first
+  // to get that list, laid out like the sheet.
+  const [sheetPdfBusy, setSheetPdfBusy] = useState<'export' | 'share' | null>(null);
+  const handleSheetPdf = async (mode: 'export' | 'share') => {
+    const job = sheetRowsPdfTable(filteredRows, FILTER_LABEL[statusFilter], activeDefaultCourse?.name);
+    if (job.count === 0) {
+      toast.info('لا توجد صفوف معروضة للتصدير');
+      return;
+    }
+    setSheetPdfBusy(mode);
+    try {
+      const result = await deliverPdf(job.table, job.filename, mode);
+      if (result === 'downloaded') showToast(`تم تصدير ${job.count} صف PDF`);
+      if (result === 'fallback') toast.info('المشاركة غير متاحة في هذا المتصفح؛ تم تنزيل ملف PDF لترسله بنفسك');
+    } catch {
+      toast.error('تعذر إنشاء ملف PDF');
+    } finally {
+      setSheetPdfBusy(null);
+    }
+  };
+
   // Deletes the saved sheet rows of the selected course (committees are not touched).
   const handleClearAll = async () => {
     const courseId = targetCourseForImport();
@@ -955,6 +983,26 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
 
           {/* Export & Sync Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleSheetPdf('export')}
+              disabled={filteredRows.length === 0 || sheetPdfBusy !== null}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              title="تصدير الصفوف المعروضة PDF (اختر «لم يتم الحفل» أو «تم الحفل» أولاً لكشفها)"
+              aria-label="تصدير الكشف المعروض PDF"
+            >
+              <FileText className="w-4 h-4" />
+              <span>{sheetPdfBusy === 'export' ? 'جاري الإنشاء...' : `PDF${FILTER_LABEL[statusFilter] ? ` (${FILTER_LABEL[statusFilter]})` : ''}`}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSheetPdf('share')}
+              disabled={filteredRows.length === 0 || sheetPdfBusy !== null}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              aria-label="مشاركة الكشف المعروض PDF"
+            >
+              <span>{sheetPdfBusy === 'share' ? 'جاري التجهيز...' : 'مشاركة PDF'}</span>
+            </button>
             {committees.length > 0 && (
               <button
                 type="button"

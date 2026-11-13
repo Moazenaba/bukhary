@@ -198,3 +198,21 @@ export async function shareFile(blob: Blob, filename: string, title: string): Pr
     throw err;
   }
 }
+
+/**
+ * Builds the PDF and either saves it on the device («تصدير») or opens the share sheet («مشاركة»;
+ * saved instead when this browser cannot share files).
+ */
+export async function deliverPdf(table: PdfTable, filename: string, mode: 'export' | 'share'): Promise<'downloaded' | 'shared' | 'cancelled' | 'fallback'> {
+  const blob = await tableToPdf(table);
+  if (mode === 'export') {
+    downloadFile(blob, filename);
+    return 'downloaded';
+  }
+  const result = await shareFile(blob, filename, table.title);
+  if (result === 'unsupported') {
+    downloadFile(blob, filename);
+    return 'fallback';
+  }
+  return result;
+}
