@@ -55,6 +55,16 @@ Release order, rollout switches and operator checks: [docs/RELEASE.md](docs/RELE
    changed through the app; nothing is deleted. If that leaves no super admin, run
    `npm run create-admin` — it ignores those legacy accounts.
 
+## Auto merge
+
+A pull request merges by itself once the `CI` workflow has passed on its latest commit
+(`.github/workflows/auto-merge.yml`, merge commit):
+- It merges exactly the commit that was tested; a commit pushed after the tests started waits for its own CI.
+- Drafts, pull requests from forks and pull requests labelled `no-auto-merge` are left alone (use the label to merge by hand).
+- Any failing job (type check, tests, build, e2e, dependency audit) means no merge. A merge conflict makes the workflow fail and the pull request stays open.
+- Add the secret `AUTO_MERGE_TOKEN` (a token for this repository only: Contents and Pull requests, read and write) so the merge is made as the owner and GitHub runs CI on `main` afterwards. Without it the workflow's own token still merges, but no workflow runs for that push.
+- To also block merging by hand before the checks finish: Settings > Branches > rule for `main` > Require status checks: `Type check, tests, build`, `E2E (browser)`, `Dependency audit`.
+
 ## Tests
 The full test strategy (unit, component, integration, migration, contract, E2E) and how CI gates
 merges: [docs/TEST_PLAN.md](docs/TEST_PLAN.md).
