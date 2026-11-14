@@ -6,7 +6,7 @@ export const Footer: React.FC = () => {
   return (
     <>
       <footer className="mt-12 bg-white border-t border-line/30 py-6 text-center text-right">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-[2200px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-brand text-[16px] font-bold">
             <span className="material-symbols-outlined">mosque</span>
             <span>مسابقات مسجد البخاري العلمية</span>

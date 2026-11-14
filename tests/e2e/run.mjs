@@ -226,6 +226,39 @@ await test('«إعدادات النظام»: choosing a font changes the whole s
   await page.keyboard.press('Escape');
 });
 
+// ---------------------------------------------------------------- laptop layout
+// Nothing may be hidden sideways on a laptop. The only content allowed to scroll sideways is a
+// TableScroll (marked data-scroll, with edge fades and arrows); anything else that is wider than its
+// box, or a page wider than the window, is a bug. Measured per element because the page itself can
+// look fine while a container clips its content.
+console.log('Laptop layout');
+const LAPTOPS = [[1280, 720], [1366, 768], [1920, 1080]];
+const LAYOUT_TABS = ['home', 'summer_course', 'committees', 'exams', 'ceremonies', 'calendar', 'courses', 'assistants', 'stats', 'daily_alerts', 'audit'];
+for (const [w, h] of LAPTOPS) {
+  for (const tab of LAYOUT_TABS) {
+    await test(`«${tab}» at ${w}×${h}: nothing is cut off or hidden sideways`, async () => {
+      await page.setViewportSize({ width: w, height: h });
+      await open(page, tab);
+      const problems = await page.evaluate(() => {
+        const out = [];
+        const label = (e) => `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.split(/\s+/).slice(0, 3).join('.') : ''}`;
+        if (document.documentElement.scrollWidth > innerWidth + 1) out.push(`page is ${document.documentElement.scrollWidth}px wide on a ${innerWidth}px window`);
+        for (const e of document.querySelectorAll('main *, aside *, header *')) {
+          if (e.closest('[data-scroll]')) continue;
+          const cs = getComputedStyle(e);
+          const clips = ['auto', 'scroll', 'hidden', 'clip'].includes(cs.overflowX);
+          if (clips && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis') {
+            out.push(`${label(e)} is ${e.scrollWidth}px of content in ${e.clientWidth}px (overflow-x: ${cs.overflowX})`);
+          }
+        }
+        return out.slice(0, 8);
+      });
+      assert.deepEqual(problems, []);
+    });
+  }
+}
+await page.setViewportSize({ width: 1400, height: 900 });
+
 // ---------------------------------------------------------------- phone
 console.log('Phone (Pixel 7)');
 const phone = await browser.newContext({ ...devices['Pixel 7'], acceptDownloads: true });

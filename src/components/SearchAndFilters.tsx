@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { StageKey, STAGES_LIST } from '../types';
+import { FilterChips } from './ui/FilterChips';
 
 interface SearchAndFiltersProps {
   searchQuery: string;
@@ -172,8 +173,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
       </section>
 
       {/* Horizontal Filter Tabs per Stage */}
-      <section className="mb-6 overflow-x-auto pb-2 scrollbar-none">
-        <div className="flex items-center gap-2 min-w-max">
+      <section className="mb-6">
+        <FilterChips label="تصفية حسب المرحلة">
           {/* All */}
           <button
             onClick={() => setSelectedStage('all')}
@@ -234,7 +235,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
               </button>
             );
           })}
-        </div>
+        </FilterChips>
       </section>
 
       {onExportExamInProgress && (
