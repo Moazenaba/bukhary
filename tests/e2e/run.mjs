@@ -232,9 +232,9 @@ await test('«إعدادات النظام»: choosing a font changes the whole s
 // box, or a page wider than the window, is a bug. Measured per element because the page itself can
 // look fine while a container clips its content.
 console.log('Laptop layout');
-// Until every screen is fixed (the laptop-layout PRs) the problems are printed as warnings; the last
-// PR of the series sets this to true so a new overflow fails the build.
-const LAYOUT_STRICT = false;
+// Strict: a new overflow on a laptop fails the build. (It was a warning while the screens were fixed;
+// the CI run of the second layout PR showed nothing left but a decorative circle, now ignored.)
+const LAYOUT_STRICT = true;
 const LAPTOPS = [[1280, 720], [1366, 768], [1920, 1080]];
 const LAYOUT_TABS = ['home', 'summer_course', 'committees', 'exams', 'ceremonies', 'calendar', 'courses', 'assistants', 'stats', 'daily_alerts', 'audit'];
 for (const [w, h] of LAPTOPS) {
@@ -251,6 +251,19 @@ for (const [w, h] of LAPTOPS) {
           const cs = getComputedStyle(e);
           const clips = ['auto', 'scroll', 'hidden', 'clip'].includes(cs.overflowX);
           if (clips && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis') {
+            // A clipping box is allowed to cut off decoration (an absolutely placed blurred circle in a
+            // banner); it is a bug only when something in the normal flow sticks out of it.
+            if (cs.overflowX === 'hidden' || cs.overflowX === 'clip') {
+              const box = e.getBoundingClientRect();
+              const stuckOut = [...e.querySelectorAll('*')].some((c) => {
+                if (c.closest('[aria-hidden="true"], [data-scroll]')) return false;
+                const pos = getComputedStyle(c).position;
+                if (pos === 'absolute' || pos === 'fixed') return false;
+                const r = c.getBoundingClientRect();
+                return r.width > 0 && (r.right > box.right + 1 || r.left < box.left - 1);
+              });
+              if (!stuckOut) continue;
+            }
             out.push(`${label(e)} is ${e.scrollWidth}px of content in ${e.clientWidth}px (overflow-x: ${cs.overflowX})`);
           }
         }
