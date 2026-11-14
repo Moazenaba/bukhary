@@ -753,7 +753,7 @@ export const CentralLoginPortal: React.FC = () => {
       {/* Forgot password: there is no self-service reset; an admin resets it. */}
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
-          <div className="bg-white max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+          <div className="bg-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[92vh] overflow-y-auto space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 id="forgot-title" className="font-bold text-sm text-slate-900">نسيت كلمة المرور؟</h3>
               <button

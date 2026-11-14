@@ -48,7 +48,7 @@ export const NewCourseModal: React.FC<{
 
   return (
 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 text-right">
             <div className="px-5 py-4 bg-gradient-to-l from-emerald-800 to-brand text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="p-2 rounded-xl bg-white/20 text-white">

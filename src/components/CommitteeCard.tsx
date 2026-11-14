@@ -64,7 +64,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
               #{committee.committeeNumber}
             </span>
             <div className="min-w-0">
-              <h3 className="text-base font-extrabold text-slate-900 block leading-snug truncate group-hover:text-brand transition-colors">
+              <h3 title={committee.committeeName} className="text-base font-extrabold text-slate-900 block leading-snug truncate group-hover:text-brand transition-colors">
                 {committee.committeeName}
               </h3>
               <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 flex-wrap">
@@ -109,7 +109,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
         <div className="flex items-center justify-between gap-2 mb-3.5 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50/80 text-brand border border-emerald-200/80 max-w-full truncate shadow-2xs">
             <span className="material-symbols-outlined text-sm text-emerald-700">menu_book</span>
-            <span className="truncate">{committee.competitionBook}</span>
+            <span className="truncate" title={committee.competitionBook}>{committee.competitionBook}</span>
           </span>
 
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold bg-blue-50 text-blue-900 border border-blue-200/80 font-mono text-xs shadow-2xs">
@@ -159,7 +159,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                 <span>الشيخ الميداني:</span>
               </span>
               <div className="flex items-center gap-1.5 text-left truncate max-w-[210px]">
-                <span className="font-bold text-brand truncate">
+                <span className="font-bold text-brand truncate" title={committee.sheikhName}>
                   {committee.sheikhName}
                   {committee.sheikhCountry && (
                     <span className="text-slate-400 font-normal text-xs mr-1">
@@ -258,7 +258,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
         <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
           <div className={`p-2 rounded-xl border ${committee.receivedByAssistant ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
             <span className="block font-bold text-slate-700">الاستلام</span>
-            <span className="block text-slate-600 truncate">
+            <span className="block text-slate-600 truncate" title={committee.receivedByAssistant ? `استلمها ${committee.receivedByAssistant.assistantName}` : 'لم تُستلم بعد'}>
               {committee.receivedByAssistant ? `استلمها ${committee.receivedByAssistant.assistantName}` : 'لم تُستلم بعد'}
             </span>
             {canReception && onReceiveCommittee && (
@@ -274,7 +274,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           </div>
           <div className={`p-2 rounded-xl border ${committee.examApprovedBy ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
             <span className="block font-bold text-slate-700">جاهزية الامتحان</span>
-            <span className="block text-slate-600 truncate">
+            <span className="block text-slate-600 truncate" title={committee.examApprovedBy ? `اعتمدها ${committee.examApprovedBy.assistantName}` : 'غير معتمدة'}>
               {committee.examApprovedBy ? `اعتمدها ${committee.examApprovedBy.assistantName}` : 'غير معتمدة'}
             </span>
             {canReception && onApproveExamReadiness && (

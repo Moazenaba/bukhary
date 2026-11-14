@@ -677,7 +677,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       {/* Add Task Modal */}
       {isAddModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 text-right">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto border border-slate-200 text-right">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black">
@@ -840,7 +840,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       {/* Dedicated Add Ceremony Modal */}
       {isAddCeremonyModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 text-right">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto border border-slate-200 text-right">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-xs">
