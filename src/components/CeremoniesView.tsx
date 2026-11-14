@@ -495,7 +495,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Status Tabs */}
           <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shrink-0">
             <button
@@ -561,7 +561,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
       </div>
 
       {/* 4. Ceremonies Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5">
         {filteredCommittees.length === 0 ? (
           <div className="col-span-full bg-white rounded-3xl border border-slate-200 p-12 text-center">
             <span className="material-symbols-outlined text-5xl text-slate-400 mb-3 block">

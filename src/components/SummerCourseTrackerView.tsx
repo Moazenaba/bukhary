@@ -53,6 +53,7 @@ import { NewCourseModal } from './course-sheet/NewCourseModal';
 import { NewSheetRowModal } from './course-sheet/NewSheetRowModal';
 import { sheetRowsPdfTable } from '../utils/reportExport';
 import { deliverPdf } from '../utils/pdf';
+import { TableScroll } from './ui/TableScroll';
 
 const FILTER_LABEL: Record<CourseFilterStatus, string> = {
   all: '', not_delivered: 'في انتظار الامتحان', delivered: 'تم الامتحان', corrected: 'تم التصحيح', reviewed: 'تمت المراجعة',
@@ -1138,38 +1139,38 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll label="كشف الدورة">
             <table className="w-full text-right text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold select-none">
-                  <th className="py-3 px-3 w-12 text-center">م</th>
-                  <th className="py-3 px-3 min-w-[170px]">الدورة المقررة</th>
-                  <th className="py-3 px-3 min-w-[190px]">اسم الشيخ</th>
-                  <th className="py-3 px-3 min-w-[180px]">المكان</th>
-                  <th className="py-3 px-3 min-w-[210px]">الكتاب المقرر</th>
-                  <th className="py-3 px-2 w-24 text-center text-slate-800 bg-slate-100/70 border-x border-slate-200/60 font-black">
+                  <th className="py-3 px-3 w-12 text-center sticky right-0 z-[2] bg-slate-100">م</th>
+                  <th className="py-3 px-3 min-w-[130px]">الدورة المقررة</th>
+                  <th className="py-3 px-3 min-w-[150px]">اسم الشيخ</th>
+                  <th className="py-3 px-3 min-w-[140px]">المكان</th>
+                  <th className="py-3 px-3 min-w-[160px]">الكتاب المقرر</th>
+                  <th className="py-3 px-2 w-20 text-center text-slate-800 bg-slate-100/70 border-x border-slate-200/60 font-black">
                     عدد الطلاب
                   </th>
-                  <th className="py-3 px-2 w-28 text-center text-emerald-900 bg-emerald-50/50">
+                  <th className="py-3 px-2 w-24 text-center text-emerald-900 bg-emerald-50/50">
                     تم الامتحان
                   </th>
-                  <th className="py-3 px-2 w-24 text-center text-teal-900 bg-teal-50/50">
+                  <th className="py-3 px-2 w-20 text-center text-teal-900 bg-teal-50/50">
                     تم التصحيح
                   </th>
-                  <th className="py-3 px-2 w-24 text-center text-blue-900 bg-blue-50/50">
+                  <th className="py-3 px-2 w-20 text-center text-blue-900 bg-blue-50/50">
                     تم المراجعة
                   </th>
-                  <th className="py-3 px-2 w-24 text-center text-teal-900 bg-teal-50/50">
+                  <th className="py-3 px-2 w-20 text-center text-teal-900 bg-teal-50/50">
                     تم الإعلان
                   </th>
-                  <th className="py-3 px-2 w-24 text-center text-amber-900 bg-amber-50/50">
+                  <th className="py-3 px-2 w-20 text-center text-amber-900 bg-amber-50/50">
                     تم الحفل
                   </th>
-                  <th className="py-3 px-2 w-24 text-center text-teal-900 bg-teal-100/70 border-x border-teal-200 font-black">
+                  <th className="py-3 px-2 w-20 text-center text-teal-900 bg-teal-100/70 border-x border-teal-200 font-black">
                     تفاصيل اللجنة
                   </th>
-                  <th className="py-3 px-3 w-28 text-center">الحالة / تدقيق</th>
-                  <th className="py-3 px-2 w-12 text-center">حذف</th>
+                  <th className="py-3 px-3 w-28 text-center sticky left-12 z-[2] bg-slate-100">الحالة / تدقيق</th>
+                  <th className="py-3 px-2 w-12 text-center sticky left-0 z-[2] bg-slate-100">حذف</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1177,6 +1178,8 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                   const isStruck = row.struck_out;
                   const isUncertain = row.uncertain;
                   const rowKey = row.id ? `${row.id}-${rIdx}` : `comm-row-${rIdx}`;
+                  // Cells that stay in view while the rest scrolls need a solid background of their own.
+                  const stickyBg = isUncertain ? 'bg-amber-50' : isStruck ? 'bg-slate-50' : 'bg-white group-hover:bg-slate-50';
 
                   return (
                     <tr
@@ -1190,7 +1193,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                       }`}
                     >
                       {/* 1) Serial Number & Committee Link Badge */}
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600">
+                      <td className={`py-2.5 px-3 text-center font-mono font-bold text-slate-600 sticky right-0 z-[1] ${stickyBg}`}>
                         <div className="flex flex-col items-center justify-center gap-1">
                           <input
                             type="number"
@@ -1213,7 +1216,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                       </td>
 
                       {/* 1.5) Course Selection Dropdown */}
-                      <td className="py-2.5 px-3 min-w-[170px]">
+                      <td className="py-2.5 px-3 min-w-[130px]">
                         <select
                           value={row.courseId || activeDefaultCourse?.id || ''}
                           onChange={(e) => {
@@ -1387,7 +1390,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                       </td>
 
                       {/* Status Badges & Toggle */}
-                      <td className="py-2.5 px-3 text-center">
+                      <td className={`py-2.5 px-3 text-center sticky left-12 z-[1] ${stickyBg}`}>
                         <div className="flex flex-col items-center gap-1">
                           {isUncertain ? (
                             <button
@@ -1442,7 +1445,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                       </td>
 
                       {/* Delete */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td className={`py-2.5 px-2 text-center sticky left-0 z-[1] ${stickyBg}`}>
                         <button
                           type="button"
                           onClick={() => handleDeleteRow(row.id, row.number)}
@@ -1457,7 +1460,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
 
         {/* Table Footer with Quick Controls */}

@@ -298,7 +298,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           </div>
 
           {/* Exams Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-5">
             {filteredExams.map((exam) => (
               <div
                 key={exam.id}

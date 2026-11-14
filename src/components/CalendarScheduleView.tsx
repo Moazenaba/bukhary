@@ -365,7 +365,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        <div className="flex flex-wrap items-center gap-2 pb-1">
           {quickDates.map((q) => {
             const isSelected = selectedDateStr === q.dateStr;
             const dayTasksCount = tasksByDate[q.dateStr]?.length || 0;

@@ -55,9 +55,84 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   const myAssignedCommittees = Array.isArray(scope) ? committees.filter((c) => scope.includes(c.id)) : [];
 
   return (
-    <div className="space-y-6 text-right">
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 text-right items-start">
+      {/* What needs attention now comes first (the right column on a wide screen, the top on a narrow one). */}
+      <div className="xl:col-span-1 xl:order-1 space-y-6 min-w-0">
       <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenDetails} />
       <OverduePanel items={overdue} overdueDays={settings.overdue_days} onOpen={onOpenDetails} onShowAll={() => onNavigateCommittees('late')} />
+
+      {/* Quick Friday 10/2 Deliverables Spotlight Card */}
+      <div className="bg-white rounded-2xl p-5 border border-emerald-300 bg-gradient-to-l from-emerald-50/50 via-teal-50/30 to-white shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
+          <div className="flex items-center gap-2.5">
+            <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold">
+              <span className="material-symbols-outlined text-xl">calendar_today</span>
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm sm:text-base text-ink">
+                  تسليمات وأعمال اليوم بمسجد البخاري:
+                </h3>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
+                  {todayTasks.length} أعمال مقررة
+                </span>
+              </div>
+              <p className="text-xs text-muted">
+                مواعيد انعقاد اللجان الميدانية، تسليم كراسات الأسئلة، واستلام دفاتر التصحيح
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab('calendar')}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-success text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <span>فتح التقويم والكاليندر بالكامل</span>
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-3">
+          {todayTasks.slice(0, 4).map((task) => (
+            <div
+              key={task.id}
+              onClick={() => onNavigateTab('calendar')}
+              className={`p-3 rounded-xl border text-xs transition-all cursor-pointer hover:shadow-xs space-y-1.5 ${
+                task.completed
+                  ? 'bg-emerald-50/60 border-emerald-200'
+                  : task.priority === 'urgent'
+                  ? 'bg-red-50/50 border-red-200 hover:border-red-300'
+                  : 'bg-white border-gray-200'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs text-gray-500 font-bold">⏰ {task.time || 'صباحاً'}</span>
+                <span
+                  className={`text-xs px-1.5 py-0.2 rounded font-bold ${
+                    task.completed
+                      ? 'bg-emerald-200 text-emerald-900'
+                      : task.priority === 'urgent'
+                      ? 'bg-red-200 text-red-900'
+                      : 'bg-blue-100 text-blue-900'
+                  }`}
+                >
+                  {task.completed ? '✓ تم' : 'عاجل'}
+                </span>
+              </div>
+              <h4 className="font-bold text-xs text-ink line-clamp-1">{task.title}</h4>
+              {task.deliverable && (
+                <p className="text-xs text-brand font-semibold truncate">
+                  📦 {task.deliverable}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      </div>
+      <div className="xl:col-span-2 xl:order-2 space-y-6 min-w-0">
       {/* Welcome Banner tailored to User Role */}
       <div className="bg-gradient-to-l from-brand via-[#0f766e] to-brand rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-2xl">
@@ -134,76 +209,6 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Friday 10/2 Deliverables Spotlight Card */}
-      <div className="bg-white rounded-2xl p-5 border border-emerald-300 bg-gradient-to-l from-emerald-50/50 via-teal-50/30 to-white shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-xl">calendar_today</span>
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-ink">
-                  تسليمات وأعمال اليوم بمسجد البخاري:
-                </h3>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
-                  {todayTasks.length} أعمال مقررة
-                </span>
-              </div>
-              <p className="text-xs text-muted">
-                مواعيد انعقاد اللجان الميدانية، تسليم كراسات الأسئلة، واستلام دفاتر التصحيح
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigateTab('calendar')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-success text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-          >
-            <span>فتح التقويم والكاليندر بالكامل</span>
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {todayTasks.slice(0, 4).map((task) => (
-            <div
-              key={task.id}
-              onClick={() => onNavigateTab('calendar')}
-              className={`p-3 rounded-xl border text-xs transition-all cursor-pointer hover:shadow-xs space-y-1.5 ${
-                task.completed
-                  ? 'bg-emerald-50/60 border-emerald-200'
-                  : task.priority === 'urgent'
-                  ? 'bg-red-50/50 border-red-200 hover:border-red-300'
-                  : 'bg-white border-gray-200'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-gray-500 font-bold">⏰ {task.time || 'صباحاً'}</span>
-                <span
-                  className={`text-xs px-1.5 py-0.2 rounded font-bold ${
-                    task.completed
-                      ? 'bg-emerald-200 text-emerald-900'
-                      : task.priority === 'urgent'
-                      ? 'bg-red-200 text-red-900'
-                      : 'bg-blue-100 text-blue-900'
-                  }`}
-                >
-                  {task.completed ? '✓ تم' : 'عاجل'}
-                </span>
-              </div>
-              <h4 className="font-bold text-xs text-ink line-clamp-1">{task.title}</h4>
-              {task.deliverable && (
-                <p className="text-xs text-brand font-semibold truncate">
-                  📦 {task.deliverable}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Courses & Rounds Summary Bar */}
       {courses.length > 0 && (
         <div className="bg-white rounded-2xl p-5 border border-line/50 shadow-xs">
@@ -224,7 +229,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3 gap-3 text-xs">
             {courses.map((c) => {
               const count = allCommittees.filter((comm) => comm.courseId === c.id).length;
               return (
@@ -260,7 +265,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       )}
 
       {/* 4 Quick Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4 gap-4">
         <div
           onClick={() => onNavigateCommittees('registration')}
           className="bg-white p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
@@ -343,7 +348,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
           {committees.slice(0, 3).map((comm) => {
             const status = calculateCurrentStage(comm.stages);
             return (
@@ -376,6 +381,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );
