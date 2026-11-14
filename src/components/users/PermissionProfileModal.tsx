@@ -52,7 +52,7 @@ export const PermissionProfileModal: React.FC<{
 
   return (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl border border-teal-200 overflow-hidden animate-in fade-in">
+          <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl border border-teal-200 max-h-[92vh] overflow-y-auto animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-teal-700 to-teal-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold">

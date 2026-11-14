@@ -42,7 +42,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="إضافة كتاب" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 max-h-[92vh] overflow-y-auto animate-in fade-in duration-150">
         {/* Header with warm Amber/Gold scholar styling */}
         <div className="px-5 py-4 bg-gradient-to-l from-amber-50 to-amber-100/60 border-b border-amber-200/60 flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-amber-900">

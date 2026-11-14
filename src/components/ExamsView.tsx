@@ -345,7 +345,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                         <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
                       </span>
                       <div className="text-right">
-                        <span className="font-bold text-xs text-emerald-950 block truncate max-w-[200px]">
+                        <span title={exam.hasFile ? exam.pdfFileName : undefined} className="font-bold text-xs text-emerald-950 block truncate max-w-[200px]">
                           {exam.hasFile ? exam.pdfFileName : 'لم يُرفع ملف أسئلة بعد'}
                         </span>
                         <span className="text-xs text-emerald-700">
@@ -527,7 +527,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       {/* PDF View Modal */}
       {viewingExam && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-line/50 text-right animate-in fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl max-h-[92vh] overflow-y-auto border border-line/50 text-right animate-in fade-in">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-line/30">
               <div className="flex items-center gap-2 text-brand">
                 <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>

@@ -1066,7 +1066,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* ASSIGN PROFILE QUICK MODAL */}
       {assigningProfileUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
-          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-teal-200 p-6 space-y-4 animate-in fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto border border-teal-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
                 <h3 className="font-black text-base text-slate-900">
@@ -1113,7 +1113,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* APPROVE APPLICANT MODAL */}
       {approvingUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
@@ -1242,7 +1242,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* DEMOTE SUPER ADMIN: the new role is chosen, not assumed (WEB-14) */}
       {demotingUser && (
         <div role="dialog" aria-modal="true" aria-labelledby="demote-title" className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 text-right">
-          <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4">
+          <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto border border-rose-200 p-6 space-y-4">
             <h3 id="demote-title" className="font-black text-base text-slate-900">تنزيل {demotingUser.name} من المشرف العام</h3>
             <label className="block text-xs font-bold text-slate-700">
               الدور الجديد
@@ -1275,7 +1275,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* SCHEDULE INTERVIEW MODAL */}
       {interviewingUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
-          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-in fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto border border-slate-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-2">
                 <span className="material-symbols-outlined text-blue-600">event</span>
@@ -1335,7 +1335,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* REJECTION MODAL */}
       {rejectingUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
-          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4 animate-in fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto border border-rose-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-black text-sm sm:text-base text-rose-950 flex items-center gap-2">
                 <span className="material-symbols-outlined text-rose-600">person_cancel</span>
@@ -1383,7 +1383,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* FULL APPLICANT DOSSIER MODAL */}
       {dossierUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-slate-900 to-slate-800 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-black text-base">ملف وسيرة المتقدم: {dossierUser.name}</h3>
@@ -1452,7 +1452,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* DIRECT ADD USER MODAL */}
       {isAddModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
@@ -1596,7 +1596,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* EDIT USER MODAL */}
       {editingUser && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto animate-in fade-in">
             <div className="p-5 bg-gradient-to-l from-slate-100 to-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-black text-base text-slate-900">تعديل بيانات وصلاحيات: {editingUser.name}</h3>
               <button
@@ -1800,7 +1800,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
       {/* DELETE CONFIRMATION MODAL */}
       {userToDelete && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 text-right">
-          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-rose-200 p-6 space-y-4 animate-in fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto border border-rose-200 p-6 space-y-4 animate-in fade-in">
             <div className="flex items-center gap-3 border-b border-rose-100 pb-3">
               <span className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold">
                 <span className="material-symbols-outlined">delete_forever</span>

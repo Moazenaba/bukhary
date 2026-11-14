@@ -39,7 +39,7 @@ export const NotificationComposer: React.FC<NotificationComposerProps> = ({ comm
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 text-right" role="dialog" aria-modal="true" aria-labelledby="composer-title">
-      <form onSubmit={submit} className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-line/50 p-5 space-y-3">
+      <form onSubmit={submit} className="bg-white w-full max-w-md rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto border border-line/50 p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 id="composer-title" className="font-bold text-sm text-ink">إرسال تنبيه للجميع</h3>
           <button type="button" onClick={onClose} aria-label="إغلاق" className="w-8 h-8 rounded-lg text-muted hover:text-ink cursor-pointer">

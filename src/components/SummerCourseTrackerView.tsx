@@ -1496,7 +1496,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       {/* Modals */}
       {isOcrOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 overflow-y-auto" role="dialog" aria-modal="true" aria-label="استخراج كشف من صورة">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-4 relative">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto p-4 relative">
             <button
               type="button"
               onClick={() => setIsOcrOpen(false)}

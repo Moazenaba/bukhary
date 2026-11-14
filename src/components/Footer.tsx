@@ -44,7 +44,7 @@ export const Footer: React.FC = () => {
       {/* Info Modals */}
       {modalContent && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-line/40 text-right animate-in fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[92vh] overflow-y-auto border border-line/40 text-right animate-in fade-in">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-line/30">
               <h3 className="font-bold text-base text-brand">
                 {modalContent === 'guide'

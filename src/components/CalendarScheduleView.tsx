@@ -821,7 +821,7 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
       {/* ADD TASK MODAL */}
       {isAddModalOpen && (
         <div role="dialog" aria-modal="true" aria-label="نافذة" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-line/50 max-h-[92vh] overflow-y-auto animate-in fade-in duration-150">
             <div className="px-5 py-4 bg-gradient-to-l from-emerald-50 to-tint border-b border-line/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center font-bold shadow-xs">
