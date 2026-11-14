@@ -1,8 +1,8 @@
 {
-  "versionCode": 12,
-  "versionName": "1.1.10",
-  "apk": "app/Bukhari-1.1.10.apk",
-  "sha256": "d84822e843f370dcae8c207219fb097b1d91ca1ce1efef7342f61c78fa60819a",
-  "size": 3334294,
-  "notes": "كمنكمن"
+  "versionCode": 13,
+  "versionName": "1.1.13",
+  "apk": "app/Bukhari-1.1.13.apk",
+  "sha256": "883cc47e70fcd0cb6c291cab7a26c989c681f6c4f0a65efdfdb3655700977280",
+  "size": 3350678,
+  "notes": "واجهة أدمن أوضح (شرائح تلف، تبويبات ظاهرة، المطلوب الآن بالأحمر)، واجهة مبسطة اختيارية للشيخ ورئيس اللجنة، وإشعار عند التحديث"
 }
