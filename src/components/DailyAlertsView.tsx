@@ -332,7 +332,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
         </div>
 
         {/* Quick Days Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-1.5 pb-1">
           {quickDays.map((q) => {
             const countOnDay = tasks.filter((t) => t.date === q.dateStr).length;
             const isSelected = viewMode === 'selected_day' && selectedDate === q.dateStr;
@@ -477,7 +477,7 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
         </div>
 
         {/* Status Filters */}
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setStatusFilter('all')}

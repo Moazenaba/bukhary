@@ -1,4 +1,5 @@
 import React from 'react';
+import { TableScroll } from './ui/TableScroll';
 import type { Committee, Course } from '../types';
 import { compareCourses, groupBy, type GroupRow } from '../utils/statsBreakdown';
 
@@ -9,7 +10,7 @@ function Table({ title, rows, nameLabel, highlight }: { title: string; rows: Gro
       {rows.length === 0 ? (
         <p className="text-xs text-muted">لا توجد بيانات بعد.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <TableScroll label={title}>
           <table className="w-full text-xs text-right">
             <thead>
               <tr className="text-slate-500 border-b border-line/60">
@@ -36,7 +37,7 @@ function Table({ title, rows, nameLabel, highlight }: { title: string; rows: Gro
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
     </section>
   );

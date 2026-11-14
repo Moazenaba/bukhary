@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { DATA_ROOT_KEY } from '../data/queries';
 import { AuditLogEntry, DataService } from '../services/DataService';
 import { errorMessage } from '../services/api';
+import { TableScroll } from './ui/TableScroll';
 
 const PAGE = 100;
 
@@ -61,7 +62,7 @@ export const AuditLogView: React.FC = () => {
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto bg-white rounded-2xl border border-line/40">
+        <TableScroll label="سجل التدقيق" className="bg-white rounded-2xl border border-line/40">
           <table className="w-full text-xs">
             <thead className="bg-canvas text-ink-soft">
               <tr>
@@ -79,12 +80,12 @@ export const AuditLogView: React.FC = () => {
                   <td className="p-2.5">{r.user}<span className="text-muted"> ({r.role})</span></td>
                   <td className="p-2.5 font-mono" dir="ltr">{r.action}</td>
                   <td className="p-2.5 font-mono text-muted" dir="ltr">{r.entity ? `${r.entity}:${r.entityId ?? ''}` : '—'}</td>
-                  <td className="p-2.5 text-ink-soft">{r.details || '—'}</td>
+                  <td className="p-2.5 text-ink-soft break-words min-w-[14rem]">{r.details || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
 
       {query.hasNextPage && (

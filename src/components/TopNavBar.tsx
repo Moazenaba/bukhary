@@ -124,12 +124,26 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
         {/* Left: Actions Cluster */}
         <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* New Committee Button (Visible to super_admin or user with add_new_committee permission) */}
+          {AuthService.can('committees.create') && (
+            <button
+              onClick={onOpenNewCommittee}
+              // Phones use the floating «+ لجنة» button instead (MobileBottomNav).
+              className="hidden md:inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-sm font-black hover:bg-brand shadow-md ring-2 ring-brand/20 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">add_circle</span>
+              <span>إضافة لجنة</span>
+            </button>
+          )}
+
+
+          <span aria-hidden="true" className="hidden md:block w-px h-6 bg-line/70" />
           {/* Database status (super admins only) */}
           {onOpenDatabaseModal && (
             <button
               type="button"
               onClick={onOpenDatabaseModal}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 text-emerald-800 text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300/80 text-emerald-800 text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
               title="حالة قاعدة البيانات"
             >
               <span className="material-symbols-outlined text-sm">database</span>
@@ -182,18 +196,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             >
               <span className="material-symbols-outlined text-base">logout</span>
               <span className="hidden sm:inline">تسجيل الخروج</span>
-            </button>
-          )}
-
-          {/* New Committee Button (Visible to super_admin or user with add_new_committee permission) */}
-          {AuthService.can('committees.create') && (
-            <button
-              onClick={onOpenNewCommittee}
-              // Phones use the floating «+ لجنة» button instead (MobileBottomNav).
-              className="hidden lg:inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#0f766e] text-white text-xs sm:text-[13px] font-bold hover:bg-brand shadow-xs active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base">add_circle</span>
-              <span>إضافة لجنة</span>
             </button>
           )}
 
