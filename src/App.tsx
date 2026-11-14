@@ -98,7 +98,8 @@ export default function App() {
     } catch {
       // ignore
     }
-    return true;
+    // A small laptop window starts with the menu closed so the content gets the width.
+    return typeof window === 'undefined' || window.innerWidth >= 1280;
   });
 
   const handleToggleSidebar = () => {
@@ -726,7 +727,7 @@ export default function App() {
       />
 
       {/* 2. Main Content Canvas */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden transition-all duration-300">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen max-lg:overflow-x-hidden transition-all duration-300">
         {/* Top Header */}
         <TopNavBar
           currentUser={currentUser}
@@ -757,7 +758,7 @@ export default function App() {
         />
 
         {/* Tab Views */}
-        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24 lg:pb-8">
+        <main className="flex-1 w-full min-w-0 max-w-[2200px] mx-auto px-3 sm:px-6 lg:px-6 2xl:px-10 py-5 sm:py-8 pb-24 lg:pb-8">
           <Suspense fallback={<div role="status" aria-live="polite" className="py-16 text-center text-sm text-muted">جاري التحميل…</div>}>
           {isLoadingDatabase && (
             <div role="status" className="mb-4 rounded-xl bg-[#dce9ff]/60 text-ink text-sm px-4 py-3">
@@ -1022,7 +1023,7 @@ export default function App() {
 
               {/* Committees Grid */}
               {paginatedCommittees.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-6">
                   {paginatedCommittees.map((committee) => (
                     <CommitteeCard
                       key={committee.id}

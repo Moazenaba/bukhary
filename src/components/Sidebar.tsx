@@ -170,23 +170,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Floating Toggle Button when Desktop Sidebar is closed */}
-      {!isOpenDesktop && (
-        <button
-          onClick={onToggleSidebar}
-          className="hidden lg:flex fixed top-20 right-0 z-40 items-center gap-2 px-3 py-2.5 bg-brand hover:bg-brand-deep text-white rounded-l-2xl shadow-xl transition-all hover:pr-4 cursor-pointer font-bold text-xs border border-white/20 active:scale-95 animate-fadeIn"
-          title="فتح القائمة الجانبية (Slide bar)"
-        >
-          <span className="material-symbols-outlined text-lg">menu_open</span>
-          <span>القائمة الجانبية</span>
-        </button>
-      )}
-
       {/* Sidebar Container */}
       <aside
         className={`fixed lg:sticky top-0 right-0 h-screen bg-white text-slate-800 border-l border-slate-200/90 flex flex-col z-50 transition-all duration-300 ease-in-out text-right shadow-2xl lg:shadow-none ${
           isOpenDesktop
-            ? 'lg:w-64 sm:lg:w-72 lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto'
+            ? 'lg:w-60 2xl:w-64 lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto'
             : 'lg:w-0 lg:overflow-hidden lg:border-none lg:opacity-0 lg:pointer-events-none'
         } ${
           isOpenMobile
