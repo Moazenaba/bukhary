@@ -1,8 +1,8 @@
 {
-  "versionCode": 15,
-  "versionName": "1.1.15",
-  "apk": "app/Bukhari-1.1.15.apk",
-  "sha256": "a2f8450eecb89e46629285cc7b3bfaec83e8c354f2d6ea128c29794b07ac159f",
-  "size": 3350678,
-  "notes": "شاشة «تحديث التطبيق» تقول لو في تحديث وليه ما اتثبّتش، وتحدّث بضغطة، وشريط يعلن عن التحديث"
+  "versionCode": 16,
+  "versionName": "1.1.16",
+  "apk": "app/Bukhari-1.1.16.apk",
+  "sha256": "e32924b3109ffbe44bba99cf7cc3ee9209ad270266e5151ce2f45409483ccaf5",
+  "size": 3350674,
+  "notes": "اهلا بكم 3"
 }
