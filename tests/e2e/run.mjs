@@ -61,6 +61,9 @@ async function openCeremonyTools(page) {
   if (!(await tools.evaluate((d) => d.open))) await page.getByText('تصدير وطباعة كشوف الحفلات').click();
 }
 
+/** The content must keep at least this much of the screen: the width minus the rail and small margins. */
+const innerWidthFor = (w) => w - 70;
+
 /** Opens a screen and waits for the app to settle. */
 async function open(page, tab) {
   await page.goto(`${BASE}/#${tab}`);
@@ -331,6 +334,34 @@ await test('the phone has one slim top bar and a side rail whose buttons open th
   });
   assert.equal(overlap, false);
 });
+
+for (const [w, h] of [[360, 780], [412, 915]]) {
+  await test(`phone ${w}px: the content has room, text is readable and nothing scrolls sideways`, async () => {
+    await mobile.setViewportSize({ width: w, height: h });
+    for (const tab of ['home', 'committees', 'summer_course', 'assistants', 'ceremonies']) {
+      await open(mobile, tab);
+      const m = await mobile.evaluate(() => {
+        const main = document.querySelector('main');
+        const cs = getComputedStyle(main);
+        const content = main.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        let tiny = 0;
+        for (const e of document.querySelectorAll('main *, header *')) {
+          if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+          const r = e.getBoundingClientRect();
+          if (r.width && r.height && parseFloat(getComputedStyle(e).fontSize) < 12) tiny++;
+        }
+        const rail = document.querySelector('nav[aria-label="التنقل بين الصفحات"]').getBoundingClientRect().width;
+        return { content, tiny, rail, header: document.querySelector('header').getBoundingClientRect().height, scroll: document.documentElement.scrollWidth };
+      });
+      assert.ok(m.content >= innerWidthFor(w) , `${tab}@${w}: content is only ${m.content}px wide`);
+      assert.equal(m.tiny, 0, `${tab}@${w}: ${m.tiny} text elements are under 12px`);
+      assert.ok(m.rail <= 49, `${tab}@${w}: rail is ${m.rail}px`);
+      assert.ok(m.header <= 52, `${tab}@${w}: top bar is ${m.header}px tall`);
+      assert.ok(m.scroll <= w + 1, `${tab}@${w}: page is ${m.scroll}px wide`);
+    }
+  });
+}
+await mobile.setViewportSize({ width: 412, height: 915 });
 
 await test('«إضافة لجنة» on the committees page opens the add-committee form on the phone, and a committee can be added', async () => {
   await open(mobile, 'committees');
