@@ -11,6 +11,7 @@ import { auditLogsRouter, databaseRouter, ocrRouter } from './routes/admin.ts';
 import { syncRouter } from './routes/sync.ts';
 import { systemSettingsRouter } from './routes/systemSettings.ts';
 import { authRouter } from './routes/authRoutes.ts';
+import { assignmentsRouter } from './routes/assignments.ts';
 import { committeesRouter } from './routes/committees.ts';
 import { coursesRouter } from './routes/courses.ts';
 import { examsRouter } from './routes/exams.ts';
@@ -86,6 +87,7 @@ export function createApp(config: AppConfig, pool: Pool) {
   const authed = [authenticate(config, pool), idempotency(pool)];
   app.use('/api/courses', authed, coursesRouter(pool));
   app.use('/api/committees', authed, committeesRouter(pool, config));
+  app.use('/api/assignments', authed, assignmentsRouter(pool));
   app.use('/api/users', authed, usersRouter(pool, { strictPermissionIds: config.strictPermissionIds }));
   app.use('/api/exams', authed, examsRouter(pool));
   app.use('/api/tasks', authed, tasksRouter(pool));

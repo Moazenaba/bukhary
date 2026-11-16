@@ -117,7 +117,10 @@ export const PRINCIPAL_COLUMNS = `
   u.id, u.name, u.role, u.status, u.permissions, u.assigned_committee_ids, u.all_committees,
   u.all_exams, u.allowed_exam_ids, u.must_change_password, u.token_version,
   COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
-            WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb) AS assigned_numbers`;
+            WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb) AS assigned_numbers,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'committeeId', a.committee_id, 'task', a.task, 'book', COALESCE(c.competition_book, '')))
+            FROM committee_assignments a JOIN committees c ON c.id = a.committee_id
+            WHERE a.user_id = u.id AND a.status = 'active' AND (a.ends_on IS NULL OR a.ends_on + 1 >= CURRENT_DATE)), '[]'::jsonb) AS observing`;
 
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
@@ -136,6 +139,7 @@ export function toPrincipal(row: any): Principal {
     allExams: Boolean(row.all_exams),
     allowedExamIds: asStrings(row.allowed_exam_ids),
     mustChangePassword: Boolean(row.must_change_password),
+    observing: Array.isArray(row.observing) ? row.observing : [],
   };
 }
 

@@ -19,6 +19,7 @@ const EXPECTED: Record<Action, [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1]> = {
   'committees.update':    [1, 1, 1, 0, 0],
   'committees.delete':    [1, 0, 1, 0, 0],
   'committees.members':   [1, 1, 1, 0, 0],
+  'assignments.manage':   [1, 1, 1, 0, 0],
   'committees.reception': [1, 1, 1, 0, 0],
   'committees.scoring':   [1, 1, 1, 0, 0],
   'committees.finalize':  [1, 1, 1, 0, 0],
