@@ -490,3 +490,32 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   overdue_days: 3,
   font_family: 'ibm-plex-sans-arabic',
 };
+
+/**
+ * An extra job given to a person on top of their role (they stay a sheikh): observing another
+ * committee's exam or following its ceremony. Read-only powers inside that committee, for a limited time.
+ */
+export type AssignmentTask = 'exam' | 'ceremony';
+export type AssignmentStatus = 'active' | 'ended' | 'cancelled';
+export interface CommitteeAssignment {
+  id: string;
+  userId: string;
+  userName: string;
+  committeeId: string;
+  committeeNumber: number;
+  committeeName: string;
+  kind: 'observer';
+  task: AssignmentTask;
+  status: AssignmentStatus;
+  startsOn: string;
+  endsOn: string;
+  assignedBy: string;
+  createdAt: string;
+  endedAt?: string;
+}
+export interface AssignmentNote {
+  id: string;
+  note: string;
+  by: string;
+  at: string;
+}
