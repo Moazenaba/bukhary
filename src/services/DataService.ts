@@ -119,6 +119,20 @@ export const DataService = {
   setCeremonyAttendees: async (id: string, change: { add?: string[]; remove?: string[] }) =>
     (await api<{ committee: Committee }>(`/committees/${enc(id)}/ceremony-attendees`, { method: 'POST', body: change })).committee,
 
+  // ---- Extra assignments («مراقب») ----
+  getAssignments: async (filter: { committeeId?: string; userId?: string } = {}) => {
+    const q = new URLSearchParams(filter as Record<string, string>).toString();
+    return (await api<{ assignments: import('../types').CommitteeAssignment[] }>(`/assignments${q ? `?${q}` : ''}`)).assignments;
+  },
+  createAssignment: async (body: { userId: string; committeeId: string; task: import('../types').AssignmentTask; startsOn?: string; endsOn?: string }) =>
+    (await api<{ assignment: import('../types').CommitteeAssignment }>('/assignments', { method: 'POST', body })).assignment,
+  /** «ended» is a normal finish, «cancelled» withdraws it; both stop the powers at once and keep the history. */
+  finishAssignment: async (id: string, how: 'end' | 'cancel') =>
+    (await api<{ assignment: import('../types').CommitteeAssignment }>(`/assignments/${enc(id)}/${how}`, { method: 'POST' })).assignment,
+  getObservations: async (assignmentId: string) =>
+    (await api<{ observations: import('../types').AssignmentNote[] }>(`/assignments/${enc(assignmentId)}/observations`)).observations,
+  addObservation: (assignmentId: string, note: string) => api(`/assignments/${enc(assignmentId)}/observations`, { method: 'POST', body: { note } }),
+
   // ---- Courses ----
   getCourses: async () => (await api<{ courses: Course[] }>('/courses')).courses,
   saveCourse: async (c: Course) => (await api<{ course: Course }>('/courses', { method: 'POST', body: c })).course,

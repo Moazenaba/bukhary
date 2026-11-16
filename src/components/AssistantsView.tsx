@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { UserAssignmentsPanel } from './Assignments';
 import {
   AppUser,
   AssistantPermission,
@@ -691,6 +692,10 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {(user.role === 'sheikh' || user.role === 'committee_head') && (
+                    <UserAssignmentsPanel userId={user.id} roleLabel={AuthService.getRoleLabel(user.role)} />
+                  )}
 
                   {/* Committees and ceremonies this person is placed on (sheikhs and committee heads) */}
                   {(user.role === 'sheikh' || user.role === 'committee_head') && (

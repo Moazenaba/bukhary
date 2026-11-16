@@ -16,6 +16,8 @@ export interface ServerPermissions {
   exams?: string[] | 'all';
   /** Roles this user may give to other accounts (admins never get admin roles). */
   grantableRoles?: UserRole[];
+  /** Extra assignments (read-only powers on other committees); the server enforces them. */
+  observing?: { id: string; committeeId: string; task: 'exam' | 'ceremony' }[];
   mustChangePassword?: boolean;
 }
 
@@ -340,6 +342,12 @@ class AuthServiceClass {
     if (!scope) return false;
     if (scope === 'all') return true;
     return scope.includes(typeof committee === 'string' ? committee : committee.id);
+  }
+
+  /** The user's active «مراقب» assignments on this committee (empty when none). */
+  public observingOn(committee: Pick<Committee, 'id'> | string) {
+    const id = typeof committee === 'string' ? committee : committee.id;
+    return (this.permissions?.observing ?? []).filter((o) => o.committeeId === id);
   }
 
   /** `action` is allowed and the committee is in scope: what the server will accept. */
