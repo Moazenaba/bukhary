@@ -130,6 +130,20 @@ describe('committee heads', () => {
     expect((await t.api().get('/api/committees').set(sheikh.auth)).body.committees).toEqual([]);
   });
 
+  it('a sheikh sees the committee head\'s phone on their committee, and no other sheikh\'s phone', async () => {
+    const c = await committee(40);
+    const head = await userWithToken(t, { role: 'committee_head', name: 'رئيس اللجنة', phone: '01011112222', committeeIds: [c.id] });
+    const sheikh = await userWithToken(t, { role: 'sheikh', name: 'الشيخ الأول', phone: '01033334444', committeeIds: [c.id] });
+    const coSheikh = await userWithToken(t, { role: 'sheikh', name: 'الشيخ الثاني', phone: '01055556666', committeeIds: [c.id] });
+
+    const seen = (await t.api().get('/api/committees').set(sheikh.auth)).body.committees.find((x: any) => x.id === c.id);
+    const byId = Object.fromEntries(seen.staff.map((p: any) => [p.id, p]));
+    expect(byId[head.id]).toMatchObject({ name: 'رئيس اللجنة', role: 'committee_head', phone: expect.stringMatching(/1011112222$/) });
+    expect(byId[sheikh.id]).not.toHaveProperty('phone');
+    expect(byId[coSheikh.id]).not.toHaveProperty('phone');
+    expect(JSON.stringify(seen)).not.toContain('1055556666');
+  });
+
   it('an admin places committee heads on a committee too', async () => {
     const c = await committee(12);
     const head = await userWithToken(t, { role: 'committee_head' });
