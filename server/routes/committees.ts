@@ -111,15 +111,21 @@ interface Person {
   id: string;
   name: string;
   role?: string;
+  /** Only a committee head's phone is sent (see presenterFor), so the sheikhs of a committee know whom to call there. */
+  phone?: string;
 }
 
 /**
  * Committees as `user` may see them: each lists its staff (committee heads and sheikhs assigned to
  * it), and admin accounts are hidden from everyone but super admins, also among ceremony attendees.
+ *
+ * A committee head's entry carries his phone: the sheikhs on that committee are told to call him when
+ * they arrive (product decision). Sheikhs' own phones are never added, and a head without a phone
+ * simply has no `phone` key.
  */
 async function presenterFor(db: Queryable, user: Principal) {
   const { rows } = await db.query(
-    `SELECT id, name, role, assigned_committee_ids FROM app_users
+    `SELECT id, name, role, phone, assigned_committee_ids FROM app_users
      WHERE status = 'approved' AND (role IN ('super_admin', 'admin') OR jsonb_array_length(assigned_committee_ids) > 0)
      ORDER BY name ASC;`
   );
@@ -129,7 +135,7 @@ async function presenterFor(db: Queryable, user: Principal) {
     if (!isScopedRole(r.role)) continue;
     for (const cid of Array.isArray(r.assigned_committee_ids) ? r.assigned_committee_ids : []) {
       const list = staffBy.get(cid) ?? [];
-      list.push({ id: r.id, name: r.name, role: r.role });
+      list.push({ id: r.id, name: r.name, role: r.role, ...(r.role === 'committee_head' && r.phone ? { phone: r.phone } : {}) });
       staffBy.set(cid, list);
     }
   }

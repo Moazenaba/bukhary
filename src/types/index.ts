@@ -171,6 +171,8 @@ export interface CommitteeStaff {
   id: string;
   name: string;
   role: UserRole;
+  /** Only a committee head's phone is sent, so a committee's sheikhs know whom to call there. */
+  phone?: string;
 }
 
 export interface Committee {
