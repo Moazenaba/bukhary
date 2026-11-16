@@ -758,7 +758,7 @@ export default function App() {
         />
 
         {/* Tab Views */}
-        <main className="flex-1 w-full min-w-0 max-w-[2200px] mx-auto pl-3 pr-[4.75rem] sm:pl-6 sm:pr-[5.5rem] lg:px-6 2xl:px-10 py-4 sm:py-8 lg:pb-8">
+        <main className="flex-1 w-full min-w-0 max-w-[2200px] mx-auto pl-2.5 pr-14 sm:pl-6 sm:pr-[5.5rem] lg:px-6 2xl:px-10 py-3 sm:py-8 lg:pb-8">
           <Suspense fallback={<div role="status" aria-live="polite" className="py-16 text-center text-sm text-muted">جاري التحميل…</div>}>
           {isLoadingDatabase && (
             <div role="status" className="mb-4 rounded-xl bg-[#dce9ff]/60 text-ink text-sm px-4 py-3">

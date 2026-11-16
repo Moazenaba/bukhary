@@ -197,12 +197,12 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       )}
 
       {/* 4 Quick Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4 gap-2 sm:gap-4">
         <div
           onClick={() => onNavigateCommittees('registration')}
-          className="bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="max-sm:flex max-sm:flex-row-reverse max-sm:items-center max-sm:justify-between max-sm:gap-3 bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
+          <div className="flex items-center justify-between sm:mb-2">
             <span className="max-sm:hidden w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
               🟦
             </span>
@@ -216,9 +216,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
         <div
           onClick={() => onNavigateCommittees('exam')}
-          className="bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="max-sm:flex max-sm:flex-row-reverse max-sm:items-center max-sm:justify-between max-sm:gap-3 bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
+          <div className="flex items-center justify-between sm:mb-2">
             <span className="max-sm:hidden w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
               🟠
             </span>
@@ -232,9 +232,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
         <div
           onClick={() => onNavigateCommittees('ceremony')}
-          className="bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-emerald-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="max-sm:flex max-sm:flex-row-reverse max-sm:items-center max-sm:justify-between max-sm:gap-3 bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-emerald-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
+          <div className="flex items-center justify-between sm:mb-2">
             <span className="max-sm:hidden w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
               🟢
             </span>
@@ -250,7 +250,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           onClick={() => onNavigateCommittees()}
           className="max-sm:hidden bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-brand shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
+          <div className="flex items-center justify-between sm:mb-2">
             <span className="max-sm:hidden w-10 h-10 rounded-xl bg-tint text-brand flex items-center justify-center font-bold">
               <span className="material-symbols-outlined">menu_book</span>
             </span>

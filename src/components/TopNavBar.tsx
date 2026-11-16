@@ -69,7 +69,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   return (
     <header className="bg-white border-b border-line/50 shadow-xs sticky top-0 z-30">
       {/* A phone gets one slim row: name, course, bell, account. Pages are in the side rail; the rest is in the account window. */}
-      <div className="w-full px-3 sm:px-6 h-14 sm:h-auto sm:py-2.5 flex flex-nowrap sm:flex-wrap items-center justify-between gap-x-2 gap-y-2 mx-auto">
+      <div className="w-full px-3 sm:px-6 h-12 sm:h-auto sm:py-2.5 flex flex-nowrap sm:flex-wrap items-center justify-between gap-x-2 gap-y-2 mx-auto">
         {/* Right: Toggle button for sidebar (desktop & mobile) + Title */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
