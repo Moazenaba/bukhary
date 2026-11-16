@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { headOf, mapsUrl } from '../utils/logistics';
 import * as XLSX from 'xlsx';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { toast } from './Toasts';
@@ -599,6 +600,38 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
               <span className="font-bold text-ink">
                 {sheikhCountry || 'غير محدد'}
               </span>
+              {mapsUrl(sheikhCountry) && (
+                <a
+                  href={mapsUrl(sheikhCountry)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mr-2 text-brand font-bold hover:underline"
+                >
+                  افتح في الخرائط
+                </a>
+              )}
+            </div>
+
+            <div>
+              <span className="text-muted block font-semibold mb-0.5">رئيس اللجنة (للتواصل في المكان):</span>
+              {headOf(committee) ? (
+                <>
+                  <span className="font-bold text-ink">{headOf(committee)!.name}</span>
+                  {headOf(committee)!.phone ? (
+                    <a
+                      href={`tel:${headOf(committee)!.phone}`}
+                      className="mr-2 font-bold font-mono text-brand hover:underline"
+                      dir="ltr"
+                    >
+                      📞 {headOf(committee)!.phone}
+                    </a>
+                  ) : (
+                    <span className="mr-2 text-gray-400">لم يُسجل له رقم</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-gray-400">لسه ما اتسندش رئيس لجنة</span>
+              )}
             </div>
 
             <div className="sm:col-span-3 pt-2 border-t border-line/20">

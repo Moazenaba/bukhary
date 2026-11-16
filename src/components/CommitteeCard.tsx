@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { headOf } from '../utils/logistics';
 import { Committee, StageKey, STAGES_LIST, AppUser } from '../types';
 import { calculateCurrentStage } from '../utils/stageUtils';
 import { EXAM_DATE_TONE_CLASS, examDateStatus } from '../utils/examDate';
@@ -178,6 +179,25 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
                   </a>
                 )}
               </div>
+            </div>
+          )}
+
+          {headOf(committee) && (
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-slate-500 font-semibold">رئيس اللجنة:</span>
+              <span className="flex items-center gap-1.5 truncate">
+                <span className="font-bold text-brand truncate">{headOf(committee)!.name}</span>
+                {headOf(committee)!.phone && (
+                  <a
+                    href={`tel:${headOf(committee)!.phone}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-md font-bold shrink-0"
+                    title={`اتصال: ${headOf(committee)!.phone}`}
+                  >
+                    📞 اتصال
+                  </a>
+                )}
+              </span>
             </div>
           )}
 
