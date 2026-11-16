@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserAssignmentsPanel } from './Assignments';
+import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 import {
   AppUser,
   AssistantPermission,
@@ -385,53 +386,30 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
   return (
     <div className="space-y-6 text-right font-sans">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-l from-brand via-emerald-800 to-brand-deep rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <span className="p-2 rounded-2xl bg-white/20 text-white shadow-inner">
-              <span className="material-symbols-outlined text-2xl">admin_panel_settings</span>
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black tracking-wide">
-              نظام الصلاحيات والأدوار وإدارة الكوادر
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-emerald-100 max-w-2xl leading-relaxed">
-            التحكم المركزي في الصلاحيات والأدوار. يتيح للسوبر أدمن إنشاء أنظمة صلاحية مخصصة، تحديد الصفحات واللجان والامتحانات المتاحة لكل مستخدم بدقة متناهية.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          {canGrant && (
-            <button
-              onClick={handleOpenCreateProfile}
-              className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-amber-950 font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-lg">add_moderator</span>
-              <span>+ إنشاء نظام صلاحية جديد</span>
-            </button>
-          )}
-
-          {/* Creating accounts is the server's users.manage: admins, or a committee head given that permission. */}
-          {AuthService.canManageUsers() && (
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/30 transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-lg">person_add</span>
-              <span>+ إضافة مستخدم</span>
-            </button>
-          )}
-
-          <button
-            onClick={onOpenAuthModal}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-black/20 hover:bg-black/30 text-emerald-200 border border-emerald-400/30 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
-          >
-            <span className="material-symbols-outlined text-lg">account_circle</span>
-            <span>حسابي</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="badge"
+        title="المستخدمون"
+        subtitle={`${approvedUsers.length} معتمد${pendingRequests.length > 0 ? ` · ${pendingRequests.length} طلب انضمام جديد` : ''}${
+          isSuperAdmin ? ` · ${superAdminsCount} من 2 سوبر أدمن` : ''
+        }`}
+        actions={
+          <>
+            {/* Creating accounts is the server's users.manage: admins, or a committee head given that permission. */}
+            {AuthService.canManageUsers() && (
+              <button type="button" onClick={() => setIsAddModalOpen(true)} className={primaryAction}>
+                <span className="material-symbols-outlined text-lg">person_add</span>
+                <span>إضافة مستخدم</span>
+              </button>
+            )}
+            {canGrant && (
+              <button type="button" onClick={handleOpenCreateProfile} className={quietAction}>
+                <span className="material-symbols-outlined text-lg">add_moderator</span>
+                <span>نظام صلاحية جديد</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* Super Admin Alert Notification */}
       {superAdminAlert && (
@@ -446,87 +424,19 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
         </div>
       )}
 
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div
-          onClick={() => setActiveTab('approved')}
-          className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
-            activeTab === 'approved' ? 'border-brand ring-2 ring-emerald-200' : 'border-slate-200'
-          }`}
-        >
-          <div>
-            <span className="text-xs text-slate-500 block font-bold">المستخدمون المعتمدون</span>
-            <span className="text-2xl font-black text-emerald-800 font-mono">{approvedUsers.length}</span>
-          </div>
-          <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">group</span>
-          </span>
-        </div>
-
-        <div
-          onClick={() => setActiveTab('profiles')}
-          className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
-            activeTab === 'profiles' ? 'border-teal-600 ring-2 ring-teal-200 bg-teal-50/20' : 'border-slate-200'
-          }`}
-        >
-          <div>
-            <span className="text-xs text-teal-900 block font-bold">أنظمة الصلاحيات المخصصة</span>
-            <span className="text-2xl font-black text-teal-700 font-mono">{effectiveProfiles.length}</span>
-          </div>
-          <span className="w-11 h-11 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">tune</span>
-          </span>
-        </div>
-
-        <div
-          onClick={() => {
-            setActiveTab('requests');
-            setRequestsSubFilter('pending');
-          }}
-          className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
-            pendingRequests.length > 0 ? 'border-amber-400 bg-amber-50/40 ring-2 ring-amber-300' : 'border-slate-200'
-          }`}
-        >
-          <div>
-            <span className="text-xs text-amber-900 block font-bold">طلبات انضمام معلقة</span>
-            <span className="text-2xl font-black text-amber-600 font-mono">{pendingRequests.length}</span>
-          </div>
-          <span className="w-11 h-11 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">pending_actions</span>
-          </span>
-        </div>
-
-        {isSuperAdmin && (
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs">
-          <div>
-            <span className="text-xs text-slate-500 block font-bold">المشرفون العامون (سوبر أدمن)</span>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-2xl font-black text-slate-900 font-mono">{superAdminsCount}</span>
-              <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">
-                أقصى حد (2)
-              </span>
-            </div>
-          </div>
-          <span className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl">military_tech</span>
-          </span>
-        </div>
-        )}
-      </div>
-
       {/* Main Tabs Navigation Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5">
           <button
             onClick={() => setActiveTab('approved')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-11 px-2 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
               activeTab === 'approved'
                 ? 'bg-brand text-white shadow-sm'
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
             }`}
           >
             <span className="material-symbols-outlined text-base">manage_accounts</span>
-            <span>المستخدمون وتعيين الأدوار</span>
+            <span>المستخدمون</span>
             <span className="px-2 py-0.5 rounded-full text-xs bg-white/20 text-white font-mono">
               {approvedUsers.length}
             </span>
@@ -534,32 +444,32 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
 
           <button
             onClick={() => setActiveTab('profiles')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-11 px-2 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
               activeTab === 'profiles'
                 ? 'bg-teal-700 text-white shadow-sm'
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-teal-50'
             }`}
           >
             <span className="material-symbols-outlined text-base">tune</span>
-            <span>مركز بناء وتصميم أنظمة الصلاحيات</span>
+            <span>الأنظمة</span>
             <span className="px-2 py-0.5 rounded-full text-xs bg-teal-200 text-teal-950 font-mono font-bold">
-              {effectiveProfiles.length} نظام
+              {effectiveProfiles.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('requests')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-11 px-2 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
               activeTab === 'requests'
                 ? 'bg-amber-600 text-white shadow-sm'
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-amber-50'
             }`}
           >
             <span className="material-symbols-outlined text-base">how_to_reg</span>
-            <span>طلبات الانضمام والمقابلات</span>
+            <span>الطلبات</span>
             {pendingRequests.length > 0 && (
               <span className="px-2 py-0.5 rounded-full text-xs bg-amber-200 text-amber-950 font-mono font-black animate-pulse">
-                {pendingRequests.length} جديد
+                {pendingRequests.length}
               </span>
             )}
           </button>

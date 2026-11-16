@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 import { todayISO } from '../utils/stageUtils';
 import { ScheduleTask, Committee, AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
@@ -307,42 +308,23 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
 
   return (
     <div className="space-y-6 text-right">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-l from-brand to-emerald-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">calendar_month</span>
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold">
-              جدول المواعيد وأعمال اللجان والتسليمات
-            </h2>
-          </div>
-          <p className="text-xs text-teal-100 mt-1 max-w-2xl leading-relaxed">
-            التقويم الزمني لمسابقات مسجد البخاري: جدول مواعيد تسليم أوراق الامتحانات، استلام كشوف التصحيح، ومتابعة الأعمال اليومية لكل معاون.
-            اضغط على أي يوم (مثل يوم الجمعة 10/2) للاطلاع على مهام ذلك اليوم وتسليمها.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={() => handleOpenAddModal(selectedDateStr)}
-            hidden={!canWriteTasks}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
-          >
-            <span className="material-symbols-outlined text-xl text-emerald-600">add_task</span>
-            <span>+ إضافة عمل / تسليم جديد</span>
-          </button>
-
-          <button
-            onClick={goToToday}
-            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0"
-          >
-            <span className="material-symbols-outlined text-lg">today</span>
-            <span>الذهاب لليوم الحالي</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="calendar_month"
+        title="التقويم والمواعيد"
+        subtitle={`${selectedDayInfo.dayName} ${selectedDayInfo.shortDate}`}
+        actions={
+          <>
+            <button type="button" onClick={() => handleOpenAddModal(selectedDateStr)} hidden={!canWriteTasks} className={primaryAction}>
+              <span className="material-symbols-outlined text-lg">add_task</span>
+              <span>إضافة عمل</span>
+            </button>
+            <button type="button" onClick={goToToday} className={quietAction}>
+              <span className="material-symbols-outlined text-lg">today</span>
+              <span>اليوم</span>
+            </button>
+          </>
+        }
+      />
 
       {/* Quick Upcoming Days Strip (الوصول السريع للأيام ومواعيد الجمعة) */}
       <div className="bg-white rounded-2xl border border-line/60 p-4 shadow-xs">
@@ -352,17 +334,10 @@ export const CalendarScheduleView: React.FC<CalendarScheduleViewProps> = ({
               <span className="material-symbols-outlined text-lg">event_upcoming</span>
             </span>
             <div>
-              <span className="font-bold text-xs sm:text-sm text-ink block">
-                مواعيد الجمعة والأيام القادمة (اضغط على أي يوم لعرض تسليماته فوراً):
-              </span>
-              <span className="text-xs text-muted">
-                الجمعة 10/2 هي الموعد الأبرز للاختبارات وتسليم الدفاتر والكشوف
-              </span>
+              <span className="font-bold text-sm text-ink block">الأيام القادمة</span>
+              <span className="text-xs text-muted">اضغط على يوم لعرض أعماله</span>
             </div>
           </div>
-          <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-            اليوم المحدد: {selectedDayInfo.dayName} ({selectedDayInfo.shortDate})
-          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pb-1">

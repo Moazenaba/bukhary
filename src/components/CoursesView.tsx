@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageHeader, primaryAction } from './ui/PageHeader';
 import { AuthService } from '../services/AuthService';
 import { todayISO } from '../utils/stageUtils';
 import { Course, Committee, AppUser } from '../types';
@@ -93,33 +94,19 @@ export const CoursesView: React.FC<CoursesViewProps> = ({
 
   return (
     <div className="space-y-6 text-right">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-l from-brand to-teal-800 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">event_repeat</span>
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold">
-              إدارة الدورات والمسابقات الموسمية
-            </h2>
-          </div>
-          <p className="text-xs text-teal-100 mt-1 max-w-2xl leading-relaxed">
-            تنظيم مسابقات مسجد البخاري على مستوى الدورات (دورة الصيف، دورة الشتاء، الدورات المكثفة).
-            تُربط اللجان بكل دورة تلقائياً، وتُحفظ الدورات المكتملة بأرشيفها وسجلاتها الدائمة.
-          </p>
-        </div>
-
-        {canWriteCourses && (
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
-          >
-            <span className="material-symbols-outlined text-xl text-emerald-600">add_circle</span>
-            <span>+ إضافة دورة جديدة</span>
-          </button>
-        )}
-      </div>
+      <PageHeader
+        icon="event_repeat"
+        title="الدورات"
+        subtitle={`${courses.length} دورة · ${courses.filter((c) => c.status === 'active').length} نشطة`}
+        actions={
+          canWriteCourses && (
+            <button type="button" onClick={handleOpenAdd} className={primaryAction}>
+              <span className="material-symbols-outlined text-lg">add</span>
+              <span>دورة جديدة</span>
+            </button>
+          )
+        }
+      />
 
       {/* Filter Tabs & Counter */}
       <div className="flex items-center justify-between border-b border-line/40 pb-3 flex-wrap gap-2">

@@ -172,8 +172,28 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
         </div>
       </section>
 
-      {/* Horizontal Filter Tabs per Stage */}
-      <section className="mb-6">
+      {/* Phones: one stage picker (nine chips would fill the screen before the first committee) */}
+      <section className="mb-4 lg:hidden">
+        <label className="block">
+          <span className="sr-only">تصفية حسب المرحلة</span>
+          <select
+            value={selectedStage}
+            onChange={(e) => setSelectedStage(e.target.value as typeof selectedStage)}
+            className="w-full min-h-12 px-4 rounded-xl border border-line/70 bg-white text-ink text-sm font-bold outline-none focus:border-brand"
+          >
+            <option value="all">كافة اللجان ({stageCounts.all || 0})</option>
+            {(stageCounts.late || 0) > 0 && <option value="late">⏰ متأخرة ({stageCounts.late})</option>}
+            {STAGES_LIST.map((stg) => (
+              <option key={stg.key} value={stg.key}>
+                {stg.emoji} {stg.activeLabel} ({stageCounts[stg.key] || 0})
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      {/* Horizontal Filter Tabs per Stage (wide screens) */}
+      <section className="mb-6 max-lg:hidden">
         <FilterChips label="تصفية حسب المرحلة">
           {/* All */}
           <button
@@ -239,7 +259,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
       </section>
 
       {onExportExamInProgress && (
-        <div className="-mt-3 mb-6 flex flex-wrap gap-2 justify-start">
+        <div className="lg:-mt-3 mb-4 lg:mb-6 flex flex-wrap gap-2 justify-start [&>button]:max-sm:flex-1 [&>button]:max-sm:justify-center">
           <button
             type="button"
             onClick={onExportExamInProgress}
@@ -247,7 +267,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-100 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-base">download</span>
-            <span>تصدير كشف «في انتظار الامتحان» Excel ({stageCounts.registration || 0} لجنة)</span>
+            <span>تصدير «في انتظار الامتحان» ({stageCounts.registration || 0})</span>
           </button>
           {onPrintExamInProgress && (
             <button
@@ -257,7 +277,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-blue-800 border border-blue-200 text-[13px] font-bold hover:bg-blue-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-base">print</span>
-              <span>طباعة / PDF</span>
+              <span>طباعة</span>
             </button>
           )}
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PageHeader, quietAction } from './ui/PageHeader';
 import { todayISO } from '../utils/stageUtils';
 import { Committee, ScheduleTask, AppUser, StageKey } from '../types';
 import { AuthService } from '../services/AuthService';
@@ -272,49 +273,38 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
 
   return (
     <div className="space-y-6 text-right animate-fadeIn pb-12">
-      {/* 1. Header Banner */}
-      <div className="bg-gradient-to-l from-emerald-900 via-brand to-teal-900 rounded-3xl p-6 sm:p-7 text-white shadow-lg relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-amber-300 font-bold text-xs mb-2.5 border border-white/20">
-              <span className="material-symbols-outlined text-sm">celebration</span>
-              <span>منظومة الحفلات والتكريم وتوزيع الجوائز</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
-              إدارة وجدولة حفلات التكريم والختام
-            </h1>
-            <p className="text-xs sm:text-sm text-teal-100 max-w-2xl mt-1.5 leading-relaxed">
-              مربوطة تلقائياً ببيانات لجان المسابقة: أي ميعاد حفل تحدده ينتقل مباشرة إلى <strong>التنبيهات والمهام اليومية</strong> و<strong>تقويم المواعيد</strong>.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap">
+      <PageHeader
+        icon="celebration"
+        title="الحفلات والتكريم"
+        subtitle={todayCeremoniesCount > 0 ? `${todayCeremoniesCount} حفل اليوم` : 'مربوطة تلقائياً بالتقويم والتنبيهات اليومية'}
+        actions={
+          <>
             {onNavigateToDailyAlerts && (
-              <button
-                type="button"
-                onClick={onNavigateToDailyAlerts}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md cursor-pointer active:scale-95"
-              >
-                <span className="material-symbols-outlined text-base">notifications_active</span>
-                <span>التنبيهات اليومية ({todayCeremoniesCount} حفل اليوم) ↗</span>
+              <button type="button" onClick={onNavigateToDailyAlerts} className={quietAction}>
+                <span className="material-symbols-outlined text-lg">notifications_active</span>
+                <span>تنبيهات اليوم</span>
               </button>
             )}
-
             {onNavigateToCalendar && (
-              <button
-                type="button"
-                onClick={onNavigateToCalendar}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/30 text-xs font-bold transition-all cursor-pointer active:scale-95"
-              >
-                <span className="material-symbols-outlined text-base">calendar_month</span>
-                <span>عرض التقويم العام ↗</span>
+              <button type="button" onClick={onNavigateToCalendar} className={quietAction}>
+                <span className="material-symbols-outlined text-lg">calendar_month</span>
+                <span>التقويم</span>
               </button>
             )}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Ceremonies sheet export */}
+      {/* Export and report tools: one closed row, so the ceremonies come first */}
+      <details className="group bg-white rounded-2xl border border-emerald-200 shadow-2xs">
+        <summary className="list-none cursor-pointer min-h-12 px-4 py-3 flex items-center justify-between gap-2 font-black text-sm text-ink [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-brand">download</span>
+            <span>تصدير وطباعة كشوف الحفلات</span>
+          </span>
+          <span className="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+        </summary>
+        <div className="p-3 space-y-3 border-t border-emerald-100">
       <section aria-labelledby="ceremonies-export" className="bg-white rounded-2xl border border-emerald-200 p-4 shadow-2xs flex flex-col lg:flex-row lg:items-end gap-3 text-xs">
         <div className="lg:flex-1">
           <h2 id="ceremonies-export" className="text-sm font-black text-slate-900 flex items-center gap-1.5">
@@ -421,23 +411,26 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
         </div>
       </section>
 
+        </div>
+      </details>
+
       <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenCommitteeDetails} />
 
       {/* 2. Key Performance Indicators (KPIs) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex items-center justify-between">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 font-bold block">إجمالي لجان المسابقة</span>
             <span className="text-2xl font-black text-slate-900 font-mono mt-1 block">
               {totalCommitteesCount}
             </span>
           </div>
-          <span className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
+          <span className="max-sm:hidden w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
             <span className="material-symbols-outlined text-2xl">groups</span>
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-amber-200 p-4 shadow-2xs flex items-center justify-between bg-amber-50/30">
+        <div className="bg-white rounded-2xl border border-amber-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between bg-amber-50/30">
           <div>
             <span className="text-xs text-amber-800 font-bold block">
               حفلات اليوم ({ARABIC_DAYS[new Date().getDay()]} {new Date().getDate()}/{new Date().getMonth() + 1})
@@ -446,24 +439,24 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
               {todayCeremoniesCount}
             </span>
           </div>
-          <span className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
+          <span className="max-sm:hidden w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
             <span className="material-symbols-outlined text-2xl">event_available</span>
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-blue-200 p-4 shadow-2xs flex items-center justify-between bg-blue-50/30">
+        <div className="bg-white rounded-2xl border border-blue-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between bg-blue-50/30">
           <div>
             <span className="text-xs text-blue-800 font-bold block">حفلات مجدولة قادمة</span>
             <span className="text-2xl font-black text-blue-700 font-mono mt-1 block">
               {scheduledUpcomingCount}
             </span>
           </div>
-          <span className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center">
+          <span className="max-sm:hidden w-11 h-11 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center">
             <span className="material-symbols-outlined text-2xl">schedule</span>
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-emerald-200 p-4 shadow-2xs flex items-center justify-between bg-emerald-50/30">
+        <div className="bg-white rounded-2xl border border-emerald-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between bg-emerald-50/30">
           <div>
             <span className="text-xs text-emerald-800 font-bold block">
               تم التكريم والحفل ({Math.round((completedCeremoniesCount / (totalCommitteesCount || 1)) * 100)}%)
@@ -472,7 +465,7 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
               {completedCeremoniesCount}
             </span>
           </div>
-          <span className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+          <span className="max-sm:hidden w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
             <span className="material-symbols-outlined text-2xl">emoji_events</span>
           </span>
         </div>

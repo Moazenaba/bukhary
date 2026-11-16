@@ -59,20 +59,18 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
     <article className="bg-white border border-slate-200/90 hover:border-emerald-600/50 rounded-2xl p-5 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group relative text-right hover:-translate-y-0.5">
       <div>
         {/* Top Header: Committee Number, Name & Status Badges */}
-        <div className="flex items-start justify-between gap-3 mb-3.5 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-3.5 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 basis-48">
             <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004d47] to-[#00665e] text-white flex items-center justify-center font-black text-sm font-mono shrink-0 shadow-xs group-hover:scale-105 transition-transform">
               #{committee.committeeNumber}
             </span>
             <div className="min-w-0">
-              <h3 title={committee.committeeName} className="text-base font-extrabold text-slate-900 block leading-snug truncate group-hover:text-brand transition-colors">
+              <h3 title={committee.committeeName} className="text-base font-extrabold text-slate-900 block leading-snug line-clamp-2 group-hover:text-brand transition-colors">
                 {committee.committeeName}
               </h3>
               <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 flex-wrap">
-                <span className="font-semibold text-slate-600">لجنة #{committee.committeeNumber}</span>
                 {committee.courseName && (
                   <>
-                    <span>•</span>
                     <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                       {committee.courseName}
                     </span>
@@ -133,6 +131,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
           </div>
 
           {/* Branch */}
+          {committee.branch && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
               <span className="material-symbols-outlined text-sm text-slate-400">alt_route</span>
@@ -140,6 +139,7 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
             </span>
             <span className="font-bold text-slate-800">{committee.branch}</span>
           </div>
+          )}
 
           {/* Association if exists */}
           {committee.associationName && (

@@ -7,6 +7,7 @@ import { overdueCommittees } from '../utils/overdue';
 import { OverduePanel } from './OverduePanel';
 import { useSettings } from '../data/queries';
 import { NavTab } from './Sidebar';
+import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 
 interface HomeOverviewViewProps {
   /** Committees of the current course: every figure on this page is about that course alone. */
@@ -54,44 +55,51 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
   const scope = AuthService.getPermissions()?.committeeScope;
   const myAssignedCommittees = Array.isArray(scope) ? committees.filter((c) => scope.includes(c.id)) : [];
 
+  const firstName = currentUser.name.trim().split(/\s+/).slice(0, 2).join(' ');
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 text-right items-start">
+    <>
+    <PageHeader
+      icon="home"
+      title={`أهلاً، ${firstName}`}
+      subtitle={`${AuthService.getRoleLabel(currentUser.role)} · ${total} لجنة${
+        !isAdmin ? ` · ${myAssignedCommittees.length} مسندة إليك` : ''
+      }`}
+      actions={
+        <>
+          <button type="button" onClick={() => onNavigateCommittees()} className={primaryAction}>
+            <span className="material-symbols-outlined text-lg">groups</span>
+            <span>{isAdmin ? `اللجان (${total})` : `لجاني (${myAssignedCommittees.length})`}</span>
+          </button>
+          {isAdmin && AuthService.can('committees.create') && (
+            <button type="button" onClick={onOpenNewCommittee} className={quietAction}>
+              <span className="material-symbols-outlined text-lg">add</span>
+              <span>لجنة جديدة</span>
+            </button>
+          )}
+        </>
+      }
+    />
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 text-right items-start">
       {/* What needs attention now comes first (the right column on a wide screen, the top on a narrow one). */}
       <div className="xl:col-span-1 xl:order-1 space-y-6 min-w-0">
       <MyCeremonies committees={committees} scheduleTasks={scheduleTasks} onOpenCommitteeDetails={onOpenDetails} />
       <OverduePanel items={overdue} overdueDays={settings.overdue_days} onOpen={onOpenDetails} onShowAll={() => onNavigateCommittees('late')} />
 
-      {/* Quick Friday 10/2 Deliverables Spotlight Card */}
-      <div className="bg-white rounded-2xl p-5 border border-emerald-300 bg-gradient-to-l from-emerald-50/50 via-teal-50/30 to-white shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold">
+      {/* Today's work: what is due, with a way into the full calendar */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-300 shadow-xs">
+        <div className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-emerald-200">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-xl">calendar_today</span>
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-ink">
-                  تسليمات وأعمال اليوم بمسجد البخاري:
-                </h3>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
-                  {todayTasks.length} أعمال مقررة
-                </span>
-              </div>
-              <p className="text-xs text-muted">
-                مواعيد انعقاد اللجان الميدانية، تسليم كراسات الأسئلة، واستلام دفاتر التصحيح
-              </p>
-            </div>
+            <h3 className="font-bold text-base text-ink">أعمال اليوم</h3>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">{todayTasks.length}</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigateTab('calendar')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-success text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-          >
-            <span>فتح التقويم والكاليندر بالكامل</span>
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          <button type="button" onClick={() => onNavigateTab('calendar')} className="text-xs text-brand font-bold hover:underline cursor-pointer shrink-0">
+            التقويم &larr;
           </button>
         </div>
+        {todayTasks.length === 0 && <p className="text-sm text-muted">لا توجد أعمال مجدولة اليوم.</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-3">
           {todayTasks.slice(0, 4).map((task) => (
@@ -133,85 +141,9 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
 
       </div>
       <div className="xl:col-span-2 xl:order-2 space-y-6 min-w-0">
-      {/* Welcome Banner tailored to User Role */}
-      <div className="bg-gradient-to-l from-brand via-[#0f766e] to-brand rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-10 max-w-2xl">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-3">
-            <span className="material-symbols-outlined text-sm">verified</span>
-            مسابقات مسجد البخاري العلمية
-          </span>
-
-          {isAdmin ? (
-            <>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2">
-                منظومة لجان الاختبار والتصحيح لمتون العقيدة
-              </h2>
-              <p className="text-sm text-teal-50 leading-relaxed mb-4">
-                متابعة فورية ومباشرة لمراحل الاختبار: في انتظار الامتحان، التصحيح، تجميع الدرجات، المراجعة، كتابة الكشوفات، الاعتمادية، إعلان النتيجة، والحفل والتكريم.
-              </p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={() => onNavigateCommittees()}
-                  className="px-4 py-2 rounded-xl bg-white text-brand font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer"
-                >
-                  عرض قائمة اللجان ({total})
-                </button>
-                <button
-                  onClick={onOpenNewCommittee}
-                  className="px-4 py-2 rounded-xl bg-brand-light/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-sm">add_circle</span>
-                  <span>تسجيل لجنة جديدة</span>
-                </button>
-                <button
-                  onClick={() => onNavigateTab('calendar')}
-                  className="px-4 py-2 rounded-xl bg-emerald-900/60 border border-white/30 text-white font-semibold text-xs hover:bg-emerald-900/80 transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-sm">calendar_month</span>
-                  <span>جدول تسليمات اليوم</span>
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2">
-                مرحباً بك: {currentUser.name}
-              </h2>
-              <p className="text-sm text-teal-50 leading-relaxed mb-4">
-                أنت مسجل بحساب <strong>{AuthService.getRoleLabel(currentUser.role)}</strong>.
-                {myAssignedCommittees.length > 0
-                  ? ` لديك (${myAssignedCommittees.length}) لجان مسندة إليك.`
-                  : ' لم تُسند إليك لجان بعد؛ ستصلك تنبيهات عند إضافتك للجنة أو حفل.'}
-              </p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={() => onNavigateCommittees()}
-                  className="px-4 py-2 rounded-xl bg-white text-brand font-bold text-xs hover:bg-teal-50 transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-sm">groups</span>
-                  <span>عرض لجاني المسندة ({myAssignedCommittees.length})</span>
-                </button>
-                <button
-                  onClick={() => onNavigateTab('calendar')}
-                  className="px-4 py-2 rounded-xl bg-brand-light/20 border border-white/40 text-white font-semibold text-xs hover:bg-white/30 transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-sm">calendar_month</span>
-                  <span>جدول أعمالي وتسليماتي في التقويم</span>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Decorative background shape */}
-        <div className="absolute left-6 -bottom-10 opacity-15 pointer-events-none">
-          <span className="material-symbols-outlined text-[180px]">mosque</span>
-        </div>
-      </div>
-
       {/* Courses & Rounds Summary Bar */}
       {courses.length > 0 && (
-        <div className="bg-white rounded-2xl p-5 border border-line/50 shadow-xs">
+        <div className="max-lg:hidden bg-white rounded-2xl p-5 border border-line/50 shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-line/30">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-xl text-brand">event_repeat</span>
@@ -265,13 +197,13 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       )}
 
       {/* 4 Quick Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-4">
         <div
           onClick={() => onNavigateCommittees('registration')}
-          className="bg-white p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-blue-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="max-sm:hidden w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
               🟦
             </span>
             <span className="text-2xl font-bold font-mono text-blue-700">{examCount}</span>
@@ -279,31 +211,31 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           <h3 className="font-bold text-sm text-ink group-hover:text-blue-700 transition-colors">
             في انتظار الامتحان
           </h3>
-          <p className="text-xs text-muted mt-1">لجان الطلاب فيها قيد أداء الاختبار</p>
+          <p className="text-xs text-muted mt-1 max-sm:hidden">لجان الطلاب فيها قيد أداء الاختبار</p>
         </div>
 
         <div
           onClick={() => onNavigateCommittees('exam')}
-          className="bg-white p-4 rounded-xl border border-line/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-amber-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="max-sm:hidden w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
               🟠
             </span>
             <span className="text-2xl font-bold font-mono text-amber-700">{scoringCount}</span>
           </div>
           <h3 className="font-bold text-sm text-ink group-hover:text-amber-700 transition-colors">
-            تم الامتحان (في انتظار التصحيح)
+            تم الامتحان (للتصحيح)
           </h3>
-          <p className="text-xs text-muted mt-1">لجان يجري تصحيح أوراقها حالياً</p>
+          <p className="text-xs text-muted mt-1 max-sm:hidden">لجان يجري تصحيح أوراقها حالياً</p>
         </div>
 
         <div
           onClick={() => onNavigateCommittees('ceremony')}
-          className="bg-white p-4 rounded-xl border border-line/50 hover:border-emerald-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-emerald-400 shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="max-sm:hidden w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
               🟢
             </span>
             <span className="text-2xl font-bold font-mono text-emerald-700">{ceremonyCount}</span>
@@ -311,15 +243,15 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           <h3 className="font-bold text-sm text-ink group-hover:text-emerald-700 transition-colors">
             تم الحفل والتكريم
           </h3>
-          <p className="text-xs text-muted mt-1">لجان اختتمت مراحلها بالكامل</p>
+          <p className="text-xs text-muted mt-1 max-sm:hidden">لجان اختتمت مراحلها بالكامل</p>
         </div>
 
         <div
           onClick={() => onNavigateCommittees()}
-          className="bg-white p-4 rounded-xl border border-line/50 hover:border-brand shadow-xs hover:shadow-md transition-all cursor-pointer group"
+          className="max-sm:hidden bg-white p-3 sm:p-4 rounded-xl border border-line/50 hover:border-brand shadow-xs hover:shadow-md transition-all cursor-pointer group"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="w-10 h-10 rounded-xl bg-tint text-brand flex items-center justify-center font-bold">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="max-sm:hidden w-10 h-10 rounded-xl bg-tint text-brand flex items-center justify-center font-bold">
               <span className="material-symbols-outlined">menu_book</span>
             </span>
             <span className="text-2xl font-bold font-mono text-brand">{total}</span>
@@ -327,7 +259,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
           <h3 className="font-bold text-sm text-ink group-hover:text-brand transition-colors">
             إجمالي اللجان المسجلة
           </h3>
-          <p className="text-xs text-muted mt-1">موزعة على كافة قاعات مسجد البخاري</p>
+          <p className="text-xs text-muted mt-1 max-sm:hidden">موزعة على كافة قاعات مسجد البخاري</p>
         </div>
       </div>
 
@@ -384,5 +316,7 @@ export const HomeOverviewView: React.FC<HomeOverviewViewProps> = ({
       </div>
       </div>
     </div>
+    </>
   );
 };
+

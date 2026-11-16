@@ -68,13 +68,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <header className="bg-white border-b border-line/50 shadow-xs sticky top-0 z-30">
-      {/* On a phone the bar wraps onto two lines instead of pushing buttons off the screen. */}
-      <div className="w-full px-3 sm:px-6 py-2 sm:py-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-2 mx-auto">
+      {/* A phone gets one slim row: name, course, bell, account. Pages are in the side rail; the rest is in the account window. */}
+      <div className="w-full px-3 sm:px-6 h-14 sm:h-auto sm:py-2.5 flex flex-nowrap sm:flex-wrap items-center justify-between gap-x-2 gap-y-2 mx-auto">
         {/* Right: Toggle button for sidebar (desktop & mobile) + Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={onToggleSidebar}
-            className="p-2 sm:px-3 rounded-xl text-brand bg-brand/10 hover:bg-brand/20 cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
+            className="hidden lg:flex p-2 sm:px-3 rounded-xl text-brand bg-brand/10 hover:bg-brand/20 cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
             title={isSidebarOpen ? "إغلاق القائمة الجانبية (Slide bar)" : "فتح القائمة الجانبية (Slide bar)"}
             aria-label="القائمة الجانبية"
           >
@@ -91,8 +91,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               <span className="material-symbols-outlined text-xl">mosque</span>
             </div>
             <div>
-              <span className="text-[16px] sm:text-[18px] font-extrabold text-brand block leading-tight">
-                مسجد الإمام البخاري
+              <span className="text-[15px] sm:text-[18px] font-extrabold text-brand block leading-tight truncate max-w-[7.5rem] sm:max-w-none">
+                <span className="sm:hidden">البخاري</span>
+                <span className="hidden sm:inline">مسجد الإمام البخاري</span>
               </span>
               <span className="text-xs text-[#0f766e] hidden sm:block font-bold">
                 متابعة الدورات العلمية - المتون العلمية
@@ -102,14 +103,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
           {/* Each course stands alone: this choice decides which course every screen shows. */}
           {courses.length > 0 && onSelectCourse && (
-            <label className="flex items-center gap-1.5 bg-canvas border border-line/70 rounded-xl px-2.5 py-1.5">
+            <label className="flex items-center gap-1 bg-canvas border border-line/70 rounded-xl px-2 sm:px-2.5 py-1.5 min-w-0">
               <span className="material-symbols-outlined text-sm text-brand">event_repeat</span>
               <span className="text-xs font-bold text-muted hidden md:inline">الدورة:</span>
               <select
                 value={currentCourseId ?? ''}
                 onChange={(e) => onSelectCourse(e.target.value)}
                 aria-label="الدورة المعروضة"
-                className="bg-transparent text-xs font-bold text-brand outline-none cursor-pointer max-w-[150px] sm:max-w-[220px]"
+                className="bg-transparent text-xs font-bold text-brand outline-none cursor-pointer max-w-[84px] sm:max-w-[220px]"
               >
                 {courses.map((course) => (
                   <option key={course.id} value={course.id}>
@@ -151,12 +152,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             </button>
           )}
 
-          {canBackup && <BackupButton />}
+          {canBackup && <span className="hidden md:inline-flex"><BackupButton /></span>}
 
           {/* User Profile / Switcher Button */}
           <button
             onClick={onOpenAuthModal}
-            className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-line/60 bg-canvas hover:bg-tint text-ink text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-2 px-1.5 sm:px-3 py-1.5 rounded-xl border border-line/60 bg-canvas hover:bg-tint text-ink text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+            aria-label="حسابي"
             title="تبديل الصلاحية أو استعراض بيانات الحساب"
           >
             <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -184,14 +186,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                  currentUser.role === 'committee_head' ? 'رئيس لجنة' : 'شيخ'}
               </span>
             </div>
-            <span className="material-symbols-outlined text-xs text-muted">expand_more</span>
+            <span className="material-symbols-outlined text-xs text-muted hidden sm:inline">expand_more</span>
           </button>
 
           {/* Sign Out Button (Central Service Exit) */}
           {onSignOut && (
             <button
               onClick={onSignOut}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
               title="تسجيل الخروج والرجوع لبوابة الدخول الخارجية"
             >
               <span className="material-symbols-outlined text-base">logout</span>
@@ -215,7 +217,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={onNavigateToDailyAlerts}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
               title={`يوجد ${todaysTasksCount} أعمال وتنبيهات مجدولة اليوم - اضغط لفتح شاشة التنبيهات والمهام اليومية`}
             >
               <span className="material-symbols-outlined text-sm text-amber-700">notifications_active</span>
@@ -242,7 +244,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             </button>
 
             {showNotifications && (
-              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-line/50 py-3 px-4 z-50 animate-in fade-in duration-150 text-right">
+              <div className="absolute left-0 mt-2 w-[calc(100vw-1.5rem)] max-w-96 sm:w-96 bg-white rounded-2xl shadow-xl border border-line/50 py-3 px-4 z-50 animate-in fade-in duration-150 text-right">
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-line/30">
                   <span className="font-bold text-[13px] text-ink">
                     إشعارات مسابقات مسجد البخاري

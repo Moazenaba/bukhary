@@ -40,7 +40,7 @@ import { ExportModal } from './components/ExportModal';
 import { HomeOverviewView } from './components/HomeOverviewView';
 const StatisticsView = lazy(() => import('./components/StatisticsView').then((m) => ({ default: m.StatisticsView })));
 const SummerCourseTrackerView = lazy(() => import('./components/SummerCourseTrackerView').then((m) => ({ default: m.SummerCourseTrackerView })));
-import { MobileBottomNav } from './components/MobileBottomNav';
+import { PhoneRail } from './components/PhoneRail';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
 const DailyAlertsView = lazy(() => import('./components/DailyAlertsView').then((m) => ({ default: m.DailyAlertsView })));
 const CeremoniesView = lazy(() => import('./components/CeremoniesView').then((m) => ({ default: m.CeremoniesView })));
@@ -758,7 +758,7 @@ export default function App() {
         />
 
         {/* Tab Views */}
-        <main className="flex-1 w-full min-w-0 max-w-[2200px] mx-auto px-3 sm:px-6 lg:px-6 2xl:px-10 py-5 sm:py-8 pb-24 lg:pb-8">
+        <main className="flex-1 w-full min-w-0 max-w-[2200px] mx-auto pl-3 pr-[4.75rem] sm:pl-6 sm:pr-[5.5rem] lg:px-6 2xl:px-10 py-4 sm:py-8 lg:pb-8">
           <Suspense fallback={<div role="status" aria-live="polite" className="py-16 text-center text-sm text-muted">جاري التحميل…</div>}>
           {isLoadingDatabase && (
             <div role="status" className="mb-4 rounded-xl bg-[#dce9ff]/60 text-ink text-sm px-4 py-3">
@@ -989,6 +989,7 @@ export default function App() {
                 totalCommittees={committees.length}
                 activeCommittees={activeCommitteesCount}
                 completedCommittees={completedCeremonyCount}
+                onAddCommittee={can('committees.create') ? () => setIsAddCommitteeOpen(true) : undefined}
               />
 
               {/* Search & Actions Toolbar */}
@@ -1116,18 +1117,14 @@ export default function App() {
           </Suspense>
         </main>
 
-        {/* Mobile App Bottom Navigation Bar (iOS / Android Native App feel) */}
-        <MobileBottomNav
+        {/* Phones: a thin rail with a button per page (replaces the bottom bar and the floating button). */}
+        <PhoneRail
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          onOpenSidebar={() => setIsMobileSidebarOpen(true)}
           currentUser={currentUser}
           pendingAssistantsCount={pendingAssistantsCount}
-          onAddCommittee={
-            can('committees.create') && ['committees', 'summer_course', 'home'].includes(activeTab)
-              ? () => setIsAddCommitteeOpen(true)
-              : undefined
-          }
+          todaysTasksCount={todaysTasksCount}
+          onOpenMore={can('settings.write') ? () => setIsMobileSidebarOpen(true) : undefined}
         />
 
         {/* Footer */}
