@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { can } from '../auth.ts';
-import { type Principal, canAccessExam, isAdminRole, isAllowed } from '../policy.ts';
+import { type Principal, canAccessExam, isAdminRole, isAllowed, observesAnyExam } from '../policy.ts';
 import { getSetting } from './systemSettings.ts';
 import { watermarkPdf } from '../watermark.ts';
 import { audit } from '../audit.ts';
@@ -42,7 +42,7 @@ const cairo = (d: Date) =>
   new Intl.DateTimeFormat('ar-EG', { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).format(d);
 
 export function examFromRow(r: any, viewer?: Principal, hoursBefore = 24) {
-  const content = !viewer || canAccessExam(viewer, r.id);
+  const content = !viewer || canAccessExam(viewer, r.id, r.book);
   const from = availableFrom(r.opens_at, hoursBefore);
   const locked = Boolean(viewer && from && !isAdminRole(viewer.role) && Date.now() < from.getTime());
   return {
@@ -56,7 +56,7 @@ export function examFromRow(r: any, viewer?: Principal, hoursBefore = 24) {
     sampleQuestions: content ? r.data?.sampleQuestions ?? [] : [],
     uploadedAt: r.uploaded_at ?? '',
     notes: content ? r.notes ?? undefined : undefined,
-    canOpen: viewer ? canAccessExam(viewer, r.id) && !locked : undefined,
+    canOpen: viewer ? canAccessExam(viewer, r.id, r.book) && !locked : undefined,
     opensAt: r.opens_at instanceof Date ? r.opens_at.toISOString() : r.opens_at ?? undefined,
     /** Until when the paper stays locked for this viewer (absent when it is open to them). */
     lockedUntil: locked ? from!.toISOString() : undefined,
@@ -77,17 +77,20 @@ export function examsRouter(pool: Pool) {
   const r = Router();
 
   // People who manage exams see them all; everyone else sees only the exams chosen for them.
-  const visible = (user: Principal, examId: string) => isAllowed(user, 'exams.write') || canAccessExam(user, examId);
+  const visible = (user: Principal, examId: string, book?: string) => isAllowed(user, 'exams.write') || canAccessExam(user, examId, book);
+  // An observer sent to a committee for its exam may list and open that book's paper without the general exam rights.
+  const canOrObserve = (action: 'exams.read' | 'exams.file') => (req: any, _res: any, next: any) =>
+    !req.user || !(isAllowed(req.user, action) || observesAnyExam(req.user)) ? next(forbidden()) : next();
 
-  r.get('/', can('exams.read'), route(async (req, res) => {
+  r.get('/', canOrObserve('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} ORDER BY e.updated_at DESC;`);
     const hours = await getSetting(pool, 'exam_open_hours_before');
-    res.json({ success: true, exams: rows.filter((r) => visible(req.user!, r.id)).map((r) => examFromRow(r, req.user, hours)) });
+    res.json({ success: true, exams: rows.filter((r) => visible(req.user!, r.id, r.book)).map((r) => examFromRow(r, req.user, hours)) });
   }));
 
-  r.get('/:id', can('exams.read'), route(async (req, res) => {
+  r.get('/:id', canOrObserve('exams.read'), route(async (req, res) => {
     const { rows } = await pool.query(`${LIST_SQL} WHERE e.id = $1;`, [req.params.id]);
-    if (!rows[0] || !visible(req.user!, rows[0].id)) throw notFound('الامتحان غير موجود');
+    if (!rows[0] || !visible(req.user!, rows[0].id, rows[0].book)) throw notFound('الامتحان غير موجود');
     res.json({ success: true, exam: examFromRow(rows[0], req.user, await getSetting(pool, 'exam_open_hours_before')) });
   }));
 
@@ -147,12 +150,12 @@ export function examsRouter(pool: Pool) {
     })
   );
 
-  r.get('/:id/file', can('exams.file'), route(async (req, res) => {
+  r.get('/:id/file', canOrObserve('exams.file'), route(async (req, res) => {
     // The per-user exam allow-list is enforced here, not only in the UI (API-06).
     const user = req.user!;
-    if (!canAccessExam(user, req.params.id)) throw forbidden('هذا الامتحان غير متاح لك');
+    const { rows: ex } = await pool.query('SELECT opens_at, book FROM exams WHERE id = $1;', [req.params.id]);
+    if (!canAccessExam(user, req.params.id, ex[0]?.book)) throw forbidden('هذا الامتحان غير متاح لك');
     // Locked until shortly before the exam, for everyone but admins and super admins.
-    const { rows: ex } = await pool.query('SELECT opens_at FROM exams WHERE id = $1;', [req.params.id]);
     const from = availableFrom(ex[0]?.opens_at, await getSetting(pool, 'exam_open_hours_before'));
     if (from && !isAdminRole(user.role) && Date.now() < from.getTime()) {
       throw new HttpError(403, `ورقة الامتحان تُتاح ${cairo(from)} (بتوقيت القاهرة)`, 'exam_not_open_yet');

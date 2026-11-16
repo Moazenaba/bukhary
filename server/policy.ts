@@ -73,6 +73,8 @@ export const ACTIONS = {
   'exams.write': { roles: MANAGERS, anyPermission: ['exams_pdf'], description: 'إضافة وتعديل الامتحانات ورفع الملفات' },
   'exams.delete': { roles: ADMIN_ROLES, description: 'حذف الامتحانات' },
   'exams.file': { roles: EVERYONE, anyPermission: ['exams_pdf'], grantedToRoles: HEADS, description: 'تنزيل ملف أسئلة الامتحان' },
+  // Who may give or end an extra «مراقب» assignment on a committee: admins anywhere, a head only on their own.
+  'assignments.manage': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'تكليف شيخ بمراقبة امتحان أو متابعة حفل في لجنة وإنهاء التكليف' },
   'tasks.read': { roles: EVERYONE, description: 'عرض المهام (الشيخ يرى مهامه ومهام لجانه فقط)' },
   // «الجدول الزمني» decides it for committee heads (migration 019 kept it for existing heads).
   'tasks.write': { roles: MANAGERS, anyPermission: ['calendar_schedule'], description: 'إضافة وتعديل المهام' },
@@ -122,6 +124,19 @@ export interface Principal {
   allowedExamIds: string[];
   /** Set after an admin password reset; only account endpoints work until it is cleared. */
   mustChangePassword: boolean;
+  /**
+   * Active extra assignments («مراقب») on other committees: read-only powers limited to that committee
+   * and task, added on top of the role. Absent means none.
+   */
+  observing?: ObservedAssignment[];
+}
+
+export interface ObservedAssignment {
+  id: string;
+  committeeId: string;
+  task: 'exam' | 'ceremony';
+  /** The committee's book: the exam paper of that book is the one an exam observer may open. */
+  book: string;
 }
 
 /** Roles whose committee actions are limited to their assigned committees. */
@@ -151,6 +166,21 @@ export function isCommitteeInScope(user: Principal, committeeId: string | null |
   return user.assignedCommitteeIds.includes(committeeId);
 }
 
+/** Committees the user observes through an active assignment (read-only, on top of the role). */
+export const observedCommitteeIds = (user: Pick<Principal, 'observing'>): string[] =>
+  [...new Set((user.observing ?? []).map((o) => o.committeeId))];
+
+/** Whether the user observes this committee, optionally for a given kind of task. */
+export const isObserving = (user: Pick<Principal, 'observing'>, committeeId: string, task?: ObservedAssignment['task']) =>
+  (user.observing ?? []).some((o) => o.committeeId === committeeId && (!task || o.task === task));
+
+/** Whether the user observes an exam of this book (the paper of the committee they were sent to). */
+export const observesExamBook = (user: Pick<Principal, 'observing'>, book: string | null | undefined) =>
+  Boolean(book?.trim()) && (user.observing ?? []).some((o) => o.task === 'exam' && o.book.trim() === book!.trim());
+
+/** Whether the user observes any exam at all (opens the exams screen/list for them). */
+export const observesAnyExam = (user: Pick<Principal, 'observing'>) => (user.observing ?? []).some((o) => o.task === 'exam');
+
 /** Whether the user sees every committee (otherwise only assigned ones and ceremonies they are invited to). */
 export const seesAllCommittees = (user: Principal) => !isScopedRole(user.role) || user.allCommittees;
 
@@ -172,7 +202,9 @@ export const seesAllExams = (user: Pick<Principal, 'role' | 'allExams'>) => isAd
  * Everyone else opens only the exams chosen for them (per-user allow-list), whatever the
  * committees' dates or stages.
  */
-export function canAccessExam(user: Principal, examId: string): boolean {
+export function canAccessExam(user: Principal, examId: string, book?: string | null): boolean {
+  // An observer sent to a committee for its exam opens that book's paper, and only that one.
+  if (observesExamBook(user, book)) return true;
   if (!isAllowed(user, 'exams.file')) return false;
   if (seesAllExams(user)) return true;
   return user.allowedExamIds.includes(examId);
@@ -195,6 +227,8 @@ export function evaluatedPermissions(user: Principal) {
     committeeNumbers: scoped ? user.assignedCommittees : ('all' as const),
     exams: seesAllExams(user) ? ('all' as const) : user.allowedExamIds,
     grantableRoles: grantableRoles(user),
+    // Extra assignments (read-only powers on other committees), so clients can show and mirror them.
+    observing: (user.observing ?? []).map((o) => ({ id: o.id, committeeId: o.committeeId, task: o.task })),
     mustChangePassword: user.mustChangePassword,
   };
 }

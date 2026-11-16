@@ -5,7 +5,7 @@ import { audit } from '../audit.ts';
 import type { AppConfig } from '../config.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, notFound, route } from '../http.ts';
-import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, seesAllCommittees } from '../policy.ts';
+import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, observedCommitteeIds, seesAllCommittees } from '../policy.ts';
 import { staffableUsers } from './users.ts';
 import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages, normalizeStageOrder } from '../workflow.ts';
 import { notify } from './notifications.ts';
@@ -190,6 +190,8 @@ function historyEntry(r: any, showAdmins: boolean) {
 /** Whether `user` may see the committee: in scope, or invited to its ceremony. */
 function canSeeCommittee(user: Principal, row: any) {
   if (isCommitteeInScope(user, row.id)) return true;
+  // Sent there as an observer: read-only (every write still needs the committee in scope).
+  if (observedCommitteeIds(user).includes(row.id)) return true;
   const attendees: Person[] = row.ceremony_details?.attendees ?? [];
   return attendees.some((a) => a.id === user.id);
 }
@@ -303,7 +305,7 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
  * Tells each person what changed for them: added to the ceremony (with its details), removed from
  * it, or — for those still invited — a new date, time or place.
  */
-async function notifyCeremonyAttendees(
+export async function notifyCeremonyAttendees(
   db: Queryable,
   committee: any,
   before: any,
@@ -381,7 +383,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
     const where = seesAllCommittees(user)
       ? ''
       : `WHERE id = ANY($1::text[]) OR ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $2::text))`;
-    const params = seesAllCommittees(user) ? [] : [user.assignedCommitteeIds, user.id];
+    const params = seesAllCommittees(user) ? [] : [[...user.assignedCommitteeIds, ...observedCommitteeIds(user)], user.id];
     const page = await pagedRows(
       pool,
       `SELECT * FROM committees ${where} ORDER BY committee_number ASC, id ASC`,
