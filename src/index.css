@@ -52,9 +52,10 @@
   scrollbar-width: none;
 }
 
-/* Touch: icon-only buttons get a 44px hit area on coarse pointers */
+/* Touch: icon-only buttons get a 44px hit area on coarse pointers.
+   (Buttons a class hides at some width keep their own display: this unlayered rule would beat Tailwind's `hidden`.) */
 @media (pointer: coarse) {
-  button:has(> .material-symbols-outlined:only-child) {
+  button:has(> .material-symbols-outlined:only-child):not([class*='hidden']) {
     min-width: 44px;
     min-height: 44px;
     display: inline-flex;

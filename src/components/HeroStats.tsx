@@ -1,65 +1,27 @@
 import React from 'react';
+import { PageHeader, primaryAction } from './ui/PageHeader';
 
 interface HeroStatsProps {
   totalCommittees: number;
   activeCommittees: number;
   completedCommittees: number;
+  /** «إضافة لجنة»: the page's main action (it used to float over the list on phones). */
+  onAddCommittee?: () => void;
 }
 
-export const HeroStats: React.FC<HeroStatsProps> = ({
-  totalCommittees,
-  activeCommittees,
-  completedCommittees,
-}) => {
-  return (
-    <section className="mb-7 text-right">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 bg-gradient-to-l from-white via-emerald-50/20 to-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className="text-xs text-emerald-900 font-extrabold bg-emerald-100/70 px-3 py-0.5 rounded-full inline-flex items-center gap-1.5 border border-emerald-300">
-              <span className="material-symbols-outlined text-sm text-brand">verified</span>
-              <span>مسابقات مسجد الإمام البخاري العلمية</span>
-            </span>
-            <span className="text-slate-500 text-xs font-semibold">• الدورة العلمية الصيفية</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            إدارة ومتابعة لجان الاختبارات الميدانية
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-            متابعة فورية ومباشرة لكافة مراحل اللجان: جاهزية الامتحان، تصحيح الأسئلة، تجميع ومراجعة الدرجات، وإعلان النتائج.
-          </p>
-        </div>
-
-        {/* Quick Summary Stats */}
-        <div className="flex items-center gap-3 shrink-0 flex-wrap sm:flex-nowrap">
-          <div className="flex-1 sm:flex-initial bg-white border border-slate-200 rounded-2xl px-5 py-3 text-center shadow-xs min-w-[110px] hover:border-emerald-500/40 transition-colors">
-            <span className="block text-2xl sm:text-3xl text-brand font-black font-mono">
-              {totalCommittees}
-            </span>
-            <span className="block text-xs font-bold text-slate-600 mt-0.5">
-              إجمالي اللجان
-            </span>
-          </div>
-
-          <div className="flex-1 sm:flex-initial bg-white border border-slate-200 rounded-2xl px-5 py-3 text-center shadow-xs min-w-[110px] hover:border-blue-500/40 transition-colors">
-            <span className="block text-2xl sm:text-3xl text-blue-700 font-black font-mono">
-              {activeCommittees}
-            </span>
-            <span className="block text-xs font-bold text-slate-600 mt-0.5">
-              لجان قيد العمل
-            </span>
-          </div>
-
-          <div className="flex-1 sm:flex-initial bg-white border border-slate-200 rounded-2xl px-5 py-3 text-center shadow-xs min-w-[110px] hover:border-emerald-500/40 transition-colors">
-            <span className="block text-2xl sm:text-3xl text-emerald-700 font-black font-mono">
-              {completedCommittees}
-            </span>
-            <span className="block text-xs font-bold text-slate-600 mt-0.5">
-              تم الحفل والتكريم
-            </span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
+/** The committees page header: one line of facts and the add button, then straight to the list. */
+export const HeroStats: React.FC<HeroStatsProps> = ({ totalCommittees, activeCommittees, completedCommittees, onAddCommittee }) => (
+  <PageHeader
+    icon="groups"
+    title="اللجان"
+    subtitle={`${totalCommittees} لجنة · ${activeCommittees} قيد العمل · ${completedCommittees} تم الحفل`}
+    actions={
+      onAddCommittee && (
+        <button type="button" onClick={onAddCommittee} className={primaryAction}>
+          <span className="material-symbols-outlined text-lg">add</span>
+          <span>إضافة لجنة</span>
+        </button>
+      )
+    }
+  />
+);

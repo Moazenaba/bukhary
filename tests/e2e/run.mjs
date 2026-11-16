@@ -54,6 +54,13 @@ async function inputWithValue(page, value) {
   return page.locator('input').nth(idx);
 }
 
+/** The ceremonies page keeps its export and report tools in one closed row; this opens it. */
+async function openCeremonyTools(page) {
+  const tools = page.locator('details', { hasText: 'تصدير وطباعة كشوف الحفلات' });
+  // The same page may already be open from an earlier test; clicking again would close it.
+  if (!(await tools.evaluate((d) => d.open))) await page.getByText('تصدير وطباعة كشوف الحفلات').click();
+}
+
 /** Opens a screen and waits for the app to settle. */
 async function open(page, tab) {
   await page.goto(`${BASE}/#${tab}`);
@@ -119,6 +126,7 @@ await test('editing the sheikh\'s name and place in the sheet updates the commit
 
 await test('ceremonies: «تصدير PDF» downloads a real PDF file', async () => {
   await open(page, 'ceremonies');
+  await openCeremonyTools(page);
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 30_000 }),
     page.getByRole('button', { name: /تصدير PDF/ }).click(),
@@ -155,6 +163,7 @@ async function downloadPdf(page, click) {
 
 await test('ceremonies: «لم يتم الحفل» report downloads as PDF', async () => {
   await open(page, 'ceremonies');
+  await openCeremonyTools(page);
   const { name } = await downloadPdf(page, () => page.getByRole('button', { name: 'تصدير كشف لم يتم الحفل PDF' }).click());
   assert.match(name, /^Bukhari-ceremony-not-held-\d{4}-\d{2}-\d{2}\.pdf$/);
   if (process.env.E2E_SAVE_DIR) (await import('node:fs')).writeFileSync(`${process.env.E2E_SAVE_DIR}/not-held.pdf`, (await downloadPdf(page, () => page.getByRole('button', { name: 'تصدير كشف لم يتم الحفل PDF' }).click())).bytes);
@@ -303,9 +312,29 @@ await test('the top bar fits the phone: no button or menu cut off at the edge', 
   assert.deepEqual(cut, []);
 });
 
-await test('«+ لجنة» opens the add-committee form on the phone, and a committee can be added', async () => {
+await test('the phone has one slim top bar and a side rail whose buttons open the pages', async () => {
+  await open(mobile, 'home');
+  const header = await mobile.locator('header').first().boundingBox();
+  assert.ok(header.height <= 64, `top bar is ${header.height}px tall (should be one slim row)`);
+  const rail = mobile.getByRole('navigation', { name: 'التنقل بين الصفحات' });
+  await rail.waitFor();
+  const box = await rail.boundingBox();
+  assert.ok(box.x + box.width >= 410 && box.width <= 72, `rail is not a thin strip on the right edge (${JSON.stringify(box)})`);
+  await rail.getByRole('button', { name: 'اللجان' }).click();
+  await mobile.getByRole('heading', { name: 'اللجان', exact: true }).waitFor();
+  await rail.getByRole('button', { name: 'الامتحانات' }).click();
+  await mobile.getByRole('heading', { name: /الامتحانات/ }).first().waitFor();
+  // The page content never sits under the rail.
+  const overlap = await mobile.evaluate(() => {
+    const r = document.querySelector('nav[aria-label="التنقل بين الصفحات"]').getBoundingClientRect();
+    return [...document.querySelectorAll('main h1')].some((h) => h.getBoundingClientRect().right > r.left + 1);
+  });
+  assert.equal(overlap, false);
+});
+
+await test('«إضافة لجنة» on the committees page opens the add-committee form on the phone, and a committee can be added', async () => {
   await open(mobile, 'committees');
-  await mobile.getByRole('button', { name: 'إضافة لجنة جديدة', exact: true }).click();
+  await mobile.getByRole('button', { name: 'إضافة لجنة', exact: true }).click();
   const dialog = mobile.getByRole('dialog', { name: 'إضافة لجنة جديدة' });
   await dialog.waitFor();
   await dialog.getByRole('textbox', { name: 'اسم اللجنة' }).fill(`لجنة الموبايل ${RUN}`);

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 import { ExamItem, AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
 import { DataService } from '../services/DataService';
@@ -116,45 +117,23 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   return (
     <div className="space-y-6 text-right">
-      {/* Header Bar with Add Book & Add Exam Buttons */}
-      <div className="bg-gradient-to-l from-emerald-800 to-brand rounded-2xl p-6 text-white shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 rounded-xl bg-white/20 text-white">
-              <span className="material-symbols-outlined text-2xl">menu_book</span>
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold">
-              الامتحانات والكتب المقررة (PDF)
-            </h2>
-          </div>
-          <p className="text-xs text-teal-100 mt-1 max-w-2xl leading-relaxed">
-            قسم متكامل لإضافة المتون والكتب المقررة، ورفع نماذج الامتحانات الرسمية المعتمدة بصيغة PDF لكل كتاب.
-          </p>
-        </div>
-
-        {/* Action Buttons: Add Book + Add Exam side by side */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* 1. Add Book Button (Golden/Amber theme) */}
-          <button
-            onClick={onOpenAddBook}
-            hidden={!canEditBooks}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer shrink-0 border border-amber-400/50"
-          >
-            <span className="material-symbols-outlined text-xl">library_add</span>
-            <span>+ إضافة كتاب مقرر</span>
-          </button>
-
-          {/* 2. Add Exam & Upload PDF Button */}
-          <button
-            onClick={onOpenAddExam}
-            hidden={!canWrite}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-brand hover:bg-emerald-50 text-xs sm:text-sm font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer shrink-0"
-          >
-            <span className="material-symbols-outlined text-xl text-emerald-600">upload_file</span>
-            <span>+ إضافة امتحان ورفع PDF</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="menu_book"
+        title="الامتحانات والكتب"
+        subtitle={`${exams.length} امتحان`}
+        actions={
+          <>
+            <button type="button" onClick={onOpenAddExam} hidden={!canWrite} className={primaryAction}>
+              <span className="material-symbols-outlined text-lg">upload_file</span>
+              <span>إضافة امتحان PDF</span>
+            </button>
+            <button type="button" onClick={onOpenAddBook} hidden={!canEditBooks} className={quietAction}>
+              <span className="material-symbols-outlined text-lg">library_add</span>
+              <span>كتاب مقرر</span>
+            </button>
+          </>
+        }
+      />
 
       {/* Subtabs Switcher: Exams vs Books */}
       <div className="flex items-center justify-between border-b border-line/40 pb-3">

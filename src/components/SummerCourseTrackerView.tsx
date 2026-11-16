@@ -54,6 +54,7 @@ import { NewSheetRowModal } from './course-sheet/NewSheetRowModal';
 import { sheetRowsPdfTable } from '../utils/reportExport';
 import { deliverPdf } from '../utils/pdf';
 import { TableScroll } from './ui/TableScroll';
+import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 
 const FILTER_LABEL: Record<CourseFilterStatus, string> = {
   all: '', not_delivered: 'في انتظار الامتحان', delivered: 'تم الامتحان', corrected: 'تم التصحيح', reviewed: 'تمت المراجعة',
@@ -534,93 +535,39 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
   return (
     <div className="space-y-6">
 
-      {/* Main Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-[#003b36] via-brand to-[#04332e] text-white p-6 sm:p-8 shadow-xl border border-emerald-600/30">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-200 text-xs font-bold border border-emerald-400/30 backdrop-blur-sm">
-                <BookOpen className="w-3.5 h-3.5 text-emerald-300" />
-                <span>نظام المتابعة الإدارية للكشوفات ورصد درجات المتون العلمية</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-200 text-xs font-bold border border-amber-400/30 backdrop-blur-sm">
-                <Users className="w-3.5 h-3.5 text-amber-300" />
-                <span>مجموع طلاب الدورة: <strong className="font-mono text-white text-sm mx-1">{stats.totalStudentsCount.toLocaleString('ar-EG')}</strong> طالب</span>
-              </div>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
-              متابعة {activeDefaultCourse?.name || 'الدورة العلمية'} {activeDefaultCourse?.year || ''}
-            </h1>
-            <p className="text-emerald-100/90 text-sm max-w-2xl leading-relaxed">
-              نظام إدارة ومتابعة دورات مسجد الإمام البخاري العلمية: رصد حالات تم الامتحان،
-              التصحيح، المراجعة، الإعلان، وإقامة الحفل، مع التعديل الفوري والحفظ السحابي الآمن.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
+      {/* One header: the page's name, the course, and its actions (no banner, no repeated counts) */}
+      <PageHeader
+        icon="table_chart"
+        title="الكشوفات"
+        subtitle={`${activeDefaultCourse?.name || 'الدورة العلمية'} ${activeDefaultCourse?.year || ''}`.trim()}
+        actions={
+          <>
             {/* Hidden file input for Excel/CSV */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-
-            {/* Add New Course Button */}
-            <button
-              type="button"
-              onClick={() => setIsAddCourseModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-teal-400/20 hover:bg-teal-400/30 text-teal-200 hover:text-white font-bold backdrop-blur-sm border border-teal-400/30 transition-all cursor-pointer shadow-xs"
-              title="إضافة دورة جديدة للمسابقات وربط اللجان بها"
-            >
-              <Plus className="w-4 h-4 text-teal-300" />
-              <span>إضافة دورة جديدة</span>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+            <button type="button" onClick={handleOpenAddRowModal} className={primaryAction} title="إضافة صف جديد وتحديد الدورة المقررة">
+              <Plus className="w-4 h-4" />
+              <span>إضافة صف</span>
             </button>
-
-            {/* Add New Row Button */}
-            <button
-              type="button"
-              onClick={handleOpenAddRowModal}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold shadow-lg hover:shadow-emerald-400/30 transition-all active:scale-[0.98] cursor-pointer"
-              title="إضافة صف جديد وتحديد الدورة المقررة"
-            >
-              <Plus className="w-5 h-5 text-slate-950" />
-              <span>إضافة صف جديد (+)</span>
-            </button>
-
-            {/* Import Excel / CSV Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-sm border border-white/20 transition-all cursor-pointer"
-              title="استيراد كشف من ملف إكسيل أو CSV"
-            >
-              <Upload className="w-4 h-4 text-emerald-300" />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className={quietAction} title="استيراد كشف من ملف إكسيل أو CSV">
+              <Upload className="w-4 h-4" />
               <span>استيراد كشف</span>
             </button>
-
             {AuthService.can('ocr.use') && (
-              <button
-                type="button"
-                onClick={() => setIsOcrOpen(true)}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-sm border border-white/20 transition-all cursor-pointer"
-                title="استخراج كشف من صورة"
-              >
-                <Camera className="w-4 h-4 text-emerald-300" />
-                <span>استخراج من صورة</span>
+              <button type="button" onClick={() => setIsOcrOpen(true)} className={quietAction} title="استخراج كشف من صورة">
+                <Camera className="w-4 h-4" />
+                <span>من صورة</span>
               </button>
             )}
-          </div>
-        </div>
+            <button type="button" onClick={() => setIsAddCourseModalOpen(true)} className={quietAction} title="إضافة دورة جديدة للمسابقات وربط اللجان بها">
+              <Plus className="w-4 h-4" />
+              <span>دورة جديدة</span>
+            </button>
+          </>
+        }
+      />
 
-        {/* Decorative background Islamic geometry / mesh */}
-        <div className="absolute -left-12 -bottom-16 w-64 h-64 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
-        <div className="absolute right-0 top-0 w-72 h-72 rounded-full bg-teal-300/10 blur-3xl pointer-events-none" />
-      </div>
-
-      {/* Courses Navigation & Selector Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-right">
+      {/* Courses Navigation & Selector Bar (only useful with more than one course) */}
+      <div className={`${courses.length <= 1 ? 'hidden' : ''} bg-white rounded-2xl border border-slate-200/90 shadow-xs p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-right`}>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 ml-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -665,7 +612,7 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-3 [&>div]:max-sm:p-3 [&_.h-1\.5]:max-sm:hidden [&_svg]:max-sm:hidden [&>div>div:first-child]:max-sm:mb-0.5 [&>div>div:last-child:not(:first-child)]:max-sm:hidden">
         {/* Total Committees */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 mb-2">

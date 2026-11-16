@@ -35,7 +35,7 @@ describe('course sheet: add row and add course windows', () => {
   it('«إضافة صف جديد» creates a committee with the next number and the typed sheikh', async () => {
     const onAddCommitteeFromRow = vi.fn(async (c: Committee) => c);
     renderSheet({ onAddCommitteeFromRow });
-    fireEvent.click(screen.getAllByRole('button', { name: /إضافة صف جديد/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /إضافة صف/ })[0]);
     fireEvent.change(await screen.findByPlaceholderText('اسم الشيخ المشرف على اللجنة...'), { target: { value: 'الشيخ هشام' } });
     fireEvent.click(screen.getByRole('button', { name: /إضافة الصف واللجنة/ }));
     await waitFor(() => expect(onAddCommitteeFromRow).toHaveBeenCalledTimes(1));
@@ -48,7 +48,7 @@ describe('course sheet: add row and add course windows', () => {
     const onAddCourse = vi.fn(async () => created);
     const onSelectCourse = vi.fn();
     renderSheet({ onAddCourse, onSelectCourse });
-    fireEvent.click(screen.getAllByRole('button', { name: /إضافة دورة جديدة/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /دورة جديدة/ })[0]);
     fireEvent.click(await screen.findByRole('button', { name: /حفظ وإضافة الدورة/ }));
     expect(onAddCourse).not.toHaveBeenCalled();
     fireEvent.change(screen.getByPlaceholderText(/مثال: دورة الصيف/), { target: { value: 'دورة جديدة' } });

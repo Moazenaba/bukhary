@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 import { todayISO } from '../utils/stageUtils';
 import { overdueCommittees } from '../utils/overdue';
 import { OverduePanel } from './OverduePanel';
@@ -229,62 +230,41 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       <OverduePanel items={overdue} overdueDays={settings.overdue_days} onOpen={onOpenCommitteeDetails} limit={20} />
-      {/* Header Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
-            <span className="material-symbols-outlined text-2xl">notifications_active</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-                التنبيهات والمهام اليومية
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-brand border border-emerald-200 text-xs font-black font-mono">
-                📅 {viewMode === 'selected_day' ? formattedSelectedDate : 'كافة المواعيد المجدولة'}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              مربوطة مباشرة بجدول تقويم المواعيد: أي عمل تضيفه في أي يوم يظهر هنا فوراً.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              setCeremonyDateInput(selectedDate);
-              if (canScheduleCeremonies) setIsAddCeremonyModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
-          >
-            <span className="material-symbols-outlined text-lg">celebration</span>
-            <span>+ إضافة وجدولة حفلة</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setNewTaskDate(selectedDate);
-              if (canWriteTasks) setIsAddModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-deep text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-          >
-            <span className="material-symbols-outlined text-lg">add_task</span>
-            <span>+ إضافة عمل / تنبيه لليوم</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onNavigateToCalendar}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition-all cursor-pointer active:scale-95"
-          >
-            <span className="material-symbols-outlined text-lg text-slate-600">calendar_month</span>
-            <span>عرض جدول التقويم الكامل ↗</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="notifications_active"
+        title="تنبيهات اليوم"
+        subtitle={viewMode === 'selected_day' ? formattedSelectedDate : 'كافة المواعيد المجدولة'}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setNewTaskDate(selectedDate);
+                if (canWriteTasks) setIsAddModalOpen(true);
+              }}
+              className={primaryAction}
+            >
+              <span className="material-symbols-outlined text-lg">add_task</span>
+              <span>إضافة عمل</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCeremonyDateInput(selectedDate);
+                if (canScheduleCeremonies) setIsAddCeremonyModalOpen(true);
+              }}
+              className={quietAction}
+            >
+              <span className="material-symbols-outlined text-lg">celebration</span>
+              <span>جدولة حفل</span>
+            </button>
+            <button type="button" onClick={onNavigateToCalendar} className={quietAction}>
+              <span className="material-symbols-outlined text-lg">calendar_month</span>
+              <span>التقويم</span>
+            </button>
+          </>
+        }
+      />
 
       {/* Date Switcher & Mode Bar (اختيار اليوم / الاثنين / الثلاثاء / إلخ) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
@@ -367,41 +347,41 @@ export const DailyAlertsView: React.FC<DailyAlertsViewProps> = ({
       </div>
 
       {/* KPI Mini-Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex items-center justify-between">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 font-bold block">
-              {viewMode === 'selected_day' ? 'مهام اليوم المحدد' : 'إجمالي كافة المهام'}
+              {viewMode === 'selected_day' ? 'مهام اليوم' : 'الكل'}
             </span>
             <span className="text-2xl font-black text-slate-900 font-mono mt-0.5 block">
               {totalCount}
             </span>
           </div>
-          <span className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+          <span className="hidden sm:flex w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
             <span className="material-symbols-outlined text-xl">list_alt</span>
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-xs text-amber-700 font-bold block">قيد المتابعة والتنفيذ</span>
+            <span className="text-xs text-amber-700 font-bold block">قيد التنفيذ</span>
             <span className="text-2xl font-black text-amber-600 font-mono mt-0.5 block">
               {pendingCount}
             </span>
           </div>
-          <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+          <span className="hidden sm:flex w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
             <span className="material-symbols-outlined text-xl">pending_actions</span>
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-xs text-emerald-700 font-bold block">المنجز ({completionPercentage}%)</span>
+            <span className="text-xs text-emerald-700 font-bold block">منجز ({completionPercentage}%)</span>
             <span className="text-2xl font-black text-emerald-600 font-mono mt-0.5 block">
               {completedCount}
             </span>
           </div>
-          <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+          <span className="hidden sm:flex w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
             <span className="material-symbols-outlined text-xl">check_circle</span>
           </span>
         </div>
