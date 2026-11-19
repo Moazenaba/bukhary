@@ -129,7 +129,7 @@ export const DataService = {
   /** «ended» is a normal finish, «cancelled» withdraws it; both stop the powers at once and keep the history. */
   finishAssignment: async (id: string, how: 'end' | 'cancel') =>
     (await api<{ assignment: import('../types').CommitteeAssignment }>(`/assignments/${enc(id)}/${how}`, { method: 'POST' })).assignment,
-  // ---- Temporary committee heads («رئيس لجنة مؤقت») ----
+  // ---- Temporary committee heads («شيخ اللجنة») ----
   getHeadGrants: async () => (await api<{ grants: import('../types').HeadGrant[]; canGrant: boolean }>('/grants')).grants,
   createHeadGrant: async (body: { userId: string; committeeIds: string[]; startsOn: string; endsOn: string }) =>
     (await api<{ grant: import('../types').HeadGrant }>('/grants', { method: 'POST', body })).grant,

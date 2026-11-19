@@ -520,7 +520,7 @@ export interface AssignmentNote {
   at: string;
 }
 
-/** «رئيس لجنة مؤقت»: a sheikh made the head of some committees for a date window (see server/routes/grants.ts). */
+/** «شيخ اللجنة»: a sheikh made the head of some committees for a date window (see server/routes/grants.ts). */
 export type CeremonyDecision = 'yes' | 'no' | 'undecided';
 export interface HeadGrant {
   id: string;

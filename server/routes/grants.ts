@@ -9,7 +9,7 @@ import { type Principal, isAdminRole } from '../policy.ts';
 import { notify } from './notifications.ts';
 
 /**
- * Temporary committee-head grants («رئيس لجنة مؤقت»). An admin makes an approved sheikh the head of one or more
+ * «شيخ اللجنة»: temporary committee-head grants. An admin makes an approved sheikh the head of one or more
  * committees for a date window. While it applies, the sheikh keeps the sheikh role and acts as the committee head on
  * those committees only (policy.ts: headGrants). Grants are never deleted: ending one only changes its status.
  *
@@ -72,44 +72,98 @@ function deciderRank(user: Principal, grant: { user_id: string; committee_ids: s
 }
 
 /**
- * Ends the grants that are over. Run on every read of the lists and by the scheduled maintenance:
- *   - a «yes» grant ends once every committee it covers has its ceremony done;
- *   - a «no» or «undecided» grant ends on its last day (an «undecided» one tells the granting admin).
+ * The line a notification carries about a committee: its number, place and the committee head to call.
+ * The head is the permanent committee head (role committee_head on this committee), by name and phone.
+ */
+export async function committeeLine(db: Queryable, committeeId: string) {
+  const { rows } = await db.query(
+    'SELECT committee_number, committee_name, COALESCE(sheikh_country, \'\') AS place FROM committees WHERE id = $1;',
+    [committeeId]
+  );
+  const c = rows[0];
+  if (!c) return null;
+  const { rows: heads } = await db.query(
+    `SELECT name, COALESCE(phone, '') AS phone FROM app_users
+     WHERE role = 'committee_head' AND assigned_committee_ids ? $1 ORDER BY name LIMIT 1;`,
+    [committeeId]
+  );
+  const head = heads[0] ? `رئيس اللجنة: ${heads[0].name}${heads[0].phone ? ` (${heads[0].phone})` : ''}` : 'رئيس اللجنة: لم يُسند بعد';
+  return {
+    number: c.committee_number as number,
+    title: `لجنة ${c.committee_number}`,
+    text: [c.place || 'المكان لم يُحدد بعد', head].join(' · '),
+  };
+}
+
+/**
+ * Ends what is over. Run on every read of the lists and by the scheduled maintenance:
+ *   - a committee whose ceremony is done leaves every «شيخ اللجنة» grant on it (the grant ends when no committee is left),
+ *     and every observer on it ends too; each person is told;
+ *   - a grant with «no» or «undecided» ends on its last day (the granting admin is told if undecided).
  */
 export async function sweepHeadGrants(db: Queryable) {
-  const { rows } = await db.query(
-    `SELECT g.id, g.user_id, g.committee_ids, g.ceremony_decision, g.granted_by, g.ends_on < CURRENT_DATE AS over
-     FROM committee_head_grants g WHERE g.status = 'active' AND (g.ends_on < CURRENT_DATE OR g.ceremony_decision = 'yes');`
-  );
   let ended = 0;
-  for (const g of rows) {
-    const cids: string[] = Array.isArray(g.committee_ids) ? g.committee_ids.map(String) : [];
-    let finish = false;
-    let note = '';
-    if (g.ceremony_decision === 'yes') {
-      const { rows: c } = await db.query(
-        `SELECT COUNT(*) FILTER (WHERE (stages->'ceremony'->>'completed') = 'true')::int AS done, COUNT(*)::int AS total
-         FROM committees WHERE id = ANY($1::text[]);`,
-        [cids]
-      );
-      finish = c[0].total > 0 && c[0].done === c[0].total;
-      note = 'انتهى الحفل، وانتهت الصلاحيات المؤقتة للشيخ.';
-    } else if (g.over) {
-      finish = true;
-      note = g.ceremony_decision === 'no'
-        ? 'انتهت المدة. القرار: لن يكون هناك حفل.'
-        : 'انتهت المدة ولم يُحدد الحفل بعد. رجع الشيخ لصلاحياته العادية؛ راجع الأمر إن كان محتاج تمديد.';
-    }
-    if (!finish) continue;
-    await db.query(
-      "UPDATE committee_head_grants SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'active';",
-      [g.id]
+  // 1. Committees whose ceremony is done: take them out of the grants and end their observers.
+  const done = await db.query(
+    `SELECT id FROM committees WHERE (stages->'ceremony'->>'completed') = 'true';`
+  );
+  for (const { id: committeeId } of done.rows) {
+    const line = await committeeLine(db, committeeId);
+    const { rows: grants } = await db.query(
+      `SELECT id, user_id, granted_by FROM committee_head_grants
+       WHERE status = 'active' AND committee_ids ? $1;`,
+      [committeeId]
     );
+    for (const g of grants) {
+      await db.query(
+        `UPDATE committee_head_grants
+         SET committee_ids = committee_ids - $2::text,
+             status = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN 'ended' ELSE status END,
+             ended_at = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN NOW() ELSE ended_at END
+         WHERE id = $1;`,
+        [g.id, committeeId]
+      );
+      await notify(db, {
+        title: `انتهى حفل ${line?.title ?? 'اللجنة'}`,
+        description: `انتهت صلاحية «شيخ اللجنة» لك في هذه اللجنة. ${line?.text ?? ''}`,
+        type: 'info',
+        committeeId,
+        targetUserId: g.user_id,
+        data: { grantId: g.id },
+      });
+    }
+    const { rows: observers } = await db.query(
+      `UPDATE committee_assignments SET status = 'ended', ended_at = NOW()
+       WHERE committee_id = $1 AND status = 'active' RETURNING user_id;`,
+      [committeeId]
+    );
+    for (const o of observers) {
+      await notify(db, {
+        title: `انتهى التكليف في ${line?.title ?? 'اللجنة'}`,
+        description: `انتهى حفل اللجنة وانتهت المراقبة. ${line?.text ?? ''}`,
+        type: 'info',
+        committeeId,
+        targetUserId: o.user_id,
+      });
+    }
+    ended += grants.length;
+  }
+
+  // 2. Grants over their window that are not «yes»: end them, and tell the granting admin when nothing was decided.
+  const { rows } = await db.query(
+    `SELECT g.id, g.user_id, g.ceremony_decision, g.granted_by FROM committee_head_grants g
+     WHERE g.status = 'active' AND g.ends_on < CURRENT_DATE AND g.ceremony_decision <> 'yes';`
+  );
+  for (const g of rows) {
+    await db.query("UPDATE committee_head_grants SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'active';", [g.id]);
     ended++;
     if (g.granted_by) {
       await notify(db, {
-        title: 'انتهت جولة رئيس لجنة مؤقت',
-        description: note,
+        title: 'انتهت مدة «شيخ اللجنة»',
+        description:
+          g.ceremony_decision === 'no'
+            ? 'انتهت المدة، والقرار: لن يكون هناك حفل.'
+            : 'انتهت المدة ولم يُحدد الحفل بعد. رجع الشيخ لصلاحياته العادية؛ راجع الأمر إن كان محتاج تمديد.',
         type: 'info',
         targetUserId: g.granted_by,
         data: { grantId: g.id },
@@ -150,15 +204,20 @@ export function grantsRouter(pool: Pool) {
         [id, body.userId, JSON.stringify(body.committeeIds), body.startsOn, body.endsOn, user.id, user.name]
       );
       const names = cs.map((c: any) => `لجنة ${c.committee_number}`).join('، ');
-      await notify(db, {
-        title: 'تم إسنادك رئيس لجنة مؤقتًا',
-        description: `${names} من ${body.startsOn} إلى ${body.endsOn}`,
-        type: 'info',
-        targetUserId: body.userId,
-        data: { grantId: id },
-      });
+      // One notification per committee, each with its place and the committee head to call.
+      for (const committeeId of body.committeeIds) {
+        const line = await committeeLine(db, committeeId);
+        await notify(db, {
+          title: `تم إسنادك «شيخ اللجنة» في ${line?.title ?? 'لجنة'}`,
+          description: `من ${body.startsOn} حتى ${body.endsOn} · ${line?.text ?? ''}`,
+          type: 'info',
+          committeeId,
+          targetUserId: body.userId,
+          data: { grantId: id },
+        });
+      }
       const { rows } = await db.query(`${SELECT} WHERE g.id = $1;`, [id]);
-      await audit(db, req, 'grant.create', 'grant', id, null, present(rows[0]), `رئيس لجنة مؤقت: ${names}`);
+      await audit(db, req, 'grant.create', 'grant', id, null, present(rows[0]), `شيخ اللجنة: ${names}`);
       return rows[0];
     });
     res.status(201).json({ success: true, grant: present(created) });
@@ -205,7 +264,7 @@ export function grantsRouter(pool: Pool) {
       const { rows } = await db.query(`${SELECT} WHERE g.id = $1;`, [grant.id]);
       if (grant.granted_by) {
         await notify(db, {
-          title: disagreed ? 'تعارض في قرار الحفل' : 'قرار الحفل في جولة رئيس لجنة مؤقت',
+          title: disagreed ? 'تعارض في قرار الحفل' : 'قرار الحفل في «شيخ اللجنة»',
           description: `${DECISION_LABEL[decision]}${disagreed ? ' — القرار السابق كان مختلفًا' : ''}`,
           type: disagreed ? 'urgent' : 'info',
           targetUserId: grant.granted_by,
@@ -228,14 +287,14 @@ export function grantsRouter(pool: Pool) {
       if (grant.status !== 'active') throw badRequest('الجولة منتهية بالفعل');
       await db.query("UPDATE committee_head_grants SET status = 'ended', ended_at = NOW(), ended_by = $2 WHERE id = $1;", [grant.id, user.id]);
       await notify(db, {
-        title: 'انتهت جولة رئيس لجنة مؤقت',
+        title: 'انتهت مدة «شيخ اللجنة»',
         description: 'أنهى الأدمن الجولة. رجعت لصلاحياتك العادية.',
         type: 'info',
         targetUserId: grant.user_id,
         data: { grantId: grant.id },
       });
       const { rows } = await db.query(`${SELECT} WHERE g.id = $1;`, [grant.id]);
-      await audit(db, req, 'grant.end', 'grant', grant.id, null, present(rows[0]), 'إنهاء رئيس لجنة مؤقت');
+      await audit(db, req, 'grant.end', 'grant', grant.id, null, present(rows[0]), 'إنهاء «شيخ اللجنة»');
       return rows[0];
     });
     res.json({ success: true, grant: present(ended) });

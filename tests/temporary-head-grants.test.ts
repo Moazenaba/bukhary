@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sweepHeadGrants } from '../server/routes/grants.ts';
 import { committeeBody, seedCourse, setupApp, userWithToken, type TestApp } from './helpers.ts';
 
-// «رئيس لجنة مؤقت»: an admin makes a sheikh the head of a committee for a date window.
+// «شيخ اللجنة»: an admin makes a sheikh the head of a committee for a date window.
 let t: TestApp;
 let admin: Awaited<ReturnType<typeof userWithToken>>;
 let sheikh: Awaited<ReturnType<typeof userWithToken>>;
@@ -106,7 +106,7 @@ describe('the sweep at the end of a window', () => {
     expect(byId[undecided.body.grant.id]).toBe('ended');
     expect(byId[yesGrant.body.grant.id]).toBe('active'); // the ceremony is not done yet
 
-    const told = await t.pool.query("SELECT count(*)::int AS n FROM notifications WHERE target_user_id = $1 AND title = 'انتهت جولة رئيس لجنة مؤقت';", [admin.id]);
+    const told = await t.pool.query("SELECT count(*)::int AS n FROM notifications WHERE target_user_id = $1 AND title = 'انتهت مدة «شيخ اللجنة»';", [admin.id]);
     expect(told.rows[0].n).toBeGreaterThan(0);
   });
 
@@ -129,6 +129,41 @@ describe('who sees a grant', () => {
     expect(seen.body.grants.every((x: any) => x.committeeIds.includes(c2.id))).toBe(true);
     // And he may decide on it: the permanent head is above the temporary one.
     expect((await decide(head.auth, g.body.grant.id, 'no')).status).toBe(200);
+  });
+});
+
+describe('«شيخ اللجنة» stacks with observer roles and ends per committee', () => {
+  it('one person may hold it on one committee and observe another at the same time; a head\'s phone comes with each notice', async () => {
+    const head = await userWithToken(t, { role: 'committee_head', committeeIds: [c1.id] });
+    const person = await userWithToken(t, { role: 'sheikh', committeeIds: [] });
+    const g = await grant({ userId: person.id, committeeIds: [c1.id], startsOn: day(0), endsOn: day(4) });
+    expect(g.status).toBe(201);
+    const obs = await t.api().post('/api/assignments').set(admin.auth).send({ userId: person.id, committeeId: c2.id, task: 'exam', startsOn: day(0), endsOn: day(4) });
+    expect(obs.status).toBe(201);
+    const perms = (await me(person)).permissions;
+    expect(perms.committeeScope).toContain(c1.id);
+    expect(perms.observing.map((o: any) => o.committeeId)).toContain(c2.id);
+    // The notice for the grant names the committee's head and his phone.
+    const n = await t.pool.query(
+      "SELECT description FROM notifications WHERE target_user_id = $1 AND title LIKE 'تم إسنادك «شيخ اللجنة»%' ORDER BY created_at DESC LIMIT 1;",
+      [person.id]
+    );
+    const who = await t.pool.query('SELECT name FROM app_users WHERE id = $1;', [head.id]);
+    expect(n.rows[0].description).toContain(`رئيس اللجنة: ${who.rows[0].name}`);
+  });
+
+  it('a committee whose ceremony is done leaves the grant and ends its observers, and no other committee is touched', async () => {
+    const person = await userWithToken(t, { role: 'sheikh', committeeIds: [] });
+    const g = await grant({ userId: person.id, committeeIds: [c1.id, c2.id], startsOn: day(0), endsOn: day(4) });
+    expect(g.status).toBe(201);
+    await t.pool.query(`UPDATE committees SET stages = jsonb_set(COALESCE(stages, '{}'::jsonb), '{ceremony}', '{"completed": true}') WHERE id = $1;`, [c1.id]);
+    await sweepHeadGrants(t.pool);
+    const row = await t.pool.query('SELECT status, committee_ids FROM committee_head_grants WHERE id = $1;', [g.body.grant.id]);
+    expect(row.rows[0].status).toBe('active');
+    expect(row.rows[0].committee_ids).toEqual([c2.id]);
+    const after = (await me(person)).permissions;
+    expect(after.committeeScope).not.toContain(c1.id);
+    expect(after.committeeScope).toContain(c2.id);
   });
 });
 

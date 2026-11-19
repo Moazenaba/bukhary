@@ -7,6 +7,7 @@ import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
 import { type Principal, isAdminRole, isAllowed, isCommitteeInScope } from '../policy.ts';
 import { notifyCeremonyAttendees } from './committees.ts';
+import { committeeLine } from './grants.ts';
 import { notify } from './notifications.ts';
 
 /**
@@ -144,9 +145,13 @@ export function assignmentsRouter(pool: Pool) {
         throw e;
       }
       if (body.task === 'ceremony') await setCeremonyAttendee(db, body.committeeId, target, true);
+      // The committee's place and the head to call come with the notice (see grants.ts committeeLine).
+      const line = await committeeLine(db, body.committeeId);
       await notify(db, {
-        title: `تم تكليفك بـ${TASK_LABEL[body.task]} في لجنة ${c[0].committee_number}`,
-        description: c[0].committee_name,
+        title: `تم تكليفك بـ${TASK_LABEL[body.task]} في ${line?.title ?? `لجنة ${c[0].committee_number}`}`,
+        description: [c[0].committee_name, body.startsOn && `من ${body.startsOn}`, body.endsOn && `حتى ${body.endsOn}`, line?.text]
+          .filter(Boolean)
+          .join(' · '),
         type: 'info',
         committeeId: body.committeeId,
         targetUserId: body.userId,

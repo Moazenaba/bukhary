@@ -4,7 +4,7 @@ import { AssignableUser, DataService } from '../services/DataService';
 import { AuthService } from '../services/AuthService';
 import { errorMessage } from '../services/api';
 
-// «رئيس لجنة مؤقت»: an admin makes an approved sheikh the head of some committees for a date window. The
+// «شيخ اللجنة»: an admin makes an approved sheikh the head of some committees for a date window. The
 // server decides who may do what; these panels only show the grants it returns and send the admin's choices.
 
 export const DECISION_LABEL: Record<CeremonyDecision, string> = {
@@ -59,7 +59,7 @@ export const HeadGrantsAdminPanel: React.FC<{ committees: Committee[] }> = ({ co
     }
   };
   const end = async (g: HeadGrant) => {
-    if (!window.confirm(`إنهاء جولة ${g.userName} كرئيس لجنة مؤقت؟ تنتهي صلاحياته فورًا.`)) return;
+    if (!window.confirm(`إنهاء جولة ${g.userName} كشيخ اللجنة؟ تنتهي صلاحياته فورًا.`)) return;
     try {
       await DataService.endHeadGrant(g.id);
       await reload();
@@ -70,9 +70,9 @@ export const HeadGrantsAdminPanel: React.FC<{ committees: Committee[] }> = ({ co
 
   const canSubmit = Boolean(userId && picked.length && startsOn && endsOn && endsOn >= startsOn) && !saving;
   return (
-    <section className="rounded-2xl border border-line bg-white p-4 space-y-4" aria-label="رئيس لجنة مؤقت">
+    <section className="rounded-2xl border border-line bg-white p-4 space-y-4" aria-label="شيخ اللجنة">
       <header>
-        <h3 className="font-bold text-ink">رئيس لجنة مؤقت</h3>
+        <h3 className="font-bold text-ink">شيخ اللجنة</h3>
         <p className="text-xs text-muted">يأخذ الشيخ صلاحيات رئيس اللجنة على اللجان المختارة لفترة محددة، وتنتهي بقرار الحفل.</p>
       </header>
 
@@ -168,7 +168,7 @@ export const CeremonyDecisionCard: React.FC<{ committee: Committee }> = ({ commi
       {grants.map((g) => (
         <div key={g.id} className="space-y-2">
           <p className="text-sm">
-            <strong>{g.userName}</strong> رئيس لجنة مؤقت {dateText(g)}.
+            <strong>{g.userName}</strong> شيخ اللجنة {dateText(g)}.
             <span className="block text-xs text-muted">
               القرار الحالي: {DECISION_LABEL[g.ceremonyDecision]}
               {g.decidedByRole ? ` (من ${ROLE_LABEL[g.decidedByRole]})` : ''}
