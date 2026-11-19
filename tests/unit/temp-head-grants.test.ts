@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Principal, isAllowed, isCommitteeInScope, isHeadOn, visibleCommitteeIds } from '../../server/policy.ts';
+import { type Principal, evaluatedPermissions, isAllowed, isCommitteeInScope, isHeadOn, visibleCommitteeIds } from '../../server/policy.ts';
 
 // A temporary head grant lends the committee head's powers on the granted committees only.
 const sheikh = (over: Partial<Principal> = {}): Principal => ({
@@ -49,5 +49,10 @@ describe('temporary head grants', () => {
     const head = sheikh({ role: 'committee_head', assignedCommitteeIds: ['c1'] });
     expect(isHeadOn(head, 'c1')).toBe(true);
     expect(isHeadOn(head, 'c2')).toBe(false);
+  });
+
+  it('the evaluated permissions say which committees the grant heads, for the apps to follow', () => {
+    expect(evaluatedPermissions(granted).headCommitteeIds).toEqual(['c2']);
+    expect(evaluatedPermissions(sheikh()).headCommitteeIds).toEqual([]);
   });
 });

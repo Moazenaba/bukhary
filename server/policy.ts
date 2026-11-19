@@ -257,6 +257,8 @@ export function evaluatedPermissions(user: Principal) {
     grantableRoles: grantableRoles(user),
     // Extra assignments (read-only powers on other committees), so clients can show and mirror them.
     observing: (user.observing ?? []).map((o) => ({ id: o.id, committeeId: o.committeeId, task: o.task })),
+    // Committees this person heads by a temporary grant right now (the head's screens and tabs follow).
+    headCommitteeIds: grantedHeadCommitteeIds(user),
     mustChangePassword: user.mustChangePassword,
   };
 }
