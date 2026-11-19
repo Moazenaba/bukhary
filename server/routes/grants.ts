@@ -169,9 +169,13 @@ export function grantsRouter(pool: Pool) {
     const user = req.user!;
     await sweepHeadGrants(pool);
     const admin = isAdminRole(user.role);
+    // Admins see every grant; a committee head sees the grants on their own committees (to decide the ceremony);
+    // everyone else sees only their own.
     const { rows } = await pool.query(
-      `${SELECT} WHERE ($1::boolean OR g.user_id = $2) ORDER BY g.created_at DESC LIMIT 200;`,
-      [admin, user.id]
+      `${SELECT} WHERE ($1::boolean OR g.user_id = $2
+          OR ($3::boolean AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(g.committee_ids) x WHERE x = ANY($4::text[]))))
+        ORDER BY g.created_at DESC LIMIT 200;`,
+      [admin, user.id, user.role === 'committee_head', user.assignedCommitteeIds]
     );
     res.json({ success: true, grants: rows.map(present), canGrant: admin });
   }));

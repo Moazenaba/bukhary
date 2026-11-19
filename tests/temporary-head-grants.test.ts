@@ -117,3 +117,18 @@ describe('the sweep at the end of a window', () => {
     expect(rows.every((r: any) => r.status === 'ended')).toBe(true);
   });
 });
+
+describe('who sees a grant', () => {
+  it('a committee head sees the grants on their own committee, and nothing else', async () => {
+    const head = await userWithToken(t, { role: 'committee_head', committeeIds: [c2.id] });
+    const g = await grant({ userId: otherSheikh.id, committeeIds: [c2.id], startsOn: day(0), endsOn: day(3) });
+    expect(g.status).toBe(201);
+    const seen = await t.api().get('/api/grants').set(head.auth);
+    expect(seen.status).toBe(200);
+    expect(seen.body.grants.some((x: any) => x.id === g.body.grant.id)).toBe(true);
+    expect(seen.body.grants.every((x: any) => x.committeeIds.includes(c2.id))).toBe(true);
+    // And he may decide on it: the permanent head is above the temporary one.
+    expect((await decide(head.auth, g.body.grant.id, 'no')).status).toBe(200);
+  });
+});
+
