@@ -1,8 +1,8 @@
 {
-  "versionCode": 21,
-  "versionName": "1.1.21",
-  "apk": "app/Bukhari-1.1.21.apk",
-  "sha256": "cb44d7cc3eff4cd9d9d5af6ad572d8c96888a86dcf7018cb5a850b194f03de8a",
+  "versionCode": 22,
+  "versionName": "1.1.22",
+  "apk": "app/Bukhari-1.1.22.apk",
+  "sha256": "d033b035e6b942d05388af8425593b65c0f3bc1a2325c40f22956273e4865d28",
   "size": 3741702,
-  "notes": "الواجهات 2: أزرار التصفية بمقاس أكبر وأسهل للمس"
+  "notes": ""
 }
