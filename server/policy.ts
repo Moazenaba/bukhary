@@ -129,6 +129,18 @@ export interface Principal {
    * and task, added on top of the role. Absent means none.
    */
   observing?: ObservedAssignment[];
+  /**
+   * Active temporary head grants inside their dates (see grants.ts). While one applies, the sheikh acts as the
+   * committee head on that committee only. Absent means none.
+   */
+  headGrants?: HeadGrant[];
+}
+
+export interface HeadGrant {
+  id: string;
+  committeeId: string;
+  /** What the grant's ceremony decision says now (drives whether it lasts past its end date). */
+  decision: 'yes' | 'no' | 'undecided';
 }
 
 export interface ObservedAssignment {
@@ -144,10 +156,14 @@ export const SCOPED_ROLES: readonly Role[] = ['committee_head', 'sheikh'];
 export const isScopedRole = (role: Role) => SCOPED_ROLES.includes(role);
 
 /** Whether `user` may perform `action` at all (committee scope is checked separately). */
-export function isAllowed(user: Pick<Principal, 'role' | 'permissions'>, action: Action): boolean {
+export function isAllowed(user: Pick<Principal, 'role' | 'permissions'> & { headGrants?: HeadGrant[] }, action: Action): boolean {
   if (user.role === 'super_admin') return true;
   const rule: ActionRule = ACTIONS[action];
   if (rule.superOnly) return false;
+  // A temporary head may do the head's committee actions, but only on the committees of their grant
+  // (isCommitteeInScope checks that for committee-scoped actions). Checked before the role list, since a sheikh
+  // is not in it.
+  if (rule.committeeScoped && rule.grantedToRoles?.includes('committee_head') && (user.headGrants?.length ?? 0) > 0) return true;
   if (rule.roles && !rule.roles.includes(user.role)) return false;
   if (user.role === 'admin') return true;
   if (rule.grantedToRoles?.includes(user.role)) return true;
@@ -163,8 +179,17 @@ export function isCommitteeInScope(user: Principal, committeeId: string | null |
   if (!isScopedRole(user.role)) return true;
   if (user.allCommittees) return true;
   if (!committeeId) return false;
-  return user.assignedCommitteeIds.includes(committeeId);
+  return user.assignedCommitteeIds.includes(committeeId) || grantedHeadCommitteeIds(user).includes(committeeId);
 }
+
+/** Committees on which the user holds a temporary head grant right now. */
+export const grantedHeadCommitteeIds = (user: Pick<Principal, 'headGrants'>): string[] =>
+  [...new Set((user.headGrants ?? []).map((g) => g.committeeId))];
+
+/** Whether the user acts as the committee head on this committee: the role, or a grant on it. */
+export const isHeadOn = (user: Principal, committeeId: string): boolean =>
+  (user.role === 'committee_head' && user.assignedCommitteeIds.includes(committeeId)) ||
+  grantedHeadCommitteeIds(user).includes(committeeId);
 
 /** Committees the user observes through an active assignment (read-only, on top of the role). */
 export const observedCommitteeIds = (user: Pick<Principal, 'observing'>): string[] =>
@@ -183,6 +208,9 @@ export const observesAnyExam = (user: Pick<Principal, 'observing'>) => (user.obs
 
 /** Whether the user sees every committee (otherwise only assigned ones and ceremonies they are invited to). */
 export const seesAllCommittees = (user: Principal) => !isScopedRole(user.role) || user.allCommittees;
+
+/** The committee ids a scoped user sees: their assignments plus the committees of their active head grants. */
+export const visibleCommitteeIds = (user: Principal): string[] => [...new Set([...user.assignedCommitteeIds, ...grantedHeadCommitteeIds(user)])];
 
 /** Roles a user may give to other accounts. Admin accounts are managed by super admins only. */
 export function grantableRoles(user: Pick<Principal, 'role' | 'permissions'>): Role[] {
@@ -222,7 +250,7 @@ export function evaluatedPermissions(user: Principal) {
     role: user.role,
     actions,
     // 'all' or the committee ids in scope.
-    committeeScope: scoped ? user.assignedCommitteeIds : ('all' as const),
+    committeeScope: scoped ? visibleCommitteeIds(user) : ('all' as const),
     // Same scope as committee numbers, for clients that predate committee ids.
     committeeNumbers: scoped ? user.assignedCommittees : ('all' as const),
     exams: seesAllExams(user) ? ('all' as const) : user.allowedExamIds,
