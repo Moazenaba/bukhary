@@ -1,5 +1,6 @@
 import type { Pool } from './db.ts';
 import { logger } from './logger.ts';
+import { sweepHeadGrants } from './routes/grants.ts';
 
 /**
  * Housekeeping that keeps auth tables small (API-21): expired or long-revoked refresh tokens,
@@ -28,8 +29,8 @@ export async function purgeExpired(pool: Pool) {
 
 export function startMaintenance(pool: Pool, everyMs = 6 * 60 * 60 * 1000) {
   const run = () =>
-    purgeExpired(pool)
-      .then((n) => logger.info('maintenance.purged', n))
+    Promise.all([purgeExpired(pool), sweepHeadGrants(pool)])
+      .then(([n, ended]) => logger.info('maintenance.purged', { ...n, headGrantsEnded: ended }))
       .catch((err) => logger.warn('maintenance.failed', { message: err.message }));
   setTimeout(run, 60_000).unref();
   setInterval(run, everyMs).unref();

@@ -129,6 +129,13 @@ export const DataService = {
   /** «ended» is a normal finish, «cancelled» withdraws it; both stop the powers at once and keep the history. */
   finishAssignment: async (id: string, how: 'end' | 'cancel') =>
     (await api<{ assignment: import('../types').CommitteeAssignment }>(`/assignments/${enc(id)}/${how}`, { method: 'POST' })).assignment,
+  // ---- Temporary committee heads («رئيس لجنة مؤقت») ----
+  getHeadGrants: async () => (await api<{ grants: import('../types').HeadGrant[]; canGrant: boolean }>('/grants')).grants,
+  createHeadGrant: async (body: { userId: string; committeeIds: string[]; startsOn: string; endsOn: string }) =>
+    (await api<{ grant: import('../types').HeadGrant }>('/grants', { method: 'POST', body })).grant,
+  decideHeadGrant: async (id: string, decision: import('../types').CeremonyDecision) =>
+    (await api<{ grant: import('../types').HeadGrant }>(`/grants/${enc(id)}/decision`, { method: 'POST', body: { decision } })).grant,
+  endHeadGrant: async (id: string) => (await api<{ grant: import('../types').HeadGrant }>(`/grants/${enc(id)}/end`, { method: 'POST' })).grant,
   getObservations: async (assignmentId: string) =>
     (await api<{ observations: import('../types').AssignmentNote[] }>(`/assignments/${enc(assignmentId)}/observations`)).observations,
   addObservation: (assignmentId: string, note: string) => api(`/assignments/${enc(assignmentId)}/observations`, { method: 'POST', body: { note } }),

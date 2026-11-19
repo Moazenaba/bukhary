@@ -519,3 +519,22 @@ export interface AssignmentNote {
   by: string;
   at: string;
 }
+
+/** «رئيس لجنة مؤقت»: a sheikh made the head of some committees for a date window (see server/routes/grants.ts). */
+export type CeremonyDecision = 'yes' | 'no' | 'undecided';
+export interface HeadGrant {
+  id: string;
+  userId: string;
+  userName: string;
+  committeeIds: string[];
+  startsOn: string;
+  endsOn: string;
+  status: 'active' | 'ended' | 'cancelled';
+  ceremonyDecision: CeremonyDecision;
+  decidedByRole: 'admin' | 'head' | 'holder' | null;
+  decidedAt: string | null;
+  grantedBy: string;
+  createdAt: string;
+  endedAt: string | null;
+}
+

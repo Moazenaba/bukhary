@@ -21,5 +21,6 @@
   "020_exam_dates.sql": "89f912c5a9e787c8a91b6a918f58bb9fd2cf3d5b0319bbb5f78d4cd7d62d16f5",
   "021_sheet_values_to_committees.sql": "e564ab08ae6a7202b19db6b3cfea541ae02d0ac42ca334732d134892eebdd49a",
   "022_name_lists_to_settings.sql": "2f67c146f06d856a3e3a84194430ba7a2132d1b1c4fa4d00e70bfb5a6b531d46",
-  "023_committee_assignments.sql": "ad3bd2255a80ee6063d78fb102cfb19d723f9f47d4f7f85344e2ecc3eeefa05c"
+  "023_committee_assignments.sql": "ad3bd2255a80ee6063d78fb102cfb19d723f9f47d4f7f85344e2ecc3eeefa05c",
+  "024_temporary_head_grants.sql": "2ea70a7e0175acad25912942ffeff56654f9eeba90f65c2190c8a127c71a105e"
 }

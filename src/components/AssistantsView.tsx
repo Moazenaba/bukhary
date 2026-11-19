@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserAssignmentsPanel } from './Assignments';
+import { HeadGrantsAdminPanel, canSeeHeadGrants } from './HeadGrants';
 import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
 import {
   AppUser,
@@ -410,6 +411,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
           </>
         }
       />
+      {canSeeHeadGrants() && <HeadGrantsAdminPanel committees={committees} />}
 
       {/* Super Admin Alert Notification */}
       {superAdminAlert && (
