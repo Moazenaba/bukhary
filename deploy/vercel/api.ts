@@ -6,6 +6,8 @@ import { loadConfig } from '../../server/config.ts';
 import { createPool, type Pool } from '../../server/db.ts';
 import { logger, reportError } from '../../server/logger.ts';
 import { purgeExpired } from '../../server/maintenance.ts';
+import { sweepHeadGrants } from '../../server/routes/grants.ts';
+import { sweepExpired } from '../../server/routes/assignments.ts';
 import { pendingMigrations } from '../../server/migrate.ts';
 import { flushPushes } from '../../server/push.ts';
 
@@ -62,8 +64,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (Date.now() - lastMaintenance > MAINTENANCE_EVERY_MS) {
     lastMaintenance = Date.now();
     waitUntil(
-      purgeExpired(pool!)
-        .then((n) => logger.info('maintenance.purged', n))
+      Promise.all([purgeExpired(pool!), sweepHeadGrants(pool!), sweepExpired(pool!)])
+        .then(([n, endedGrants, endedAssigns]) => logger.info('maintenance.purged', { ...n, headGrantsEnded: endedGrants, assignmentsEnded: endedAssigns }))
         .catch((err) => logger.warn('maintenance.failed', { message: err.message }))
     );
   }

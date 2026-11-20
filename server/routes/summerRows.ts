@@ -1,10 +1,11 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { assertAllowed, can } from '../auth.ts';
+import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, forbidden, notFound, route } from '../http.ts';
 import { id, nonNegativeInt, optionalId, optionalText } from '../schemas.ts';
+import { isScopedRole } from '../policy.ts';
 
 // Field names follow the web type SummerCourseRow (snake_case sheet columns + camelCase links).
 const rowInput = z.object({
@@ -71,6 +72,12 @@ async function upsertRow(db: Queryable, req: Request, row: RowInput) {
     courseName = rows[0].name;
   }
   const { rows: before } = await db.query('SELECT * FROM summer_course_rows WHERE id = $1 FOR UPDATE;', [row.id]);
+  if (before[0]?.committee_id && isScopedRole(req.user!.role) && !req.user!.allCommittees) {
+    assertCommitteeScope(req.user!, before[0].committee_id);
+  }
+  if (row.committeeId && isScopedRole(req.user!.role) && !req.user!.allCommittees) {
+    assertCommitteeScope(req.user!, row.committeeId);
+  }
   // A row linked to a committee does not hold its own sheikh/place/book/students any more: those
   // are edited on the committee. The stored copy is kept as it was (never wiped).
   if (row.committeeId) {
@@ -148,6 +155,9 @@ export function summerRowsRouter(pool: Pool) {
     await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM summer_course_rows WHERE id = $1 FOR UPDATE;', [req.params.id]);
       if (!rows[0]) throw notFound('الصف غير موجود');
+      if (rows[0].committee_id && isScopedRole(req.user!.role) && !req.user!.allCommittees) {
+        assertCommitteeScope(req.user!, rows[0].committee_id);
+      }
       await db.query('DELETE FROM summer_course_rows WHERE id = $1;', [req.params.id]);
       await audit(db, req, 'sheet_row.delete', 'summer_course_row', req.params.id, fromRow(rows[0]), null);
     });

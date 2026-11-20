@@ -104,8 +104,17 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     const win = window.open('', '_blank');
     try {
       const url = await DataService.examFileUrl(exam.id);
-      if (win) win.location.href = url;
-      else window.location.href = url;
+      if (win) {
+        win.location.href = url;
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       win?.close();

@@ -76,17 +76,17 @@
 
 ## ٢. الأدوار والصلاحيات
 
-الأدوار: `super_admin` (المشرف العام)، `committee_head` (رئيس لجنة)، `teacher` (مصحح)، `assistant` (معاون)، `auditor` (مدقق).
-«المديرون» في الجدول = `super_admin` و`committee_head`.
+الأدوار: `super_admin` (المشرف العام)، `admin` (أدمن)، `committee_head` (رئيس لجنة)، `sheikh` (شيخ).
+«المديرون» في الجدول = `super_admin` و`admin` و`committee_head`.
 
-القاعدة: الدور يجب أن يكون ضمن الأدوار المسموحة **و**، لغير المشرف العام، أن يملك إحدى الصلاحيات المذكورة
+القاعدة: الدور يجب أن يكون ضمن الأدوار المسموحة **و**، لغير المشرف العام والأدمن، أن يملك إحدى الصلاحيات المذكورة
 (إلا إذا كانت الصلاحية ممنوحة لدوره تلقائياً). المصدر: `server/policy.ts`، ويصل للعميل جاهزاً في `GET /api/auth/me`.
 
-**نطاق اللجان:** رئيس اللجنة والمعاون والمعلم يعملون على اللجان المسندة إليهم **بالمعرّف** (`assignedCommitteeIds`)،
-لأن رقم اللجنة يتكرر بين الدورات، أو على كل اللجان إذا منحهم المشرف العام `allCommitteesAllowed`. `me.permissions.committeeScope`
-= `"all"` أو قائمة المعرّفات، و`committeeNumbers` نفس النطاق بالأرقام للعرض. المشرف العام والمدقق غير مقيّدين باللجان.
+**نطاق اللجان:** رئيس اللجنة والشيخ يعملون على اللجان المسندة إليهم **بالمعرّف** (`assignedCommitteeIds`)،
+لأن رقم اللجنة يتكرر بين الدورات، أو على كل اللجان إذا منحهم المشرف العام أو الأدمن `allCommitteesAllowed`. `me.permissions.committeeScope`
+= `"all"` أو قائمة المعرّفات، و`committeeNumbers` نفس النطاق بالأرقام للعرض. المشرف العام والأدمن غير مقيّدين باللجان.
 
-**ملفات الامتحانات ومحتواها:** لغير المشرف العام تخضع لقائمة `allowedExamIds` إلا مع `allExamsAllowed`؛ `me.permissions.exams`
+**ملفات الامتحانات ومحتواها:** لغير الأدمن والمشرف العام تخضع لقائمة `allowedExamIds` إلا مع `allExamsAllowed`؛ `me.permissions.exams`
 = `"all"` أو القائمة. من لا يحق له فتح الامتحان يرى بياناته دون الأسئلة النموذجية والملاحظات (`canOpen: false`).
 
 **الصلاحيات المخصصة:** تسميات عرض فقط ولا تمنح شيئاً. الصلاحيات المخزنة هي صلاحيات النظام فقط؛ غيرها يُحذف
@@ -94,28 +94,34 @@
 
 | الإجراء | الأدوار | الصلاحية المطلوبة | مقيّد باللجنة |
 |---|---|---|---|
-| `committees.read`, `courses.read`, `exams.read`, `tasks.read`, `books.read`, `summerRows.read` | كل مستخدم معتمد | — | — |
+| `committees.read`, `courses.read`, `tasks.read`, `books.read` | كل مستخدم معتمد | — | رئيس اللجنة والشيخ يريان لجانهما |
 | `committees.create` | المديرون | `add_new_committee` | — |
-| `committees.update`, `committees.delete` | المديرون | `manage_committees` | نعم |
-| `committees.reception` (مرحلتا التسجيل والامتحان) | المديرون، `assistant` | `manage_committees` (ممنوحة للمعاون) | نعم |
-| `committees.scoring` (التصحيح والتجميع والمراجعة) | المديرون، `teacher` | `manage_committees` (ممنوحة للمصحح) | نعم (المعلم أيضاً) |
-| `committees.finalize` (الكشف، الاعتماد، الإعلان، الحفل) | المديرون | `manage_committees` | نعم |
+| `committees.update`, `committees.delete` | المديرون | `manage_committees` (ممنوحة لرئيس اللجنة للتعديل) | نعم |
+| `committees.members` | المديرون | ممنوحة لرئيس اللجنة | نعم |
+| `committees.reception` (مرحلتا التسجيل والامتحان) | المديرون | ممنوحة لرئيس اللجنة | نعم |
+| `committees.scoring` (التصحيح والتجميع والمراجعة) | المديرون | ممنوحة لرئيس اللجنة | نعم |
+| `committees.finalize` (الكشف، الاعتماد، الإعلان، الحفل) | المديرون | ممنوحة لرئيس اللجنة | نعم |
 | `courses.write` | المديرون | `manage_courses` | — |
+| `exams.read` | كل مستخدم | `exams_pdf` (ممنوحة لرئيس اللجنة) | قائمة الامتحانات المسموحة |
 | `exams.write` (إنشاء، تعديل، رفع ملف) | المديرون | `exams_pdf` | — |
-| `exams.file` (تنزيل ملف الأسئلة) | المديرون فقط | — | قائمة الامتحانات المسموحة |
-| `exams.delete` | `super_admin` | — | — |
-| `tasks.write` | الكل عدا `auditor` | `calendar_schedule` | نعم (مهام اللجان) |
-| `tasks.delete` | المديرون | `calendar_schedule` | نعم |
-| `users.read`, `users.manage`, `profiles.read` | المديرون | `manage_assistants` | رئيس اللجنة: المتقدمون ومعاونو لجانه فقط |
-| `users.delete`, `users.grant`, `profiles.write` | `super_admin` | — | — |
+| `exams.file` (تنزيل ملف الأسئلة) | كل مستخدم | `exams_pdf` (ممنوحة لرئيس اللجنة) | قائمة الامتحانات المسموحة |
+| `exams.delete` | المشرف العام والأدمن | — | — |
+| `assignments.manage` | المديرون | ممنوحة لرئيس اللجنة | نعم |
+| `tasks.write`, `tasks.delete` | المديرون | `calendar_schedule` | نعم |
+| `users.read` | المديرون | ممنوحة لرئيس اللجنة | نعم |
+| `users.manage` | المديرون | `manage_assistants` | — |
+| `users.delete`, `users.grant` | المشرف العام والأدمن | — | — |
+| `users.admins` | المشرف العام فقط | — | — |
+| `profiles.read`, `profiles.write` | المشرف العام والأدمن | — | — |
 | `books.write` | المديرون | إحدى: `manage_courses`, `add_new_committee`, `exams_pdf` | — |
-| `summerRows.write` | المديرون | إحدى: `database_sheets`, `manage_committees` | — |
-| `scoring.read` | الكل عدا `assistant` | — | — |
-| `scoring.write` | المديرون، `teacher` | `manage_committees` (ممنوحة للمصحح) | نعم (المعلم أيضاً) |
-| `notifications.create` | `super_admin` | — | — |
-| `audit.read` | `super_admin`, `auditor` | — | — |
-| `stats.read` (شاشة الإحصائيات) | الكل للقراءة | `progress_stats` (ممنوحة لرئيس اللجنة والمدقق) | — |
-| `database.admin` | `super_admin` | — | — |
+| `summerRows.read`, `summerRows.write` | المديرون | إحدى: `database_sheets`, `manage_committees` (ممنوحة لرئيس اللجنة) | نعم للكتابة |
+| `scoring.read`, `scoring.write` | المديرون | ممنوحة لرئيس اللجنة | نعم |
+| `settings.write` | المشرف العام والأدمن | — | — |
+| `notifications.create` | المشرف العام والأدمن | — | — |
+| `audit.read` | المشرف العام فقط | — | — |
+| `stats.read` (شاشة الإحصائيات) | المديرون | `progress_stats` | — |
+| `database.admin` | المشرف العام فقط | — | — |
+| `database.backup` | المشرف العام والأدمن | — | — |
 | `ocr.use` | المديرون | `database_sheets` | — |
 
 هوية المنفّذ (اسم المصحح، من استلم اللجنة، من اعتمد، وقت الإنجاز) يضعها السيرفر من التوكن، ولا تُقبل من جسم الطلب.

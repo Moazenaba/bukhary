@@ -169,11 +169,28 @@ export function printExamInProgress(committees: Committee[]): number {
   doc.open();
   doc.write(examInProgressHtml(committees));
   doc.close();
+  const cleanup = () => {
+    setTimeout(() => {
+      try {
+        frame.remove();
+      } catch {
+        // already removed
+      }
+    }, 1000);
+  };
+
   setTimeout(() => {
-    frame.contentWindow?.focus();
-    frame.contentWindow?.print();
-    setTimeout(() => frame.remove(), 1000);
-  }, 100);
+    try {
+      frame.contentWindow?.focus();
+      if (frame.contentWindow) {
+        frame.contentWindow.onafterprint = cleanup;
+      }
+      frame.contentWindow?.print();
+    } catch {
+      cleanup();
+    }
+    setTimeout(cleanup, 60_000);
+  }, 250);
   return count;
 }
 

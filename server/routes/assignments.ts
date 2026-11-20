@@ -72,7 +72,7 @@ async function setCeremonyAttendee(db: Queryable, committeeId: string, person: {
 }
 
 /** Ends the assignments whose dates passed (the observer's powers already stop by date; this tidies up). */
-async function sweepExpired(db: Queryable) {
+export async function sweepExpired(db: Queryable) {
   const { rows } = await db.query(
     `UPDATE committee_assignments SET status = 'ended', ended_at = NOW()
      WHERE status = 'active' AND ends_on IS NOT NULL AND ends_on + 1 < CURRENT_DATE

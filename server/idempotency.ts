@@ -40,16 +40,33 @@ export function idempotency(pool: Pool) {
         res.setHeader('Idempotent-Replay', 'true');
         return res.status(prev.status).json(prev.response);
       }
-      const json = res.json.bind(res);
-      res.json = (body: unknown) => {
+      let settled = false;
+      const settle = (status: number, body: unknown) => {
+        if (settled) return;
+        settled = true;
         const done =
-          res.statusCode < 500
+          status > 0 && status < 500
             ? pool.query('UPDATE idempotency_keys SET status = $3, response = $4 WHERE user_id = $1 AND key = $2;',
-                [req.user!.id, key, res.statusCode, JSON.stringify(body ?? null)])
+                [req.user!.id, key, status, JSON.stringify(body ?? null)])
             : pool.query('DELETE FROM idempotency_keys WHERE user_id = $1 AND key = $2;', [req.user!.id, key]);
         done.catch((err) => logger.warn('idempotency.store_failed', { message: err.message }));
+      };
+
+      const json = res.json.bind(res);
+      res.json = (body: unknown) => {
+        settle(res.statusCode, body);
         return json(body);
       };
+
+      const send = res.send.bind(res);
+      res.send = (body: any) => {
+        if (!settled) settle(res.statusCode, typeof body === 'object' ? body : { content: String(body) });
+        return send(body);
+      };
+
+      res.on('close', () => {
+        if (!settled) settle(0, null);
+      });
       next();
     } catch (err) {
       next(err);

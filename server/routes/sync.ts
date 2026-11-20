@@ -22,7 +22,10 @@ export function syncRouter(pool: Pool) {
          (SELECT concat(max(updated_at), ':', count(*)) FROM permission_profiles),
          (SELECT concat(max(created_at), ':', count(*)) FROM books),
          (SELECT concat(max(created_at), ':', count(*)) FROM notifications WHERE target_user_id IS NULL OR target_user_id = $1),
-         (SELECT concat(max(read_at), ':', count(*)) FROM notification_reads WHERE user_id = $1)
+         (SELECT concat(max(read_at), ':', count(*)) FROM notification_reads WHERE user_id = $1),
+         (SELECT concat(max(created_at), ':', count(*)) FROM committee_head_grants WHERE user_id = $1 OR status = 'active'),
+         (SELECT concat(max(created_at), ':', count(*)) FROM committee_assignments WHERE user_id = $1 OR status = 'active'),
+         (SELECT concat(max(updated_at), ':', count(*)) FROM system_settings)
        )) AS version;`,
       [req.user!.id]
     );

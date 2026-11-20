@@ -76,8 +76,11 @@ class AuthServiceClass {
     this.initPromise ??= (async () => {
       try {
         if (tokens.access || (await refreshTokens())) await this.loadMe();
-      } catch {
-        this.reset();
+      } catch (err) {
+        // Do not reset session on transient network or 5xx errors; only reset on 401 Unauthorized
+        if (err instanceof ApiError && err.status === 401) {
+          this.reset();
+        }
       }
       this.ready = true;
       this.notify();
@@ -90,14 +93,24 @@ class AuthServiceClass {
     this.currentUser = { ...me.user, mustChangePassword: Boolean(me.mustChangePassword ?? me.user.mustChangePassword) };
     this.permissions = me.permissions;
     // Until a reset password is replaced, the server answers nothing else.
-    if (!this.currentUser.mustChangePassword) await this.refreshDirectory();
+    if (!this.currentUser.mustChangePassword) {
+      try {
+        await this.refreshDirectory();
+      } catch {
+        // Auxiliary directory loading failure is non-fatal to the user session
+      }
+    }
     this.notify();
   }
 
   /** Reloads the user list and permission profiles if this user may see them. */
   public async refreshDirectory() {
-    this.users = this.can('users.read') ? await DataService.getUsers() : this.currentUser ? [this.currentUser] : [];
-    this.profiles = this.can('profiles.read') ? await DataService.getProfiles() : [];
+    try {
+      this.users = this.can('users.read') ? await DataService.getUsers() : this.currentUser ? [this.currentUser] : [];
+      this.profiles = this.can('profiles.read') ? await DataService.getProfiles() : [];
+    } catch {
+      // Non-fatal
+    }
     this.notify();
   }
 
@@ -153,9 +166,9 @@ class AuthServiceClass {
       await this.loadMe();
       return { success: true, user: this.currentUser ?? data.user };
     } catch (err) {
-      // All or nothing: if the account or its permissions could not be loaded, no half-made
-      // session may survive to be restored on the next page load.
-      this.reset();
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        this.reset();
+      }
       return { success: false, error: err instanceof ApiError ? err.message : 'تعذر الاتصال بالخادم' };
     }
   }

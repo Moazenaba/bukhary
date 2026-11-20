@@ -98,12 +98,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="تصدير الكشوف" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-line/50 max-h-[92vh] overflow-y-auto animate-in fade-in duration-150">
+    <div role="dialog" aria-modal="true" aria-label="تصدير الكشوف" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto text-right print:p-0 print:bg-transparent print:static">
+      <style>{`
+        @media print {
+          body > *:not(#root) { display: none !important; }
+          .print-chrome-hide { display: none !important; }
+          .print-export-container { box-shadow: none !important; border: none !important; max-width: 100% !important; max-height: none !important; }
+        }
+      `}</style>
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-line/50 max-h-[92vh] overflow-y-auto animate-in fade-in duration-150 print-export-container">
         {/* Header */}
         <div className="px-5 py-4 bg-canvas border-b border-line/40 flex items-center justify-between">
           <div className="flex items-center gap-2 text-brand">
-            <span className="material-symbols-outlined text-2xl">file_download</span>
+            <span className="material-symbols-outlined text-2xl print-chrome-hide">file_download</span>
             <h3 className="font-bold text-base text-ink">
               تصدير كشوفات لجان مسابقات مسجد البخاري
             </h3>
@@ -111,7 +118,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <button
             aria-label="إغلاق"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center"
+            className="w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 flex items-center justify-center print-chrome-hide"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -119,12 +126,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         {/* Content */}
         <div className="p-5 space-y-4 text-right">
-          <p className="text-xs text-ink-soft leading-relaxed">
+          <p className="text-xs text-ink-soft leading-relaxed print-chrome-hide">
             تصدير كشف شامل لكافة لجان المسابقة ({committees.length} لجنة) بجميع مراحلها وملاحظاتها
             المسجلة لطباعتها أو فتحها في Google Sheets و Microsoft Excel.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 print-chrome-hide">
             <div
               onClick={() => setExportFormat('csv')}
               className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
@@ -217,7 +224,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 bg-canvas border-t border-line/40 flex items-center justify-end gap-2">
+        <div className="px-5 py-3.5 bg-canvas border-t border-line/40 flex items-center justify-end gap-2 print-chrome-hide">
           <button
             aria-label="إغلاق"
             onClick={onClose}

@@ -3,6 +3,7 @@ import { AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { toast } from './Toasts';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface AuthModalProps {
 
 /** The logged-in user's account: details, password change and logout. */
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUser, onLogout }) => {
+  useEscapeKey(isOpen ? onClose : () => {});
   if (!isOpen) return null;
 
   return (

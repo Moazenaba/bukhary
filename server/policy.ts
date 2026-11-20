@@ -94,7 +94,7 @@ export const ACTIONS = {
   },
   'summerRows.read': { roles: MANAGERS, anyPermission: ['database_sheets', 'manage_committees'], description: 'عرض كشف الدورة' },
   'summerRows.write': { roles: MANAGERS, anyPermission: ['database_sheets', 'manage_committees'], description: 'تعديل كشف الدورة' },
-  'scoring.read': { roles: MANAGERS, grantedToRoles: HEADS, description: 'عرض رصد الدرجات' },
+  'scoring.read': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'عرض رصد الدرجات' },
   'scoring.write': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'رصد درجات الطلاب' },
   'settings.write': { roles: ADMIN_ROLES, description: 'تعديل إعدادات النظام (موعد فتح الامتحانات، المراقبون، الخط، مدة التأخير)' },
   'notifications.create': { roles: ADMIN_ROLES, description: 'إرسال تنبيه عام' },

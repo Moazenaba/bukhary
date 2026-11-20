@@ -50,7 +50,7 @@ function buildDatabaseUrl(env: NodeJS.ProcessEnv): string | undefined {
 
 function parseTrustProxy(value: string | undefined): string | number | boolean {
   if (value === undefined || value === '') return false;
-  if (value === 'true') return true;
+  if (value === 'true') return 'loopback, linklocal, uniquelocal';
   if (value === 'false') return false;
   const n = Number(value);
   return Number.isInteger(n) ? n : value;

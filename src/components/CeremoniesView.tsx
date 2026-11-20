@@ -39,7 +39,7 @@ interface CeremoniesViewProps {
 const ARABIC_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 // Generate dynamic week mapping starting from current date
-const generateWeekMap = () => {
+export const generateWeekMap = () => {
   const map: Record<string, string> = {};
   const now = new Date();
   for (let i = 0; i < 7; i++) {
@@ -51,8 +51,6 @@ const generateWeekMap = () => {
   }
   return map;
 };
-
-const DAY_TO_DATE_MAP = generateWeekMap();
 
 export function getArabicDayName(dateStr?: string): string {
   if (!dateStr) return 'الاثنين';
@@ -161,8 +159,9 @@ export const CeremoniesView: React.FC<CeremoniesViewProps> = ({
   // Select day handler
   const handleSelectDayName = (day: string) => {
     setCeremonyDayName(day);
-    if (DAY_TO_DATE_MAP[day]) {
-      setCeremonyDate(DAY_TO_DATE_MAP[day]);
+    const dynamicWeekMap = generateWeekMap();
+    if (dynamicWeekMap[day]) {
+      setCeremonyDate(dynamicWeekMap[day]);
     }
   };
 

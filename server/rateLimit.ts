@@ -1,5 +1,19 @@
+import type { Request } from 'express';
 import type { Queryable } from './db.ts';
 import { HttpError } from './http.ts';
+
+/**
+ * Extracts and sanitizes the caller's IP address.
+ * Replaces IPv4-mapped IPv6 prefixes and falls back to socket address if untrusted or malformed.
+ */
+export function getClientIp(req: Request): string {
+  const raw = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  const clean = raw.replace(/^::ffff:/, '').trim();
+  if (/^[0-9a-fA-F:.]+$/.test(clean) && clean.length <= 45) {
+    return clean;
+  }
+  return req.socket?.remoteAddress?.replace(/^::ffff:/, '').trim() || '127.0.0.1';
+}
 
 // Attempt limits per caller address, kept in the database (several server instances share them).
 // After `max` failures inside `windowMs`, the address waits `blockMs`, then starts afresh.

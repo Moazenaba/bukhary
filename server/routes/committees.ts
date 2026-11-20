@@ -540,17 +540,22 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       for (const k of Object.keys(body.stages ?? {}) as StageKey[]) needed.add(STAGE_ACTION[k]);
       if (body.scoringDetails || body.aggregationDetails) needed.add('committees.scoring');
       if (body.ceremonyDetails) needed.add('committees.finalize');
+      if (body.excelUrl) needed.add('committees.scoring');
       if (body.receivedByAssistant !== undefined || body.examApprovedBy !== undefined) needed.add('committees.reception');
       for (const a of needed) assertAllowed(user, a);
       assertCommitteeScope(user, existing.id);
 
       const now = new Date().toISOString();
       const stages = { ...emptyStages(), ...(existing.stages ?? {}) };
+      if (body.excelUrl !== undefined) {
+        stages.sheet = { ...(stages.sheet ?? { completed: false }), excelUrl: body.excelUrl };
+      }
       if (body.stages) {
         Object.assign(stages, mergeLegacyStages(existing.stages ?? {}, body.stages, user, now));
         const { changed } = normalizeStageOrder(existing.stages ?? {}, stages, user, now, body.ceremonyDetails ?? existing.ceremony_details);
         for (const k of changed) assertAllowed(user, STAGE_ACTION[k]);
       }
+      const committeeData = { ...(existing.data ?? {}), ...(body.excelUrl ? { excelUrl: body.excelUrl } : {}) };
       const reception =
         body.receivedByAssistant === undefined
           ? existing.received_by_assistant
@@ -572,6 +577,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
            ceremony_details = COALESCE($5::jsonb, ceremony_details),
            received_by_assistant = $6::jsonb,
            exam_approved_by = $7::jsonb,
+           data = $8::jsonb,
            updated_at = NOW()
          WHERE id = $1 RETURNING *;`,
         [
@@ -584,6 +590,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
             : null,
           reception ? JSON.stringify(reception) : null,
           approval ? JSON.stringify(approval) : null,
+          JSON.stringify(committeeData),
         ]
       );
       if (body.ceremonyDetails) await syncCeremonyTask(db, updated[0]);
@@ -714,6 +721,13 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       );
       await db.query(
         'UPDATE permission_profiles SET allowed_committee_ids = allowed_committee_ids - $1::text WHERE allowed_committee_ids ? $1;',
+        [req.params.id]
+      );
+      await db.query(
+        `UPDATE committee_head_grants SET committee_ids = committee_ids - $1::text,
+           status = CASE WHEN jsonb_array_length(committee_ids - $1::text) = 0 THEN 'ended' ELSE status END,
+           ended_at = CASE WHEN jsonb_array_length(committee_ids - $1::text) = 0 THEN NOW() ELSE ended_at END
+         WHERE committee_ids ? $1;`,
         [req.params.id]
       );
       await audit(db, req, 'committee.delete', 'committee', req.params.id, committeeFromRow(rows[0]), null);

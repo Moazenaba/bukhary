@@ -21,7 +21,7 @@ import { evaluatedPermissions } from '../policy.ts';
 import { normalizePhone, optionalText, toAsciiDigits } from '../schemas.ts';
 import { emailSchema, passwordSchema, phoneSchema, userFromRow } from './users.ts';
 import { notify } from './notifications.ts';
-import { JOIN_LIMIT, LOGIN_LIMIT, assertNotBlocked, clearAttempts, countAttempt } from '../rateLimit.ts';
+import { JOIN_LIMIT, LOGIN_LIMIT, assertNotBlocked, clearAttempts, countAttempt, getClientIp } from '../rateLimit.ts';
 
 // Hash of a random string, compared when the account does not exist so that
 // "unknown user" and "wrong password" take the same time.
@@ -118,7 +118,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
   r.post('/login', route(async (req, res) => {
     const { identifier: raw, password } = loginInput.parse(req.body);
     // Too many wrong passwords from this address: a two-minute wait (no account is locked).
-    const limitKey = `login:${req.ip}`;
+    const limitKey = `login:${getClientIp(req)}`;
     await assertNotBlocked(pool, limitKey, LOGIN_LIMIT, res);
     // Phones are stored in one form (normalizePhone); an older row may still hold the form typed.
     const identifier = toAsciiDigits(raw).trim();
@@ -207,7 +207,7 @@ export function authRouter(config: AppConfig, pool: Pool) {
   }));
 
   r.post('/register', route(async (req, res) => {
-    const joinKey = `register:${req.ip}`;
+    const joinKey = `register:${getClientIp(req)}`;
     await assertNotBlocked(pool, joinKey, JOIN_LIMIT, res);
     const input = registerInput.parse(req.body);
     await countAttempt(pool, joinKey, JOIN_LIMIT);
@@ -234,27 +234,29 @@ export function authRouter(config: AppConfig, pool: Pool) {
     }
     await audit(pool, req, 'user.register', 'user', id, null, { name, role: roleKey, requestCode });
     // Admins are told at once, in the app and on their phones.
-    const { rows: admins } = await pool.query("SELECT id FROM app_users WHERE role IN ('super_admin', 'admin') AND status = 'approved';");
-    for (const admin of admins) {
-      // One unread «طلبات انضمام جديدة» notification per admin that keeps counting, instead of one
-      // notification (and one phone alert) per request.
-      const { rows: open } = await pool.query(
-        `SELECT n.id, n.data FROM notifications n
-         WHERE n.target_user_id = $1 AND n.data->>'kind' = 'join_requests'
-           AND NOT EXISTS (SELECT 1 FROM notification_reads r WHERE r.notification_id = n.id AND r.user_id = $1)
-         ORDER BY n.created_at DESC LIMIT 1;`,
-        [admin.id]
-      );
-      if (open[0]) {
-        const count = Number(open[0].data?.count ?? 1) + 1;
-        await pool.query(
-          `UPDATE notifications SET title = $2, description = $3, data = jsonb_set(data, '{count}', to_jsonb($4::int)) WHERE id = $1;`,
-          [open[0].id, `طلبات انضمام جديدة (${count})`, `آخرها: ${name}`, count]
+    await withTransaction(pool, async (db) => {
+      const { rows: admins } = await db.query("SELECT id FROM app_users WHERE role IN ('super_admin', 'admin') AND status = 'approved';");
+      for (const admin of admins) {
+        // One unread «طلبات انضمام جديدة» notification per admin that keeps counting, instead of one
+        // notification (and one phone alert) per request.
+        const { rows: open } = await db.query(
+          `SELECT n.id, n.data FROM notifications n
+           WHERE n.target_user_id = $1 AND n.data->>'kind' = 'join_requests'
+             AND NOT EXISTS (SELECT 1 FROM notification_reads r WHERE r.notification_id = n.id AND r.user_id = $1)
+           ORDER BY n.created_at DESC LIMIT 1 FOR UPDATE;`,
+          [admin.id]
         );
-      } else {
-        await notify(pool, { title: 'طلب انضمام جديد', description: name, type: 'info', targetUserId: admin.id, data: { kind: 'join_requests', count: 1 } });
+        if (open[0]) {
+          const count = Number(open[0].data?.count ?? 1) + 1;
+          await db.query(
+            `UPDATE notifications SET title = $2, description = $3, data = jsonb_set(data, '{count}', to_jsonb($4::int)) WHERE id = $1;`,
+            [open[0].id, `طلبات انضمام جديدة (${count})`, `آخرها: ${name}`, count]
+          );
+        } else {
+          await notify(db, { title: 'طلب انضمام جديد', description: name, type: 'info', targetUserId: admin.id, data: { kind: 'join_requests', count: 1 } });
+        }
       }
-    }
+    });
     res.status(201).json({ success: true, requestCode, message: 'تم تسجيل طلب الانضمام وهو الآن قيد المراجعة' });
   }));
 

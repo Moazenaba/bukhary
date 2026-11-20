@@ -44,6 +44,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   const [examDate, setExamDate] = useState<string>('');
   const [studentsCount, setStudentsCount] = useState<number | ''>('');
   const [questionsCount, setQuestionsCount] = useState<number>(5);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Inline quick course creation state
   const [isCreatingInline, setIsCreatingInline] = useState(false);
@@ -96,7 +97,15 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!committeeName.trim() || !selectedCourseId) return;
+    setFormError(null);
+    if (!committeeName.trim()) {
+      setFormError('يرجى كتابة اسم اللجنة.');
+      return;
+    }
+    if (!selectedCourseId) {
+      setFormError('يرجى تحديد الدورة التي تتبع لها هذه اللجنة.');
+      return;
+    }
 
     const finalMembers = members.map((m) => m.trim()).filter(Boolean);
 
@@ -792,6 +801,13 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               className="w-full bg-canvas border border-line rounded-xl p-2.5 text-xs text-ink outline-none focus:border-brand focus:bg-white"
             />
           </div>
+
+          {formError && (
+            <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+              <span className="material-symbols-outlined text-base text-rose-600">error</span>
+              <span>{formError}</span>
+            </div>
+          )}
 
           {/* Submit Buttons */}
           <div className="pt-3 border-t border-line/30 flex items-center justify-end gap-2">

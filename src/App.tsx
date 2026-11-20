@@ -171,12 +171,12 @@ export default function App() {
   });
   // The chosen course if it still exists, else the default (current) course, else any active one.
   const currentCourseId =
-    courses.find((c) => c.id === storedCourseId)?.id ??
-    courses.find((c) => c.isDefault)?.id ??
-    courses.find((c) => c.status === 'active')?.id ??
+    courses.find((c) => c?.id === storedCourseId)?.id ??
+    courses.find((c) => c?.isDefault)?.id ??
+    courses.find((c) => c?.status === 'active')?.id ??
     courses[0]?.id;
   const committees = useMemo(
-    () => (currentCourseId ? allCommittees.filter((c) => c.courseId === currentCourseId) : allCommittees),
+    () => (currentCourseId ? allCommittees.filter((c) => c.courseId === currentCourseId || !c.courseId) : allCommittees),
     [allCommittees, currentCourseId]
   );
   // Tasks and notices about a committee of another course are hidden; general ones stay.

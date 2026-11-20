@@ -117,7 +117,7 @@ export function userFromRow(r: any) {
 
 async function countSuperAdmins(db: Queryable, excludeId: string): Promise<number> {
   const { rows } = await db.query(
-    "SELECT count(*)::int AS n FROM app_users WHERE role = 'super_admin' AND status = 'approved' AND id <> $1;",
+    "SELECT count(*)::int AS n FROM app_users WHERE role = 'super_admin' AND status = 'approved' AND id <> $1 FOR UPDATE;",
     [excludeId]
   );
   return rows[0].n;
@@ -246,6 +246,13 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
   if (isSelf && existing && (roleChanged || permsChanged || statusChanged || assignedChanged || grantsChanged)) {
     throw forbidden('لا يمكنك تعديل صلاحياتك أو لجانك أو حالة حسابك بنفسك');
   }
+  // Non-admins cannot self-edit their primary identity (name, phone, email) without management permission.
+  const nameChanged = existing ? input.name.trim() !== existing.name.trim() : false;
+  const phoneChanged = existing ? input.phone !== existing.phone : false;
+  const emailChanged = existing ? (sent('email') && input.email !== existing.email) : false;
+  if (isSelf && existing && !canManage && (nameChanged || phoneChanged || emailChanged)) {
+    throw forbidden('تعديل الاسم أو رقم الهاتف أو البريد الإلكتروني يتطلب مراجعة المشرف');
+  }
   if ((roleChanged || permsChanged || grantsChanged) && !canGrant) {
     throw forbidden('تعيين الأدوار والصلاحيات متاح للأدمن فقط');
   }
@@ -283,6 +290,7 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
 
   // Never leave the system without an approved super admin.
   if (existing?.role === 'super_admin' && (role !== 'super_admin' || status !== 'approved')) {
+    await db.query("SELECT id FROM app_users WHERE role = 'super_admin' FOR UPDATE;");
     if ((await countSuperAdmins(db, existing.id)) === 0) throw conflict('لا يمكن إزالة آخر مشرف عام في النظام');
   }
 
@@ -460,6 +468,7 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
     assertAllowed(req.user!, 'users.delete');
     if (req.params.id === req.user!.id) throw badRequest('لا يمكنك حذف حسابك الشخصي');
     await withTransaction(pool, async (db) => {
+      await db.query("SELECT id FROM app_users WHERE role = 'super_admin' FOR UPDATE;");
       const { rows } = await db.query('SELECT * FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
       if (!rows[0] || !canSeeRole(req.user!, rows[0].role)) throw notFound('المستخدم غير موجود');
       if (rows[0].role === 'super_admin' && (await countSuperAdmins(db, rows[0].id)) === 0) {

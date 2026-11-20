@@ -61,6 +61,14 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !book.trim()) return;
+    let safeOpensAt: string | undefined = undefined;
+    if (opensAt) {
+      const parsed = new Date(opensAt);
+      if (!Number.isNaN(parsed.getTime())) {
+        safeOpensAt = parsed.toISOString();
+      }
+    }
+
     const newExam: ExamItem = {
       id: `exam-${crypto.randomUUID()}`,
       title: title.trim(),
@@ -72,7 +80,7 @@ export const AddExamModal: React.FC<AddExamModalProps> = ({
       // Set by the server (WEB-01); the display format used before was rejected.
       uploadedAt: '',
       notes: notes.trim(),
-      opensAt: opensAt ? new Date(opensAt).toISOString() : undefined,
+      opensAt: safeOpensAt,
     };
     setIsSaving(true);
     const saved = await onAddExam(newExam, pdfFile ?? undefined);

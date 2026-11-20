@@ -154,7 +154,8 @@ export function examsRouter(pool: Pool) {
     // The per-user exam allow-list is enforced here, not only in the UI (API-06).
     const user = req.user!;
     const { rows: ex } = await pool.query('SELECT opens_at, book FROM exams WHERE id = $1;', [req.params.id]);
-    if (!canAccessExam(user, req.params.id, ex[0]?.book)) throw forbidden('هذا الامتحان غير متاح لك');
+    if (!ex[0]) throw notFound('الامتحان غير موجود');
+    if (!canAccessExam(user, req.params.id, ex[0].book)) throw forbidden('هذا الامتحان غير متاح لك');
     // Locked until shortly before the exam, for everyone but admins and super admins.
     const from = availableFrom(ex[0]?.opens_at, await getSetting(pool, 'exam_open_hours_before'));
     if (from && !isAdminRole(user.role) && Date.now() < from.getTime()) {

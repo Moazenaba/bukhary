@@ -377,12 +377,12 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
       };
       setStages(nextStages);
       const nextStudentsCount: number | undefined =
-        parsedStudents.length > 0 && (!studentsCount || studentsCount === 0)
+        canEditBase && parsedStudents.length > 0 && (!studentsCount || studentsCount === 0)
           ? parsedStudents.length
           : typeof studentsCount === 'number' && !isNaN(studentsCount)
           ? studentsCount
-          : undefined;
-      if (parsedStudents.length > 0 && (!studentsCount || studentsCount === 0)) {
+          : committee.studentsCount;
+      if (canEditBase && parsedStudents.length > 0 && (!studentsCount || studentsCount === 0)) {
         setStudentsCount(parsedStudents.length);
       }
 

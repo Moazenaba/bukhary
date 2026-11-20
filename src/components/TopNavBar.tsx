@@ -113,9 +113,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                 className="bg-transparent text-xs font-bold text-brand outline-none cursor-pointer max-w-[84px] sm:max-w-[220px]"
               >
                 {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name}
-                    {course.isDefault ? ' (الحالية)' : ''}
+                  <option key={course?.id} value={course?.id}>
+                    {course?.name}
+                    {course?.isDefault ? ' (الحالية)' : ''}
                   </option>
                 ))}
               </select>

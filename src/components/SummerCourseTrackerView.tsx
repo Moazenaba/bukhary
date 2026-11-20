@@ -455,7 +455,10 @@ export const SummerCourseTrackerView: React.FC<SummerCourseTrackerViewProps> = (
       return;
     }
     const inCourse = committees.filter((c) => c.courseId === targetCourse.id);
-    const nextNum = inCourse.reduce((max, c) => Math.max(max, c.committeeNumber || 0), 0) + 1;
+    const inCourseRows = rows.filter((r) => (r.courseId || activeDefaultCourse?.id) === targetCourse.id);
+    const maxCommNum = inCourse.reduce((max, c) => Math.max(max, c.committeeNumber || 0), 0);
+    const maxRowNum = inCourseRows.reduce((max, r) => Math.max(max, r.number || 0), 0);
+    const nextNum = Math.max(maxCommNum, maxRowNum) + 1;
     const now = new Date();
     await onAddCommitteeFromRow?.({
       id: `comm-${crypto.randomUUID()}`,
