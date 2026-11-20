@@ -2,6 +2,45 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api, onSessionExpired, refreshTokens, tokens } from '../../src/services/api';
 
+const store = new Map<string, string>();
+const storageTarget = {
+  getItem: (k: string) => store.get(k) ?? null,
+  setItem: (k: string, v: string) => store.set(k, String(v)),
+  removeItem: (k: string) => store.delete(k),
+  clear: () => store.clear(),
+  get length() { return store.size; },
+  key: (i: number) => Array.from(store.keys())[i] ?? null,
+};
+const storageMock = new Proxy(storageTarget, {
+  get(target, prop, receiver) {
+    if (prop in target) return (target as any)[prop];
+    return store.get(String(prop)) ?? null;
+  },
+  set(target, prop, value) {
+    store.set(String(prop), String(value));
+    return true;
+  },
+  deleteProperty(target, prop) {
+    return store.delete(String(prop));
+  },
+  ownKeys() {
+    return Array.from(store.keys());
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    if (store.has(String(prop))) {
+      return { configurable: true, enumerable: true, value: store.get(String(prop)) };
+    }
+    return undefined;
+  },
+});
+try {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: storageMock,
+    configurable: true,
+    writable: true,
+  });
+} catch {}
+
 // Replaces the network with a list of canned responses, in order.
 function mockFetch(responses: Array<{ status: number; body?: unknown }>) {
   const calls: Array<{ url: string; init?: RequestInit }> = [];

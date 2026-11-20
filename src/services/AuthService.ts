@@ -166,9 +166,7 @@ class AuthServiceClass {
       await this.loadMe();
       return { success: true, user: this.currentUser ?? data.user };
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        this.reset();
-      }
+      this.reset();
       return { success: false, error: err instanceof ApiError ? err.message : 'تعذر الاتصال بالخادم' };
     }
   }
