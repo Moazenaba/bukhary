@@ -165,5 +165,19 @@ describe('«شيخ اللجنة» stacks with observer roles and ends per commit
     expect(after.committeeScope).not.toContain(c1.id);
     expect(after.committeeScope).toContain(c2.id);
   });
+
+  it('a ceremony done before the hook existed is cleared by the sweep, without ending later observers', async () => {
+    const person = await userWithToken(t, { role: 'sheikh', committeeIds: [] });
+    const c3 = await mk(33);
+    const g = await grant({ userId: person.id, committeeIds: [c3.id], startsOn: day(0), endsOn: day(4) });
+    expect(g.status).toBe(201);
+    // Marked done directly in the database, as it was before the one-time hook.
+    await t.pool.query(`UPDATE committees SET stages = jsonb_set(COALESCE(stages, '{}'::jsonb), '{ceremony}', '{"completed": true}') WHERE id = $1;`, [c3.id]);
+    await sweepHeadGrants(t.pool);
+    const row = await t.pool.query('SELECT status FROM committee_head_grants WHERE id = $1;', [g.body.grant.id]);
+    expect(row.rows[0].status).toBe('ended');
+    const after = (await me(person)).permissions;
+    expect(after.committeeScope).not.toContain(c3.id);
+  });
 });
 

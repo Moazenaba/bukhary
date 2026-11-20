@@ -97,8 +97,7 @@ export async function committeeLine(db: Queryable, committeeId: string) {
 
 /**
  * Ends what is over. Run on every read of the lists and by the scheduled maintenance:
- *   - a committee whose ceremony is done leaves every «شيخ اللجنة» grant on it (the grant ends when no committee is left),
- *     and every observer on it ends too; each person is told;
+ *   - a committee whose ceremony is done leaves every «شيخ اللجنة» grant on it (the grant ends when no committee is left);
  *   - a grant with «no» or «undecided» ends on its last day (the granting admin is told if undecided).
  */
 /**
@@ -151,6 +150,34 @@ export async function onCeremonyDone(db: Queryable, committeeId: string) {
 
 export async function sweepHeadGrants(db: Queryable) {
   let ended = 0;
+  // 1. Committees whose ceremony was already done before the one-time hook existed: the grant leaves them.
+  //    Observers are NOT touched here (an observer assigned after the ceremony keeps the assignment).
+  const { rows: stale } = await db.query(
+    `SELECT g.id, g.user_id, c.id AS committee_id FROM committee_head_grants g
+     CROSS JOIN LATERAL jsonb_array_elements_text(g.committee_ids) AS cid(value)
+     JOIN committees c ON c.id = cid.value
+     WHERE g.status = 'active' AND (c.stages -> 'ceremony' ->> 'completed') = 'true';`
+  );
+  for (const s of stale) {
+    const line = await committeeLine(db, s.committee_id);
+    await db.query(
+      `UPDATE committee_head_grants
+       SET committee_ids = committee_ids - $2::text,
+           status = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN 'ended' ELSE status END,
+           ended_at = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN NOW() ELSE ended_at END
+       WHERE id = $1;`,
+      [s.id, s.committee_id]
+    );
+    ended++;
+    await notify(db, {
+      title: `انتهى حفل ${line?.title ?? 'اللجنة'}`,
+      description: `انتهت صلاحية «شيخ اللجنة» لك في هذه اللجنة. ${line?.text ?? ''}`,
+      type: 'info',
+      committeeId: s.committee_id,
+      targetUserId: s.user_id,
+      data: { grantId: s.id },
+    });
+  }
   // 2. Grants over their window that are not «yes»: end them, and tell the granting admin when nothing was decided.
   const { rows } = await db.query(
     `SELECT g.id, g.user_id, g.ceremony_decision, g.granted_by FROM committee_head_grants g

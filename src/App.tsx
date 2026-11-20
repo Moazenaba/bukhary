@@ -961,7 +961,11 @@ export default function App() {
                       }`}
                     >
                       <span className="material-symbols-outlined text-sm">filter_alt</span>
-                      <span>لجاني المسندة فقط ({currentUser.allCommitteesAllowed ? 'الكل' : (currentUser.assignedCommitteeIds ?? []).length})</span>
+                      <span>لجاني المسندة فقط ({(() => {
+                        const scope = AuthService.getPermissions()?.committeeScope;
+                        if (currentUser.allCommitteesAllowed || scope === 'all') return 'الكل';
+                        return Array.isArray(scope) ? scope.length : (currentUser.assignedCommitteeIds ?? []).length;
+                      })()})</span>
                     </button>
 
                     <button
