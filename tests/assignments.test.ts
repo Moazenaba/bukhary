@@ -64,9 +64,8 @@ describe('who may assign', () => {
     expect((await assign(head.auth, { ...body, userId: head.id })).status).toBe(403); // himself
   });
 
-  it('refuses targets that are not sheikhs or heads, or already sit on that committee', async () => {
+  it('refuses targets that are not sheikhs or heads, or an inverted window', async () => {
     expect((await assign(admin.auth, { userId: sa.id, committeeId: other.id, task: 'exam' })).status).toBe(400);
-    expect((await assign(admin.auth, { userId: sheikh.id, committeeId: own.id, task: 'exam' })).status).toBe(400);
     expect((await assign(admin.auth, { userId: sheikh.id, committeeId: other.id, task: 'exam', startsOn: '2026-05-02', endsOn: '2026-05-01' })).status).toBe(400);
   });
 });

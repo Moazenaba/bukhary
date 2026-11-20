@@ -6,7 +6,7 @@ import { audit } from '../audit.ts';
 import type { Pool, Queryable } from '../db.ts';
 import { notFound, route } from '../http.ts';
 import { optionalId } from '../schemas.ts';
-import { seesAllCommittees } from '../policy.ts';
+import { seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
 import { queuePush } from '../push.ts';
 
 export type NotificationType = 'urgent' | 'info' | 'success';
@@ -61,7 +61,7 @@ export function notificationsRouter(pool: Pool) {
                 OR EXISTS (SELECT 1 FROM committees c WHERE c.id = n.committee_id
                            AND c.ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $1::text)))))
        ORDER BY n.created_at DESC LIMIT $2;`,
-      [user.id, limit, seesAllCommittees(user), user.assignedCommitteeIds]
+      [user.id, limit, seesAllCommittees(user), visibleCommitteeIds(user)]
     );
     res.json({ success: true, notifications: rows.map(fromRow) });
   }));
