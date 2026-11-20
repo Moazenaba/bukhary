@@ -132,7 +132,7 @@ export function assignmentsRouter(pool: Pool) {
       const target = u[0];
       if (!target || target.status !== 'approved') throw badRequest('الشخص المختار غير موجود أو غير معتمد');
       if (target.role !== 'sheikh' && target.role !== 'committee_head') throw badRequest('التكليف للشيوخ ورؤساء اللجان فقط');
-      if ((target.assigned_committee_ids ?? []).includes(body.committeeId)) throw badRequest('هذا الشخص مسند لهذه اللجنة أصلًا');
+      // A person may also observe a committee they are already on (the owner's rule): the observer role adds read-only powers.
       const id = crypto.randomUUID();
       try {
         await db.query(

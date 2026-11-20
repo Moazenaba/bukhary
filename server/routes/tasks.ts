@@ -1,10 +1,11 @@
 import { Router } from 'express';
+import { onCeremonyDone } from './grants.ts';
 import { z } from 'zod';
 import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, forbidden, notFound, route } from '../http.ts';
-import { isAllowed, isCommitteeInScope, isScopedRole, seesAllCommittees } from '../policy.ts';
+import { isAllowed, isCommitteeInScope, isScopedRole, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
 import { dateOnly, id, optionalId, optionalText, pageQuery, pagedRows } from '../schemas.ts';
 import { notify } from './notifications.ts';
 import { syncCeremonyTask } from './committees.ts';
@@ -88,7 +89,7 @@ export function tasksRouter(pool: Pool) {
       `SELECT * FROM schedule_tasks ${where} ORDER BY date ASC, time ASC NULLS LAST, id ASC`,
       `SELECT count(*)::int AS n FROM schedule_tasks ${where};`,
       q,
-      all ? [] : [user.assignedCommitteeIds, user.id]
+      all ? [] : [visibleCommitteeIds(user), user.id]
     );
     res.json({ success: true, tasks: page.rows.map(taskFromRow), total: page.total, hasMore: page.hasMore });
   }));
@@ -164,6 +165,8 @@ export function tasksRouter(pool: Pool) {
         );
         const { rows: upd } = await db.query('UPDATE committees SET stages = $2::jsonb, updated_at = NOW() WHERE id = $1 RETURNING *;', [c.id, JSON.stringify(next.stages)]);
         await syncCeremonyTask(db, upd[0], { detailsChanged: false });
+        // The ceremony is done for the first time: its grants and observers end now (see grants.ts onCeremonyDone).
+        if (!c.stages?.ceremony?.completed && next.stages?.ceremony?.completed) await onCeremonyDone(db, c.id);
         await audit(db, req, completed ? 'committee.completeStage' : 'committee.reopenStage', 'committee', c.id, null, null, 'ceremony');
         const { rows: after } = await db.query('SELECT * FROM schedule_tasks WHERE id = $1;', [task.id]);
         return after[0];

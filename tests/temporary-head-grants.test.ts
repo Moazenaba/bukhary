@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { sweepHeadGrants } from '../server/routes/grants.ts';
+import { onCeremonyDone, sweepHeadGrants } from '../server/routes/grants.ts';
 import { committeeBody, seedCourse, setupApp, userWithToken, type TestApp } from './helpers.ts';
 
 // «شيخ اللجنة»: an admin makes a sheikh the head of a committee for a date window.
@@ -112,7 +112,7 @@ describe('the sweep at the end of a window', () => {
 
   it('a «yes» grant ends once the ceremony of its committee is marked done', async () => {
     await t.pool.query(`UPDATE committees SET stages = jsonb_set(COALESCE(stages, '{}'::jsonb), '{ceremony}', '{"completed": true}') WHERE id = $1;`, [c1.id]);
-    await sweepHeadGrants(t.pool);
+    await onCeremonyDone(t.pool, c1.id);
     const { rows } = await t.pool.query("SELECT status FROM committee_head_grants WHERE user_id = $1 AND committee_ids @> $2::jsonb;", [sheikh.id, JSON.stringify([c1.id])]);
     expect(rows.every((r: any) => r.status === 'ended')).toBe(true);
   });
@@ -157,7 +157,7 @@ describe('«شيخ اللجنة» stacks with observer roles and ends per commit
     const g = await grant({ userId: person.id, committeeIds: [c1.id, c2.id], startsOn: day(0), endsOn: day(4) });
     expect(g.status).toBe(201);
     await t.pool.query(`UPDATE committees SET stages = jsonb_set(COALESCE(stages, '{}'::jsonb), '{ceremony}', '{"completed": true}') WHERE id = $1;`, [c1.id]);
-    await sweepHeadGrants(t.pool);
+    await onCeremonyDone(t.pool, c1.id);
     const row = await t.pool.query('SELECT status, committee_ids FROM committee_head_grants WHERE id = $1;', [g.body.grant.id]);
     expect(row.rows[0].status).toBe('active');
     expect(row.rows[0].committee_ids).toEqual([c2.id]);

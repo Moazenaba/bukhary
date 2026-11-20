@@ -1,11 +1,12 @@
 import { Router, type Request } from 'express';
+import { onCeremonyDone } from './grants.ts';
 import { z } from 'zod';
 import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import type { AppConfig } from '../config.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, notFound, route } from '../http.ts';
-import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, observedCommitteeIds, seesAllCommittees } from '../policy.ts';
+import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, observedCommitteeIds, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
 import { staffableUsers } from './users.ts';
 import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages, normalizeStageOrder } from '../workflow.ts';
 import { notify } from './notifications.ts';
@@ -383,7 +384,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
     const where = seesAllCommittees(user)
       ? ''
       : `WHERE id = ANY($1::text[]) OR ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $2::text))`;
-    const params = seesAllCommittees(user) ? [] : [[...user.assignedCommitteeIds, ...observedCommitteeIds(user)], user.id];
+    const params = seesAllCommittees(user) ? [] : [[...visibleCommitteeIds(user), ...observedCommitteeIds(user)], user.id];
     const page = await pagedRows(
       pool,
       `SELECT * FROM committees ${where} ORDER BY committee_number ASC, id ASC`,
@@ -587,6 +588,8 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       );
       if (body.ceremonyDetails) await syncCeremonyTask(db, updated[0]);
       else if (body.stages) await syncCeremonyTask(db, updated[0], { detailsChanged: false });
+      // The ceremony is done for the first time: its grants and observers end now (see grants.ts onCeremonyDone).
+      if (!existing.stages?.ceremony?.completed && stages.ceremony?.completed) await onCeremonyDone(db, existing.id);
       await audit(db, req, 'committee.patch', 'committee', req.params.id, committeeFromRow(existing), committeeFromRow(updated[0]),
         Object.keys(body).filter((k) => k !== 'expectedUpdatedAt').join(','));
       return updated[0];
@@ -654,6 +657,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         // The ceremony's calendar task follows the stage.
         await syncCeremonyTask(db, updated[0], { detailsChanged: false });
       }
+      if (!existing.stages?.ceremony?.completed && next.stages?.ceremony?.completed) await onCeremonyDone(db, existing.id);
       if (action.type === 'scheduleCeremony') {
         await notifyCeremonyAttendees(db, existing, before, beforeAttendees, next.ceremonyDetails ?? {});
         await syncCeremonyTask(db, updated[0]);

@@ -101,54 +101,56 @@ export async function committeeLine(db: Queryable, committeeId: string) {
  *     and every observer on it ends too; each person is told;
  *   - a grant with «no» or «undecided» ends on its last day (the granting admin is told if undecided).
  */
+/**
+ * Runs once, the moment a committee's ceremony is marked done for the first time (the committee screens call it).
+ * Every «شيخ اللجنة» grant on that committee loses it, and every observer on it ends; each person is told.
+ * It is not run on a timer: an observer assigned after the ceremony is over keeps the assignment.
+ */
+export async function onCeremonyDone(db: Queryable, committeeId: string) {
+  let ended = 0;
+  const line = await committeeLine(db, committeeId);
+  const { rows: grants } = await db.query(
+    `SELECT id, user_id FROM committee_head_grants WHERE status = 'active' AND committee_ids ? $1;`,
+    [committeeId]
+  );
+  for (const g of grants) {
+    await db.query(
+      `UPDATE committee_head_grants
+       SET committee_ids = committee_ids - $2::text,
+           status = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN 'ended' ELSE status END,
+           ended_at = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN NOW() ELSE ended_at END
+       WHERE id = $1;`,
+      [g.id, committeeId]
+    );
+    ended++;
+    await notify(db, {
+      title: `انتهى حفل ${line?.title ?? 'اللجنة'}`,
+      description: `انتهت صلاحية «شيخ اللجنة» لك في هذه اللجنة. ${line?.text ?? ''}`,
+      type: 'info',
+      committeeId,
+      targetUserId: g.user_id,
+      data: { grantId: g.id },
+    });
+  }
+  const { rows: observers } = await db.query(
+    `UPDATE committee_assignments SET status = 'ended', ended_at = NOW()
+     WHERE committee_id = $1 AND status = 'active' RETURNING user_id;`,
+    [committeeId]
+  );
+  for (const o of observers) {
+    await notify(db, {
+      title: `انتهى التكليف في ${line?.title ?? 'اللجنة'}`,
+      description: `انتهى حفل اللجنة وانتهت المراقبة. ${line?.text ?? ''}`,
+      type: 'info',
+      committeeId,
+      targetUserId: o.user_id,
+    });
+  }
+  return ended + observers.length;
+}
+
 export async function sweepHeadGrants(db: Queryable) {
   let ended = 0;
-  // 1. Committees whose ceremony is done: take them out of the grants and end their observers.
-  const done = await db.query(
-    `SELECT id FROM committees WHERE (stages->'ceremony'->>'completed') = 'true';`
-  );
-  for (const { id: committeeId } of done.rows) {
-    const line = await committeeLine(db, committeeId);
-    const { rows: grants } = await db.query(
-      `SELECT id, user_id, granted_by FROM committee_head_grants
-       WHERE status = 'active' AND committee_ids ? $1;`,
-      [committeeId]
-    );
-    for (const g of grants) {
-      await db.query(
-        `UPDATE committee_head_grants
-         SET committee_ids = committee_ids - $2::text,
-             status = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN 'ended' ELSE status END,
-             ended_at = CASE WHEN jsonb_array_length(committee_ids - $2::text) = 0 THEN NOW() ELSE ended_at END
-         WHERE id = $1;`,
-        [g.id, committeeId]
-      );
-      await notify(db, {
-        title: `انتهى حفل ${line?.title ?? 'اللجنة'}`,
-        description: `انتهت صلاحية «شيخ اللجنة» لك في هذه اللجنة. ${line?.text ?? ''}`,
-        type: 'info',
-        committeeId,
-        targetUserId: g.user_id,
-        data: { grantId: g.id },
-      });
-    }
-    const { rows: observers } = await db.query(
-      `UPDATE committee_assignments SET status = 'ended', ended_at = NOW()
-       WHERE committee_id = $1 AND status = 'active' RETURNING user_id;`,
-      [committeeId]
-    );
-    for (const o of observers) {
-      await notify(db, {
-        title: `انتهى التكليف في ${line?.title ?? 'اللجنة'}`,
-        description: `انتهى حفل اللجنة وانتهت المراقبة. ${line?.text ?? ''}`,
-        type: 'info',
-        committeeId,
-        targetUserId: o.user_id,
-      });
-    }
-    ended += grants.length;
-  }
-
   // 2. Grants over their window that are not «yes»: end them, and tell the granting admin when nothing was decided.
   const { rows } = await db.query(
     `SELECT g.id, g.user_id, g.ceremony_decision, g.granted_by FROM committee_head_grants g
