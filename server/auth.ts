@@ -19,7 +19,24 @@ interface AccessClaims {
   sub: string;
   ver: number;
   sid?: string;
+  /** «الدخول بعين المستخدم»: the admin acting as `sub`. */
+  imp?: string;
 }
+
+/** How long an admin may act as another user before signing in as them again. */
+export const IMPERSONATION_TTL_SECONDS = 3600;
+
+/** A token for an admin acting as `userId` (no refresh token: it simply ends). */
+export function signImpersonationToken(config: AppConfig, userId: string, tokenVersion: number, sessionId: string, adminId: string): string {
+  return jwt.sign({ ver: tokenVersion, sid: sessionId, imp: adminId } satisfies Omit<AccessClaims, 'sub'>, config.jwtSecret, {
+    subject: userId,
+    expiresIn: IMPERSONATION_TTL_SECONDS,
+    algorithm: 'HS256',
+  });
+}
+
+/** What an admin acting as someone may not do: their own phone would get the person's pushes, and so on. */
+const IMPERSONATION_BLOCKED = [/^\/api\/devices/, /^\/api\/auth\/change-password$/, /^\/api\/auth\/logout-all$/, /^\/api\/impersonation\/start/];
 
 /** A rotated refresh token presented again within this window is treated as a race between tabs, not theft. */
 export const REFRESH_REUSE_GRACE_SECONDS = 30;
@@ -186,7 +203,7 @@ export function authenticate(config: AppConfig, pool: Pool) {
       }
 
       const { rows } = await pool.query(
-        `SELECT ${PRINCIPAL_COLUMNS}, s.revoked_at AS session_revoked, s.id AS session_found
+        `SELECT ${PRINCIPAL_COLUMNS}, s.revoked_at AS session_revoked, s.id AS session_found, s.impersonator_id AS session_impersonator
          FROM app_users u LEFT JOIN sessions s ON s.id = $2 AND s.user_id = u.id
          WHERE u.id = $1;`,
         [claims.sub, claims.sid ?? null]
@@ -199,6 +216,21 @@ export function authenticate(config: AppConfig, pool: Pool) {
       req.user = toPrincipal(row);
       req.sessionId = claims.sid;
       const path = `${req.baseUrl}${req.path}`.replace(/\/$/, '');
+      if (claims.imp || row.session_impersonator) {
+        // The session must be the one opened for this admin, who must still be an admin.
+        if (!claims.imp || claims.imp !== row.session_impersonator) {
+          throw new HttpError(401, 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى', 'session_revoked');
+        }
+        const { rows: admins } = await pool.query(
+          `SELECT id, name, role FROM app_users WHERE id = $1 AND status = 'approved' AND role IN ('super_admin', 'admin');`,
+          [claims.imp]
+        );
+        if (!admins[0]) throw new HttpError(401, 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى', 'session_revoked');
+        req.user.impersonator = { id: admins[0].id, name: admins[0].name, role: admins[0].role };
+        if (IMPERSONATION_BLOCKED.some((re) => re.test(path))) {
+          throw new HttpError(403, 'غير متاح أثناء الدخول بعين مستخدم', 'impersonation_blocked');
+        }
+      }
       if (config.enforcePasswordChange && req.user.mustChangePassword && !PASSWORD_CHANGE_ALLOWED.has(path)) {
         throw new HttpError(403, 'يجب تغيير كلمة المرور قبل المتابعة', 'password_change_required');
       }

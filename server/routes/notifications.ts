@@ -4,9 +4,10 @@ import { z } from 'zod';
 import { can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import type { Pool, Queryable } from '../db.ts';
-import { notFound, route } from '../http.ts';
+import { badRequest, notFound, route } from '../http.ts';
 import { optionalId } from '../schemas.ts';
-import { seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
+import { type Principal, canSeeRole, isAdminRole, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
+import { busyOn } from '../staff.ts';
 import { queuePush } from '../push.ts';
 
 export type NotificationType = 'urgent' | 'info' | 'success';
@@ -54,6 +55,75 @@ export async function notifyMany(
   return batchId;
 }
 
+const audienceInput = z.object({
+  kind: z.enum(['all', 'users', 'accountRole', 'staffRole', 'committee', 'available']),
+  userIds: z.array(z.string().max(255)).max(2000).optional(),
+  accountRole: z.enum(['admin', 'exams_manager', 'committee_head', 'sheikh']).optional(),
+  staffRole: z.enum(['owner', 'observer', 'ceremony_sheikh']).optional(),
+  committeeId: z.string().max(255).optional(),
+  committeeRoles: z.array(z.enum(['owner', 'observer', 'ceremony_sheikh'])).max(3).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+export type Audience = z.infer<typeof audienceInput>;
+const messageInput = z.object({
+  title: z.string().trim().min(1).max(300),
+  description: z.string().max(2000).default(''),
+  type: z.enum(['urgent', 'info', 'success']).default('info'),
+  committeeId: optionalId,
+  audience: audienceInput.optional(),
+});
+
+/**
+ * The people a manual message reaches (docs/PLAN_ROLES_AND_FLOW.md 1.6). Super admins are never counted (unless a
+ * super admin sends); admins are left out when the sender may not see admin accounts. Members of a committee are
+ * reached only once the committee is active.
+ */
+export async function resolveAudience(db: Queryable, sender: Principal, a: Audience): Promise<string[]> {
+  const hidden = sender.role === 'super_admin' ? ['__none__'] : canSeeRole(sender, 'admin') ? ['super_admin'] : ['super_admin', 'admin'];
+  const base = `SELECT u.id FROM app_users u WHERE u.status = 'approved' AND NOT (u.role = ANY($1::text[])) AND u.id <> $2`;
+  const live = `c.lifecycle IN ('active', 'observed', 'accredited', 'ceremony_done')`;
+  let rows: Array<{ id: string }> = [];
+  switch (a.kind) {
+    case 'all':
+      ({ rows } = await db.query(`${base};`, [hidden, sender.id]));
+      break;
+    case 'users':
+      if (!a.userIds?.length) throw badRequest('اختر شخصًا واحدًا على الأقل');
+      ({ rows } = await db.query(`${base} AND u.id = ANY($3::text[]);`, [hidden, sender.id, a.userIds]));
+      break;
+    case 'accountRole':
+      if (!a.accountRole) throw badRequest('اختر الدور');
+      ({ rows } = await db.query(`${base} AND u.role = $3;`, [hidden, sender.id, a.accountRole]));
+      break;
+    case 'staffRole':
+      if (!a.staffRole) throw badRequest('اختر الدور');
+      ({ rows } = await db.query(
+        `${base} AND EXISTS (SELECT 1 FROM committee_staff s JOIN committees c ON c.id = s.committee_id
+                             WHERE s.user_id = u.id AND s.status = 'active' AND s.role = $3 AND ${live} AND c.lifecycle <> 'ceremony_done');`,
+        [hidden, sender.id, a.staffRole]
+      ));
+      break;
+    case 'committee': {
+      if (!a.committeeId) throw badRequest('اختر اللجنة');
+      const roles = a.committeeRoles?.length ? a.committeeRoles : ['owner', 'observer', 'ceremony_sheikh'];
+      ({ rows } = await db.query(
+        `${base} AND EXISTS (SELECT 1 FROM committee_staff s JOIN committees c ON c.id = s.committee_id
+                             WHERE s.user_id = u.id AND s.status = 'active' AND s.committee_id = $3 AND s.role = ANY($4::text[]) AND ${live});`,
+        [hidden, sender.id, a.committeeId, roles]
+      ));
+      break;
+    }
+    case 'available': {
+      if (!a.date) throw badRequest('اختر اليوم');
+      const { rows: people } = await db.query(`${base} AND u.role IN ('committee_head', 'sheikh');`, [hidden, sender.id]);
+      const busy = new Set((await busyOn(db, people.map((p) => p.id), a.date)).map((b) => b.userId));
+      rows = people.filter((p) => !busy.has(p.id));
+      break;
+    }
+  }
+  return [...new Set(rows.map((r) => r.id))];
+}
+
 function fromRow(r: any) {
   return {
     id: r.id,
@@ -87,18 +157,64 @@ export function notificationsRouter(pool: Pool) {
     res.json({ success: true, notifications: rows.map(fromRow) });
   }));
 
+  // Without an audience: the older broadcast (everyone, or the people who see one committee).
   r.post('/', can('notifications.create'), route(async (req, res) => {
-    const n = z
-      .object({
-        title: z.string().trim().min(1).max(300),
-        description: z.string().max(2000).default(''),
-        type: z.enum(['urgent', 'info', 'success']).default('info'),
-        committeeId: optionalId,
-      })
-      .parse(req.body);
-    await notify(pool, n);
-    await audit(pool, req, 'notification.create', 'notification', null, null, n);
-    res.status(201).json({ success: true });
+    const n = messageInput.parse(req.body);
+    if (!n.audience) {
+      const { audience: _a, ...plain } = n;
+      await notify(pool, { ...plain, data: { kind: 'manual' } });
+      await audit(pool, req, 'notification.create', 'notification', null, null, plain);
+      return res.status(201).json({ success: true });
+    }
+    const ids = await resolveAudience(pool, req.user!, n.audience);
+    if (ids.length === 0) throw badRequest('لا يوجد مستلمون لهذا الاختيار');
+    const batchId = await notifyMany(pool, ids, {
+      title: n.title,
+      description: n.description,
+      type: n.type,
+      committeeId: n.committeeId ?? n.audience.committeeId ?? null,
+      data: { kind: 'manual' },
+      sentBy: req.user!.id,
+    });
+    await audit(pool, req, 'notification.send', 'notification', batchId, null, { ...n, recipients: ids.length }, `${ids.length} مستلم`);
+    res.status(201).json({ success: true, batchId, recipients: ids.length });
+  }));
+
+  // How many people a choice reaches, before sending.
+  r.post('/preview', can('notifications.create'), route(async (req, res) => {
+    const audience = audienceInput.parse(req.body?.audience ?? req.body);
+    const ids = await resolveAudience(pool, req.user!, audience);
+    const { rows } = await pool.query('SELECT id, name FROM app_users WHERE id = ANY($1::text[]) ORDER BY name LIMIT 50;', [ids]);
+    res.json({ success: true, recipients: ids.length, sample: rows });
+  }));
+
+  // Messages sent by hand: admins see all of them, the exams manager their own.
+  r.get('/sent', can('notifications.create'), route(async (req, res) => {
+    const user = req.user!;
+    const { rows } = await pool.query(
+      `SELECT n.batch_id, min(n.title) AS title, min(n.description) AS description, min(n.type) AS type, min(n.created_at) AS created_at,
+              count(*)::int AS recipients, count(nr.user_id)::int AS read, min(u.name) AS sent_by_name, min(u.role) AS sent_by_role
+       FROM notifications n
+       LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = n.target_user_id
+       LEFT JOIN app_users u ON u.id = n.sent_by
+       WHERE n.batch_id IS NOT NULL AND n.sent_by IS NOT NULL AND ($1::boolean OR n.sent_by = $2)
+       GROUP BY n.batch_id ORDER BY min(n.created_at) DESC LIMIT 100;`,
+      [isAdminRole(user.role), user.id]
+    );
+    const showAdmins = user.role === 'super_admin';
+    res.json({
+      success: true,
+      sent: rows.map((x) => ({
+        batchId: x.batch_id,
+        title: x.title,
+        description: x.description ?? '',
+        type: x.type,
+        createdAt: x.created_at instanceof Date ? x.created_at.toISOString() : x.created_at,
+        recipients: x.recipients,
+        read: x.read,
+        sentBy: !showAdmins && (x.sent_by_role === 'super_admin' || x.sent_by_role === 'admin') ? 'الإدارة' : x.sent_by_name ?? '',
+      })),
+    });
   }));
 
   r.patch('/:id/read', route(async (req, res) => {

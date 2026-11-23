@@ -15,6 +15,7 @@ import { assignmentsRouter } from './routes/assignments.ts';
 import { grantsRouter } from './routes/grants.ts';
 import { committeesRouter } from './routes/committees.ts';
 import { peopleRouter, staffRouter } from './routes/staff.ts';
+import { impersonationRouter } from './routes/impersonation.ts';
 import { coursesRouter } from './routes/courses.ts';
 import { examsRouter } from './routes/exams.ts';
 import { notificationsRouter } from './routes/notifications.ts';
@@ -90,6 +91,7 @@ export function createApp(config: AppConfig, pool: Pool) {
   app.use('/api/courses', authed, coursesRouter(pool));
   app.use('/api/committees', authed, staffRouter(pool), committeesRouter(pool, config));
   app.use('/api/people', authed, peopleRouter(pool));
+  app.use('/api/impersonation', authed, impersonationRouter(config, pool));
   app.use('/api/assignments', authed, assignmentsRouter(pool));
   app.use('/api/grants', authed, grantsRouter(pool));
   app.use('/api/users', authed, usersRouter(pool, { strictPermissionIds: config.strictPermissionIds }));
