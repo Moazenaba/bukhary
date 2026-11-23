@@ -250,3 +250,32 @@
   الإرسال أو يحذفها؛ 5xx تُعاد حتى 5 مرات ثم تُركن. قفل واحد للتطبيق وWorkManager يمنع الإرسال المزدوج.
 - اختبار العقد: `tests/contract/` في هذا المستودع يعيد إرسال طلبات الأندرويد المسجّلة (`android-payloads.json` من
   `ContractPayloadTest` في مستودع التطبيق) ويشغّل كود الويب الحقيقي ضد الخادم.
+
+## Committee flow, staff, messages and impersonation (migration 025–026)
+
+See `docs/PLAN_ROLES_AND_FLOW.md`. Roles: `super_admin`, `admin`, `exams_manager`, `committee_head`, `sheikh`; jobs on
+a committee (`committee_staff`): `owner`, `observer`, `ceremony_sheikh`. Committees carry `lifecycle`
+(`draft` → `sent_to_manager` → `observers_open` → `active` → `observed` → `accredited` → `ceremony_done`),
+`lifecycleLabel`, `driver` and, per viewer, `viewer`. `/auth/me` permissions add `staff` and `impersonating`.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| POST | `/api/committees` | admin | body may carry `ownerUserId`; new committees start as `draft` |
+| POST | `/api/committees/:id/lifecycle` `{to}` | step's actor | one step forward (admin: send, allow observers, accredit; manager: activate, observed, ceremony done); admin may go back one |
+| GET | `/api/committees/:id/people` | anyone who sees it | `{viewer, lifecycle, owner, ownerCanAssign, observers, ceremonySheikhs, driver, mine, excused?}` filtered by viewer |
+| POST | `/api/committees/:id/staff` `{userId, role, note?, confirmConflicts?}` | admin, manager, owner with can_assign | 409 `schedule_conflict` with `details.conflicts` until confirmed |
+| DELETE | `/api/committees/:id/staff/:staffId` | same | |
+| POST | `/api/committees/:id/staff/:staffId/excuse` `{reason}` | the person | manager(s) and owner are told |
+| PUT | `/api/committees/:id/owner` `{userId}` | admin | |
+| PATCH | `/api/committees/:id/owner/can-assign` `{value}` | admin, manager | |
+| PATCH | `/api/committees/:id/driver` `{hasDriver, name?, phone?}` | admin, manager | |
+| POST | `/api/committees/:id/ceremony` `{ceremonyDate, ceremonyTime, ceremonyPlace, honoredStudentsCount?, notes?}` | admin, manager | |
+| GET | `/api/people/availability?date=` | admin, manager | `{available, unassigned, busy[{items}]}` |
+| POST | `/api/notifications` `{title, description, type, audience}` | admin, manager | audience `kind`: all, users, accountRole, staffRole, committee, available; without `audience`, the old broadcast |
+| POST | `/api/notifications/preview` `{audience}` | admin, manager | `{recipients, sample}` |
+| GET | `/api/notifications/sent` | admin, manager | |
+| POST | `/api/impersonation/start/:userId` | admin (non-admins), super admin | `{token}` valid 1 h, no refresh; devices, password change and nested impersonation refused |
+| POST | `/api/impersonation/end` | the impersonation session | |
+| GET | `/api/audit-logs?impersonatedOnly=true` | admin, super admin | rows carry `impersonatedBy`; admins never see super admins' rows |
+
+Push `data` now carries `kind` (e.g. `staff.assigned`, `lifecycle.accredited`, `staff.excused`, `manual`) next to `committeeId`.

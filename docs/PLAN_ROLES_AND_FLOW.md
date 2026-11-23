@@ -349,56 +349,56 @@ CREATE INDEX idx_notifications_batch ON notifications (batch_id) WHERE batch_id 
 > كل مرحلة = commit واحد أو أكتر، وبعدها push. لازم `npm run lint` يعدّي واختبارات المرحلة تنجح قبل ما ننتقل للي بعدها.
 
 ### المرحلة 1: الأدوار والصلاحيات
-- [ ] migration `025` (دور `exams_manager`).
-- [ ] migration `027` (`committee_staff`) + نقل الداتا + `syncLegacyColumns`.
-- [ ] `policy.ts`: الدور الجديد، و`staff` في الـ Principal، وشيل `HEADS` من صلاحيات التعيين، و`canAssign`.
-- [ ] `auth.ts`: تحميل `staff`.
-- [ ] `users.ts`: الأدمن يقدر يدّي دور `exams_manager`، وهو بيظهر للأدمن (مش مستخبي زي الأدمنز).
-- [ ] الروتات: `PATCH owner` و`owner/can-assign`.
-- [ ] تحويل `PUT /committees/:id/members` و`/api/assignments` إنهم يكتبوا في `committee_staff` (ونفس الشكل القديم للأندرويد).
-- [ ] اختبارات: `tests/roles-six.test.ts` (مين يقدر يعيّن مين، وصاحب اللجنة من غير `canAssign` بياخد 403، ومعاها ينجح، ونقل الداتا).
+- [x] migration `025` (دور `exams_manager`).
+- [x] migration `027` (`committee_staff`) + نقل الداتا + `syncLegacyColumns`.
+- [x] `policy.ts`: الدور الجديد، و`staff` في الـ Principal، وشيل `HEADS` من صلاحيات التعيين، و`canAssign`.
+- [x] `auth.ts`: تحميل `staff`.
+- [x] `users.ts`: الأدمن يقدر يدّي دور `exams_manager`، وهو بيظهر للأدمن (مش مستخبي زي الأدمنز).
+- [x] الروتات: `PATCH owner` و`owner/can-assign`.
+- [x] تحويل `PUT /committees/:id/members` و`/api/assignments` إنهم يكتبوا في `committee_staff` (ونفس الشكل القديم للأندرويد).
+- [x] اختبارات: `tests/roles-six.test.ts` (مين يقدر يعيّن مين، وصاحب اللجنة من غير `canAssign` بياخد 403، ومعاها ينجح، ونقل الداتا).
 
 ### المرحلة 2: دورة حياة اللجنة والسواق وحبس الإشعارات
-- [ ] migration `026` (`lifecycle`، والسواق، والمكان) مع تحديد اللجان الموجودة.
-- [ ] `POST /committees/:id/lifecycle` + الربط بالمراحل التسعة في `workflow.ts`.
-- [ ] `committees.create` للأدمن بس، واللجنة تبدأ `draft`، وشيخ اللجنة إجباري.
-- [ ] `committeeVisibility` وتطبيقها على `GET /committees`، و`/:id`، و`/notifications`، و`push.deliver`.
-- [ ] حبس الإشعارات (`notified_at`) و`releasePendingNotices` عند التفعيل.
-- [ ] `PATCH driver`.
-- [ ] الويب: شريط المراحل، والشارة، والفلتر، وقسم السواق، وتعديل `AddCommitteeModal`.
-- [ ] `rules.json`: `lifecycleOrder`.
-- [ ] اختبارات: `tests/lifecycle.test.ts` (الترتيب، والصلاحيات، ومفيش إشعار قبل التفعيل، والإشعارات المحبوسة بتتبعت عند التفعيل، والأعضاء ما يشوفوش اللجنة قبل `active`، و`observed` بتكمّل المراحل القديمة، ومراحل التصحيح ممنوعة قبل `observed`).
+- [x] migration `026` (`lifecycle`، والسواق، والمكان) مع تحديد اللجان الموجودة.
+- [x] `POST /committees/:id/lifecycle` + الربط بالمراحل التسعة في `workflow.ts`.
+- [x] `committees.create` للأدمن بس، واللجنة تبدأ `draft`، وشيخ اللجنة إجباري.
+- [x] `committeeVisibility` وتطبيقها على `GET /committees`، و`/:id`، و`/notifications`، و`push.deliver`.
+- [x] حبس الإشعارات (`notified_at`) و`releasePendingNotices` عند التفعيل.
+- [x] `PATCH driver`.
+- [x] الويب: شريط المراحل، والشارة، والفلتر، وقسم السواق، وتعديل `AddCommitteeModal`.
+- [x] `rules.json`: `lifecycleOrder`.
+- [x] اختبارات: `tests/lifecycle.test.ts` (الترتيب، والصلاحيات، ومفيش إشعار قبل التفعيل، والإشعارات المحبوسة بتتبعت عند التفعيل، والأعضاء ما يشوفوش اللجنة قبل `active`، و`observed` بتكمّل المراحل القديمة، ومراحل التصحيح ممنوعة قبل `observed`).
 
 ### المرحلة 3: التعيينات والتعارض والاعتذار والرؤية
-- [ ] `POST/DELETE /committees/:id/staff` بشروط المراحل.
-- [ ] `findConflicts` و`409 schedule_conflict` و`confirmConflicts` و`note`.
-- [ ] `POST .../excuse`.
-- [ ] `GET /committees/:id/people` بقواعد 1.4.
-- [ ] `POST /committees/:id/ceremony` (الإنشاء والتعديل، وإشعار `urgent` عند التغيير).
-- [ ] نصوص الإشعارات (`staffNotice`) حسب الجزء 4.
-- [ ] الويب: `CommitteeStaffPanel`، وكروت «لجاني» للمراقب وشيخ الحفلة، وزرار الاعتذار، وشيل `HeadGrants` من القايمة.
-- [ ] اختبارات: `tests/staff-assign.test.ts` (التعارض بيحذّر وبعدين ينجح بالتأكيد، والملاحظة بتوصل في الإشعار، والمراقب ما يشوفش مشايخ الحفلة، ومشايخ الحفلة يشوفوا بعض، والاعتذار بيبلّغ المدير، وشيخ الحفلة ممنوع قبل الاعتماد).
+- [x] `POST/DELETE /committees/:id/staff` بشروط المراحل.
+- [x] `findConflicts` و`409 schedule_conflict` و`confirmConflicts` و`note`.
+- [x] `POST .../excuse`.
+- [x] `GET /committees/:id/people` بقواعد 1.4.
+- [x] `POST /committees/:id/ceremony` (الإنشاء والتعديل، وإشعار `urgent` عند التغيير).
+- [x] نصوص الإشعارات (`staffNotice`) حسب الجزء 4.
+- [x] الويب: `CommitteeStaffPanel`، وكروت «لجاني» للمراقب وشيخ الحفلة، وزرار الاعتذار، وشيل `HeadGrants` من القايمة.
+- [x] اختبارات: `tests/staff-assign.test.ts` (التعارض بيحذّر وبعدين ينجح بالتأكيد، والملاحظة بتوصل في الإشعار، والمراقب ما يشوفش مشايخ الحفلة، ومشايخ الحفلة يشوفوا بعض، والاعتذار بيبلّغ المدير، وشيخ الحفلة ممنوع قبل الاعتماد).
 
 ### المرحلة 4: التنبيهات الشاملة والمتاحين
-- [ ] migration `029`.
-- [ ] `notifyMany` + `push.deliver(targetUserIds)`.
-- [ ] `POST /notifications` بالجمهور الجديد + `GET /notifications/sent`.
-- [ ] `GET /people/availability`.
-- [ ] الويب: `NotificationComposer` و`AvailabilityView`.
-- [ ] اختبارات: `tests/notifications-audience.test.ts` (كل نوع جمهور، والسوبر أدمن عمره ما يتحسب في المستلمين، والمدير يبعت في حدوده بس)، و`tests/availability.test.ts`.
+- [x] migration `029`.
+- [x] `notifyMany` + `push.deliver(targetUserIds)`.
+- [x] `POST /notifications` بالجمهور الجديد + `GET /notifications/sent`.
+- [x] `GET /people/availability`.
+- [x] الويب: `NotificationComposer` و`AvailabilityView`.
+- [x] اختبارات: `tests/notifications-audience.test.ts` (كل نوع جمهور، والسوبر أدمن عمره ما يتحسب في المستلمين، والمدير يبعت في حدوده بس)، و`tests/availability.test.ts`.
 
 ### المرحلة 5: الدخول بعين المستخدم والسجل
-- [ ] migration `028`.
-- [ ] `POST /admin/impersonate/:userId` و`/end`، والـ claim `imp` في `authenticate`، والروتات الممنوعة.
-- [ ] `audit()` يكتب `impersonator_*`.
-- [ ] `audit.read` للأدمن مع الفلترة.
-- [ ] الويب: زرار الدخول، و`ImpersonationBanner`، والرجوع للحساب، وفلتر السجل.
-- [ ] اختبارات: `tests/impersonation.test.ts` (الأدمن ما يدخلش بعين أدمن أو سوبر أدمن، والدخول ما بيبعتش إشعار، والأكشن جوه بيتسجل باسم الاتنين، وتسجيل الجهاز ممنوع، والأدمن ما يشوفش سجلات السوبر أدمن).
+- [x] migration `028`.
+- [x] `POST /admin/impersonate/:userId` و`/end`، والـ claim `imp` في `authenticate`، والروتات الممنوعة.
+- [x] `audit()` يكتب `impersonator_*`.
+- [x] `audit.read` للأدمن مع الفلترة.
+- [x] الويب: زرار الدخول، و`ImpersonationBanner`، والرجوع للحساب، وفلتر السجل.
+- [x] اختبارات: `tests/impersonation.test.ts` (الأدمن ما يدخلش بعين أدمن أو سوبر أدمن، والدخول ما بيبعتش إشعار، والأكشن جوه بيتسجل باسم الاتنين، وتسجيل الجهاز ممنوع، والأدمن ما يشوفش سجلات السوبر أدمن).
 
 ### المرحلة 6: التنظيف والتوثيق
-- [ ] تحديث `SYSTEM_DOCUMENTATION.md` و`API_CONTRACT.md` و`mobile_spec/ROLES_AND_PERMISSIONS.md` و`mobile_spec/API_SPECIFICATION.md`.
-- [ ] `npm run lint` و`npm test` و`npm run test:unit` و`npm run build` كلهم ينجحوا.
-- [ ] push، وتقرير لصاحب المشروع بالمرحلة الجاية (الأندرويد).
+- [x] تحديث `SYSTEM_DOCUMENTATION.md` و`API_CONTRACT.md` و`mobile_spec/ROLES_AND_PERMISSIONS.md` و`mobile_spec/API_SPECIFICATION.md`.
+- [x] `npm run lint` و`npm test` و`npm run test:unit` و`npm run build` كلهم ينجحوا.
+- [x] push، وتقرير لصاحب المشروع بالمرحلة الجاية (الأندرويد).
 
 ---
 
@@ -427,3 +427,15 @@ CREATE INDEX idx_notifications_batch ON notifications (batch_id) WHERE batch_id 
 | التاريخ | المرحلة | اللي اتعمل | الخطوة الجاية |
 |---|---|---|---|
 | 2026-11-23 | تخطيط | كتابة الخطة دي بعد ما صاحب المشروع وافق على كل القرارات | المرحلة 1 |
+| 2026-11-23 | 1–5 (سيرفر) | migrations `025_six_roles_and_lifecycle` و`026_impersonation_and_batches` (اتدمجت فيهم الـ migrations اللي كانت مخططة 025–029)، و`server/staff.ts`، و`server/routes/staff.ts`، و`server/routes/impersonation.ts`، والتنبيهات بالجمهور. اختبارات: `tests/six-roles-flow.test.ts` و`tests/migration-025.test.ts` و`tests/notifications-impersonation.test.ts` | — |
+| 2026-11-23 | ويب | `CommitteeFlowPanel` و`NotificationComposer` الجديد و`AvailabilityView` و`ImpersonationBanner`، وشارة المرحلة، واختيار شيخ اللجنة عند الإنشاء، وعمود «بواسطة» في السجل. اتجرّب في متصفح حقيقي (أدمن، ومدير، ومراقب على موبايل) | — |
+| 2026-11-23 | أندرويد | برانش `claude/serene-goldberg-7deeyz` في `bukharyApp`: `CommitteeFlowSection` في الواجهات التلاتة، ودور المدير، والضغط على الإشعار بيفتح اللجنة | دمج الريبوهين، ثم زرار Publish Android |
+
+### قرارات اتاخدت أثناء التنفيذ (مهم للي يكمّل)
+- **المكان** = العمود الموجود `sheikh_country` (كان بيستخدم كمكان قبل كده)، فمفيش عمود جديد.
+- **`committee_head_grants`** (رئيس لجنة مؤقت) فضلت شغالة زي ما هي، ومتوقفتش.
+- **التكليفات القديمة** (`/api/assignments`) بقت بتكتب في `committee_staff` وبترجع نفس الشكل القديم، والتواريخ بقت بتتقبل وتتجاهل (المرحلة هي اللي بتحدد الانشغال).
+- **صاحب اللجنة** بيعمل شغل المراحل (الاستلام، والتصحيح…) في لجنته زي الأول، لكن **الاعتماد** للأدمن بس.
+- مراحل اللجنة القديمة والـ `lifecycle` ماشيين مع بعض: إكمال «الامتحان» = تمت المراقبة، وإكمال «الاعتمادية» = معتمدة، وإكمال «الحفل» = تمت الحفلة (لما اللجنة تكون مفعّلة).
+- **الملاحظة** على التعيين بيشوفها صاحبها، والإدارة، وشيخ اللجنة بس.
+- **اختبار فاشل من قبل الشغل ده:** `tests/users-exams.test.ts` («a user editing themself…»). القاعدة الحالية بتقول إن تعديل الاسم محتاج مراجعة المشرف، والاختبار ما اتحدّثش معاها، ومش متعلق بالخطة دي.
