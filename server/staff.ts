@@ -174,8 +174,8 @@ export async function busyOn(db: Queryable, userIds: string[], day: string, exce
      FROM committee_staff s JOIN committees c ON c.id = s.committee_id
      WHERE s.user_id = ANY($1::text[]) AND s.status = 'active' AND ($3::text IS NULL OR c.id <> $3)
        AND (
-         (s.role IN ('owner', 'observer') AND c.exam_date = $2::date AND c.lifecycle IN ('sent_to_manager', 'observers_open', 'active'))
-         OR (s.role = 'ceremony_sheikh' AND left(replace(c.ceremony_details ->> 'ceremonyDate', '/', '-'), 10) = $2 AND c.lifecycle <> 'ceremony_done')
+         (s.role IN ('owner', 'observer') AND c.exam_date = ($2::text)::date AND c.lifecycle IN ('sent_to_manager', 'observers_open', 'active'))
+         OR (s.role = 'ceremony_sheikh' AND left(replace(c.ceremony_details ->> 'ceremonyDate', '/', '-'), 10) = $2::text AND c.lifecycle <> 'ceremony_done')
        );`,
     [userIds, day, exceptCommitteeId ?? null]
   );
