@@ -33,6 +33,27 @@ export async function notify(
   queuePush(n);
 }
 
+/**
+ * The same notification for each of `userIds` (one row each, so each person reads it on their own), and one
+ * push to all their phones. Returns the batch id.
+ */
+export async function notifyMany(
+  db: Queryable,
+  userIds: string[],
+  n: { title: string; description: string; type?: NotificationType; committeeId?: string | null; data?: Record<string, unknown>; sentBy?: string | null }
+) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  const batchId = crypto.randomUUID();
+  if (ids.length === 0) return batchId;
+  await db.query(
+    `INSERT INTO notifications (id, title, description, type, committee_id, target_user_id, created_at, data, batch_id, sent_by)
+     SELECT 'ntf_' || md5($7 || ':' || uid), $1, $2, $3, $4, uid, NOW(), $5::jsonb, $7, $6 FROM unnest($8::text[]) AS uid;`,
+    [n.title, n.description, n.type ?? 'info', n.committeeId ?? null, JSON.stringify(n.data ?? {}), n.sentBy ?? null, batchId, ids]
+  );
+  queuePush({ title: n.title, description: n.description, type: n.type, committeeId: n.committeeId ?? null, targetUserIds: ids, data: n.data });
+  return batchId;
+}
+
 function fromRow(r: any) {
   return {
     id: r.id,

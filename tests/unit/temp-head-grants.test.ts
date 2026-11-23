@@ -27,7 +27,9 @@ describe('temporary head grants', () => {
   });
 
   it('a grant gives the head actions on the granted committee only', () => {
-    expect(isAllowed(granted, 'committees.members')).toBe(true);
+    expect(isAllowed(granted, 'committees.update')).toBe(true);
+    // Staffing is not a head's right any more: only an owner given can_assign (docs/PLAN_ROLES_AND_FLOW.md).
+    expect(isAllowed(granted, 'committees.members')).toBe(false);
     expect(isCommitteeInScope(granted, 'c2')).toBe(true);
     expect(isCommitteeInScope(granted, 'c3')).toBe(false);
   });

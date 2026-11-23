@@ -6,7 +6,21 @@ import { audit } from '../audit.ts';
 import type { AppConfig } from '../config.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, notFound, route } from '../http.ts';
-import { type Action, type Principal, isAdminRole, isAllowed, isCommitteeInScope, isScopedRole, observedCommitteeIds, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
+import {
+  type Action,
+  type Principal,
+  canManageCommittee,
+  canStaffCommittee,
+  committeeViewer,
+  isAdminRole,
+  isAllowed,
+  isScopedRole,
+  observedCommitteeIds,
+  seesAllCommittees,
+  visibleCommitteeIds,
+} from '../policy.ts';
+import { LIFECYCLE_LABEL, STAFF_SELECT, activeStaff, addStaff, endStaff, followStages, syncLegacy } from '../staff.ts';
+import { forbidden } from '../http.ts';
 import { staffableUsers } from './users.ts';
 import { STAGE_ACTION, actionPermission, applyCommitteeAction, committeeAction, mergeLegacyStages, normalizeStageOrder } from '../workflow.ts';
 import { notify } from './notifications.ts';
@@ -56,6 +70,8 @@ const committeeInput = z.object({
   ceremonyDetails: ceremonyDetails.nullish(),
   createdDate: dateOnly,
   createdAtTime: optionalText(100),
+  /** The committee's owner («شيخ اللجنة»), set by the admin who creates it. */
+  ownerUserId: optionalId,
   expectedUpdatedAt,
 });
 type CommitteeInput = z.infer<typeof committeeInput>;
@@ -104,6 +120,9 @@ export function committeeFromRow(r: any) {
     examApprovedBy: r.exam_approved_by ?? undefined,
     createdDate: r.created_date ?? '',
     createdAtTime: r.created_at_time ?? '',
+    lifecycle: r.lifecycle ?? 'active',
+    lifecycleLabel: LIFECYCLE_LABEL[(r.lifecycle ?? 'active') as keyof typeof LIFECYCLE_LABEL],
+    driver: r.has_driver ? { name: r.driver_name ?? '', phone: r.driver_phone ?? '' } : null,
     updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : r.updated_at,
   };
 }
@@ -131,12 +150,18 @@ async function presenterFor(db: Queryable, user: Principal) {
      ORDER BY name ASC;`
   );
   const hidden = new Set<string>(isAllowed(user, 'users.admins') ? [] : rows.filter((r) => isAdminRole(r.role)).map((r) => r.id));
+  // Jobs on committees: owners show as the committee's head (with their phone), everyone else as a sheikh.
+  const { rows: jobs } = await db.query(`SELECT committee_id, user_id, role FROM committee_staff WHERE status = 'active';`);
+  const jobOf = new Map<string, string[]>();
+  for (const j of jobs) jobOf.set(`${j.committee_id}:${j.user_id}`, [...(jobOf.get(`${j.committee_id}:${j.user_id}`) ?? []), j.role]);
   const staffBy = new Map<string, Person[]>();
   for (const r of rows) {
     if (!isScopedRole(r.role)) continue;
     for (const cid of Array.isArray(r.assigned_committee_ids) ? r.assigned_committee_ids : []) {
+      const mine = jobOf.get(`${cid}:${r.id}`);
+      const head = mine ? mine.includes('owner') : r.role === 'committee_head';
       const list = staffBy.get(cid) ?? [];
-      list.push({ id: r.id, name: r.name, role: r.role, ...(r.role === 'committee_head' && r.phone ? { phone: r.phone } : {}) });
+      list.push({ id: r.id, name: r.name, role: head ? 'committee_head' : 'sheikh', ...(head && r.phone ? { phone: r.phone } : {}) });
       staffBy.set(cid, list);
     }
   }
@@ -144,11 +169,15 @@ async function presenterFor(db: Queryable, user: Principal) {
     hidden,
     present(row: any) {
       const c = committeeFromRow(row);
-      const attendees: Person[] | undefined = c.ceremonyDetails?.attendees;
+      const viewer = committeeViewer(user, row);
+      // Observers do not see the ceremony's sheikhs; ceremony sheikhs see only the committee's owner.
+      const attendees: Person[] | undefined = viewer === 'observer' ? [] : c.ceremonyDetails?.attendees;
+      const staff = (staffBy.get(row.id) ?? []).filter((p) => viewer !== 'ceremony_sheikh' || p.role === 'committee_head');
       return {
         ...c,
         ceremonyDetails: attendees ? { ...c.ceremonyDetails, attendees: attendees.filter((a) => !hidden.has(a.id)) } : c.ceremonyDetails,
-        staff: staffBy.get(row.id) ?? [],
+        staff,
+        viewer,
       };
     },
   };
@@ -190,11 +219,19 @@ function historyEntry(r: any, showAdmins: boolean) {
 
 /** Whether `user` may see the committee: in scope, or invited to its ceremony. */
 function canSeeCommittee(user: Principal, row: any) {
-  if (isCommitteeInScope(user, row.id)) return true;
+  if (committeeViewer(user, row) !== 'none') return true;
   // Sent there as an observer: read-only (every write still needs the committee in scope).
-  if (observedCommitteeIds(user).includes(row.id)) return true;
-  const attendees: Person[] = row.ceremony_details?.attendees ?? [];
-  return attendees.some((a) => a.id === user.id);
+  return observedCommitteeIds(user).includes(row.id);
+}
+
+/** Changing a committee (its data and stage work): admins, and its head on it. */
+function assertCanManage(user: Principal, committeeId: string) {
+  if (!canManageCommittee(user, committeeId)) throw forbidden('هذه اللجنة غير مسندة إليك');
+}
+
+/** The accreditation is the admin's step (docs/PLAN_ROLES_AND_FLOW.md 1.2). */
+function assertStageChanges(user: Principal, changed: string[]) {
+  if (changed.includes('accreditation') && !isAdminRole(user.role)) throw forbidden('اعتماد اللجنة يأخذه الأدمن');
 }
 
 async function courseName(db: Queryable, courseId: string | null): Promise<string | null> {
@@ -221,7 +258,7 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
   const user = req.user!;
   if (existing) {
     assertAllowed(user, 'committees.update');
-    assertCommitteeScope(user, existing.id);
+    assertCanManage(user, existing.id);
     checkVersion(existing, c.expectedUpdatedAt, Boolean(c.scoringDetails || c.aggregationDetails || c.ceremonyDetails));
   } else {
     assertAllowed(user, 'committees.create');
@@ -240,6 +277,7 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
   const ceremonyAfter = c.ceremonyDetails ?? existing?.ceremony_details;
   const { changed } = normalizeStageOrder(existing?.stages ?? {}, stages, user, now, ceremonyAfter);
   for (const k of changed) assertAllowed(user, STAGE_ACTION[k]);
+  assertStageChanges(user, changed);
   const sheetExcel = c.excelUrl ?? c.stages?.sheet?.excelUrl ?? existing?.stages?.sheet?.excelUrl ?? existing?.data?.excelUrl ?? null;
   if (sheetExcel !== null && sheetExcel !== undefined) {
     stages.sheet = { ...(stages.sheet ?? { completed: false }), excelUrl: sheetExcel };
@@ -250,8 +288,8 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
        id, committee_number, committee_name, association_name, members, branch, competition_book,
        general_notes, course_id, course_name, sheikh_name, sheikh_phone, sheikh_country, students_count,
        is_women_committee, stages, scoring_details, aggregation_details, ceremony_details,
-       created_date, created_at_time, data, exam_date, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW())
+       created_date, created_at_time, data, exam_date, lifecycle, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,'draft',NOW())
      ON CONFLICT (id) DO UPDATE SET
        committee_number = EXCLUDED.committee_number, committee_name = EXCLUDED.committee_name,
        association_name = EXCLUDED.association_name, members = EXCLUDED.members, branch = EXCLUDED.branch,
@@ -289,16 +327,17 @@ async function upsertCommittee(db: Queryable, req: Request, c: CommitteeInput, e
   // The ceremony's calendar task follows the committee (date and «تم الحفل»).
   if (c.ceremonyDetails) await syncCeremonyTask(db, rows[0]);
   else if (changed.includes('ceremony')) await syncCeremonyTask(db, rows[0], { detailsChanged: false });
-  if (!existing && isScopedRole(user.role) && !user.allCommittees) {
-    // A scoped manager who creates a committee is responsible for it.
-    await db.query(
-      `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids || to_jsonb($2::text)
-       WHERE id = $1 AND NOT assigned_committee_ids ? $2;`,
-      [user.id, c.id]
-    );
-  }
   await audit(db, req, existing ? 'committee.update' : 'committee.create', 'committee', c.id,
     existing ? committeeFromRow(existing) : null, committeeFromRow(rows[0]));
+  // The owner («شيخ اللجنة») the admin chose; their notice waits for the committee to be activated.
+  if (c.ownerUserId && isAllowed(user, 'committees.owner')) {
+    const current = (await activeStaff(db, c.id)).find((s) => s.role === 'owner');
+    if (current?.user_id !== c.ownerUserId) {
+      if (current) await endStaff(db, req, rows[0], current, { status: 'removed' });
+      await addStaff(db, req, rows[0], { userId: c.ownerUserId, role: 'owner', confirmConflicts: true });
+    }
+  }
+  if (existing) return (await followStages(db, rows[0])) ? (await db.query('SELECT * FROM committees WHERE id = $1;', [c.id])).rows[0] : rows[0];
   return rows[0];
 }
 
@@ -374,6 +413,28 @@ export async function syncCeremonyTask(db: Queryable, committee: any, opts: { de
   );
 }
 
+/**
+ * Adds and removes ceremony sheikhs (committee_staff): the admin and the exams manager, or an owner with can_assign;
+ * after the accreditation for everyone but admins.
+ */
+async function changeCeremonySheikhs(db: Queryable, req: Request, committee: any, add: Set<string>, remove: Set<string>) {
+  const user = req.user!;
+  if (add.size === 0 && remove.size === 0) return;
+  if (!isAllowed(user, 'committees.members') || !canStaffCommittee(user, committee.id)) {
+    throw forbidden('لا تملك صلاحية تعيين مشايخ الحفلة في هذه اللجنة');
+  }
+  if (add.size && !isAdminRole(user.role) && !['accredited', 'ceremony_done'].includes(committee.lifecycle)) {
+    throw forbidden('يُعيَّن مشايخ الحفلة بعد اعتماد اللجنة');
+  }
+  const people = add.size ? await staffableUsers(db, user, [...add]) : [];
+  if (people.length !== add.size) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
+  const staff = (await activeStaff(db, committee.id)).filter((s) => s.role === 'ceremony_sheikh');
+  for (const p of people) {
+    if (!staff.some((s) => s.user_id === p.id)) await addStaff(db, req, committee, { userId: p.id, role: 'ceremony_sheikh', confirmConflicts: true });
+  }
+  for (const s of staff) if (remove.has(s.user_id)) await endStaff(db, req, committee, s, { status: 'removed' });
+}
+
 export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStagePatch'>) {
   const r = Router();
 
@@ -382,7 +443,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
     const q = pageQuery.parse(req.query);
     const user = req.user!;
     const where = seesAllCommittees(user)
-      ? ''
+      ? user.role === 'exams_manager' ? `WHERE lifecycle <> 'draft'` : ''
       : `WHERE id = ANY($1::text[]) OR ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', $2::text))`;
     const params = seesAllCommittees(user) ? [] : [[...visibleCommitteeIds(user), ...observedCommitteeIds(user)], user.id];
     const page = await pagedRows(
@@ -414,50 +475,41 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
     const row = await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
       const committee = rows[0];
-      if (!committee) throw notFound('اللجنة غير موجودة');
-      assertCommitteeScope(user, committee.id);
+      if (!committee || committeeViewer(user, committee) === 'none') throw notFound('اللجنة غير موجودة');
+      if (!canStaffCommittee(user, committee.id)) throw forbidden('لا تملك صلاحية تعيين أشخاص في هذه اللجنة');
       const wanted = new Set(userIds);
       const placeable = (await staffableUsers(db, user)).filter((p) => isScopedRole(p.role) && p.id !== user.id);
       const placeableIds = new Set(placeable.map((p) => p.id));
       const unknown = [...wanted].filter((uid) => !placeableIds.has(uid));
       if (unknown.length) throw badRequest('بعض الأشخاص المختارين غير موجودين أو لا يمكنك إضافتهم لهذه اللجنة');
-      const { rows: current } = await db.query(
-        'SELECT id FROM app_users WHERE assigned_committee_ids ? $1 AND id = ANY($2::text[]) FOR UPDATE;',
+      // Members are the committee's observers (and its owner, who stays: the owner is changed by the admin).
+      const staff = await activeStaff(db, committee.id);
+      const ownerId = staff.find((s) => s.role === 'owner')?.user_id;
+      const observers = new Map(staff.filter((s) => s.role === 'observer').map((s) => [s.user_id, s]));
+      // Older data: people on the committee with no job row there.
+      const { rows: legacy } = await db.query(
+        `SELECT u.id FROM app_users u WHERE u.assigned_committee_ids ? $1 AND u.id = ANY($2::text[])
+           AND NOT EXISTS (SELECT 1 FROM committee_staff s WHERE s.user_id = u.id AND s.committee_id = $1);`,
         [committee.id, [...placeableIds]]
       );
-      const had = new Set(current.map((r) => r.id as string));
-      const added = [...wanted].filter((uid) => !had.has(uid));
-      const removed = [...had].filter((uid) => !wanted.has(uid));
-      if (added.length) {
+      const added = [...wanted].filter((uid) => uid !== ownerId && !observers.has(uid) && !legacy.some((l) => l.id === uid));
+      const removed = [...observers.values()].filter((s) => placeableIds.has(s.user_id) && !wanted.has(s.user_id));
+      const removedLegacy = legacy.map((l) => l.id as string).filter((uid) => !wanted.has(uid));
+      for (const uid of added) await addStaff(db, req, committee, { userId: uid, role: 'observer', confirmConflicts: true });
+      for (const s of removed) await endStaff(db, req, committee, s, { status: 'removed' });
+      if (removedLegacy.length) {
         await db.query(
-          `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids || to_jsonb($2::text), updated_at = NOW()
-           WHERE id = ANY($1::text[]) AND NOT assigned_committee_ids ? $2;`,
-          [added, committee.id]
+          `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids - $2::text, updated_at = NOW() WHERE id = ANY($1::text[]);`,
+          [removedLegacy, committee.id]
         );
+        await syncLegacy(db, { userIds: removedLegacy });
+        for (const uid of removedLegacy) {
+          await notify(db, { title: `تم إلغاء إضافتك إلى لجنة ${committee.committee_number} (${committee.committee_name})`, description: '', type: 'info', targetUserId: uid });
+        }
       }
-      if (removed.length) {
-        await db.query(
-          `UPDATE app_users SET assigned_committee_ids = assigned_committee_ids - $2::text, updated_at = NOW()
-           WHERE id = ANY($1::text[]);`,
-          [removed, committee.id]
-        );
-      }
-      await db.query(
-        `UPDATE app_users u SET assigned_committees = COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
-                                                               WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb)
-         WHERE u.id = ANY($1::text[]);`,
-        [[...added, ...removed]]
-      );
-      const label = `لجنة ${committee.committee_number} (${committee.committee_name})`;
-      for (const uid of added) {
-        await notify(db, { title: `تمت إضافتك إلى ${label}`, description: committee.course_name ?? '', type: 'info', committeeId: committee.id, targetUserId: uid });
-      }
-      for (const uid of removed) {
-        await notify(db, { title: `تم إلغاء إضافتك إلى ${label}`, description: '', type: 'info', targetUserId: uid });
-      }
-      await audit(db, req, 'committee.members', 'committee', committee.id, { members: [...had] }, { members: [...wanted] },
-        `added:${added.length},removed:${removed.length}`);
-      return committee;
+      await audit(db, req, 'committee.members', 'committee', committee.id, { members: [...observers.keys(), ...legacy.map((l) => l.id)] }, { members: [...wanted] },
+        `added:${added.length},removed:${removed.length + removedLegacy.length}`);
+      return (await db.query('SELECT * FROM committees WHERE id = $1;', [committee.id])).rows[0];
     });
     const { present } = await presenterFor(pool, user);
     res.json({ success: true, committee: present(row) });
@@ -467,7 +519,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
    * Invites people to (or removes them from) the committee's ceremony without touching its
    * details: used from a sheikh's page ("add to this ceremony") and from the ceremony itself.
    */
-  r.post('/:id/ceremony-attendees', can('committees.finalize'), route(async (req, res) => {
+  r.post('/:id/ceremony-attendees', can('committees.members'), route(async (req, res) => {
     const body = z
       .object({ add: z.array(z.string().max(255)).max(200).default([]), remove: z.array(z.string().max(255)).max(200).default([]) })
       .parse(req.body);
@@ -475,25 +527,9 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
     const row = await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [req.params.id]);
       const existing = rows[0];
-      if (!existing) throw notFound('اللجنة غير موجودة');
-      assertCommitteeScope(user, existing.id);
-      const before = existing.ceremony_details ?? {};
-      const beforeAttendees: Person[] = before.attendees ?? [];
-      const people = body.add.length ? await staffableUsers(db, user, [...new Set(body.add)]) : [];
-      if (people.length !== new Set(body.add).size) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
-      const removing = new Set(body.remove);
-      const attendees = [
-        ...beforeAttendees.filter((a) => !removing.has(a.id)),
-        ...people.filter((p) => !beforeAttendees.some((a) => a.id === p.id)).map((p) => ({ id: p.id, name: p.name })),
-      ];
-      const after = { ...before, attendees };
-      const { rows: updated } = await db.query(
-        'UPDATE committees SET ceremony_details = $2::jsonb, updated_at = NOW() WHERE id = $1 RETURNING *;',
-        [existing.id, JSON.stringify(after)]
-      );
-      await notifyCeremonyAttendees(db, existing, before, beforeAttendees, after);
-      await audit(db, req, 'committee.ceremonyAttendees', 'committee', existing.id, { attendees: beforeAttendees }, { attendees }, '');
-      return updated[0];
+      if (!existing || committeeViewer(user, existing) === 'none') throw notFound('اللجنة غير موجودة');
+      await changeCeremonySheikhs(db, req, existing, new Set(body.add), new Set(body.remove));
+      return (await db.query('SELECT * FROM committees WHERE id = $1;', [existing.id])).rows[0];
     });
     const { present } = await presenterFor(pool, user);
     res.json({ success: true, committee: present(row) });
@@ -543,7 +579,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       if (body.excelUrl) needed.add('committees.scoring');
       if (body.receivedByAssistant !== undefined || body.examApprovedBy !== undefined) needed.add('committees.reception');
       for (const a of needed) assertAllowed(user, a);
-      assertCommitteeScope(user, existing.id);
+      assertCanManage(user, existing.id);
 
       const now = new Date().toISOString();
       const stages = { ...emptyStages(), ...(existing.stages ?? {}) };
@@ -554,6 +590,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
         Object.assign(stages, mergeLegacyStages(existing.stages ?? {}, body.stages, user, now));
         const { changed } = normalizeStageOrder(existing.stages ?? {}, stages, user, now, body.ceremonyDetails ?? existing.ceremony_details);
         for (const k of changed) assertAllowed(user, STAGE_ACTION[k]);
+        assertStageChanges(user, changed);
       }
       const committeeData = { ...(existing.data ?? {}), ...(body.excelUrl ? { excelUrl: body.excelUrl } : {}) };
       const reception =
@@ -597,6 +634,7 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       else if (body.stages) await syncCeremonyTask(db, updated[0], { detailsChanged: false });
       // The ceremony is done for the first time: its grants and observers end now (see grants.ts onCeremonyDone).
       if (!existing.stages?.ceremony?.completed && stages.ceremony?.completed) await onCeremonyDone(db, existing.id);
+      if (await followStages(db, updated[0])) updated[0] = (await db.query('SELECT * FROM committees WHERE id = $1;', [existing.id])).rows[0];
       await audit(db, req, 'committee.patch', 'committee', req.params.id, committeeFromRow(existing), committeeFromRow(updated[0]),
         Object.keys(body).filter((k) => k !== 'expectedUpdatedAt').join(','));
       return updated[0];
@@ -617,20 +655,20 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
       if (!existing) throw notFound('اللجنة غير موجودة');
       checkVersion(existing, expected);
       assertAllowed(user, actionPermission(action));
-      assertCommitteeScope(user, existing.id);
+      assertCanManage(user, existing.id);
+      if (action.type === 'completeStage' || action.type === 'reopenStage') assertStageChanges(user, [action.stage]);
       const before = existing.ceremony_details ?? {};
       const beforeAttendees: Array<{ id: string; name: string }> = before.attendees ?? [];
       let attendees = beforeAttendees;
+      let sheikhChanges: { add: Set<string>; remove: Set<string> } | null = null;
       if (action.type === 'scheduleCeremony' && action.attendeeUserIds) {
-        // The caller sends the attendees they can see; attendees hidden from them stay invited.
+        // The caller sends the attendees they can see; attendees hidden from them stay invited. They are the
+        // ceremony's sheikhs (committee_staff); the legacy list follows.
         const { hidden } = await presenterFor(db, user);
-        const kept = beforeAttendees.filter((a) => hidden.has(a.id));
-        const ids = [...new Set(action.attendeeUserIds)].filter((uid) => !hidden.has(uid));
-        const newIds = ids.filter((uid) => !beforeAttendees.some((a) => a.id === uid));
-        const people = newIds.length ? await staffableUsers(db, user, newIds) : [];
-        if (people.length !== newIds.length) throw badRequest('بعض الأشخاص المختارين غير موجودين أو غير معتمدين');
-        const name = (uid: string) => people.find((p) => p.id === uid)?.name ?? beforeAttendees.find((a) => a.id === uid)!.name;
-        attendees = [...kept, ...ids.map((uid) => ({ id: uid, name: name(uid) }))];
+        const ids = new Set([...new Set(action.attendeeUserIds)].filter((uid) => !hidden.has(uid)));
+        const add = new Set([...ids].filter((uid) => !beforeAttendees.some((a) => a.id === uid)));
+        const remove = new Set(beforeAttendees.filter((a) => !hidden.has(a.id) && !ids.has(a.id)).map((a) => a.id));
+        sheikhChanges = { add, remove };
       }
       const next = applyCommitteeAction(
         {
@@ -660,13 +698,22 @@ export function committeesRouter(pool: Pool, config: Pick<AppConfig, 'legacyStag
           JSON.stringify(next.ceremonyDetails ?? {}),
         ]
       );
+      if (sheikhChanges) {
+        // With the new day and place in place, so each person's notice carries them.
+        await changeCeremonySheikhs(db, req, updated[0], sheikhChanges.add, sheikhChanges.remove);
+        updated[0] = (await db.query('SELECT * FROM committees WHERE id = $1;', [existing.id])).rows[0];
+        attendees = updated[0].ceremony_details?.attendees ?? [];
+      }
       if ((action.type === 'completeStage' || action.type === 'reopenStage') && action.stage === 'ceremony') {
         // The ceremony's calendar task follows the stage.
         await syncCeremonyTask(db, updated[0], { detailsChanged: false });
       }
       if (!existing.stages?.ceremony?.completed && next.stages?.ceremony?.completed) await onCeremonyDone(db, existing.id);
+      if (await followStages(db, updated[0])) updated[0] = (await db.query('SELECT * FROM committees WHERE id = $1;', [existing.id])).rows[0];
       if (action.type === 'scheduleCeremony') {
-        await notifyCeremonyAttendees(db, existing, before, beforeAttendees, next.ceremonyDetails ?? {});
+        // Who joined or left was told by committee_staff; here only the people who stay hear about a new day or place.
+        const stayed = beforeAttendees.filter((a) => attendees.some((x) => x.id === a.id));
+        await notifyCeremonyAttendees(db, existing, before, stayed, { ...(next.ceremonyDetails ?? {}), attendees: stayed });
         await syncCeremonyTask(db, updated[0]);
         if (action.ceremonyDate) {
           await notify(db, {

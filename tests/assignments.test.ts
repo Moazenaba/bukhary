@@ -2,7 +2,7 @@ import { PDFDocument } from 'pdf-lib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { committeeBody, seedCourse, setupApp, userWithToken, type TestApp } from './helpers.ts';
 
-// «مراقب»: an extra, scoped, time-limited assignment on top of the sheikh's own role.
+// «مراقب»: an extra, scoped job on top of the sheikh's own role (a committee_staff row since migration 025).
 let t: TestApp;
 let sa: Awaited<ReturnType<typeof userWithToken>>;
 let admin: Awaited<ReturnType<typeof userWithToken>>;
@@ -25,6 +25,8 @@ const binary = (res: any, cb: any) => {
 const mk = async (n: number, extra: Record<string, unknown> = {}) => {
   const res = await t.api().post('/api/committees').set(admin.auth).send(committeeBody({ committeeNumber: n, ...extra }));
   expect(res.status).toBe(200);
+  // Members see a committee once it is active (docs/PLAN_ROLES_AND_FLOW.md).
+  await t.pool.query(`UPDATE committees SET lifecycle = 'active' WHERE id = $1;`, [res.body.committee.id]);
   return res.body.committee as any;
 };
 const assign = (auth: Record<string, string>, body: Record<string, unknown>) => t.api().post('/api/assignments').set(auth).send(body);
@@ -51,6 +53,12 @@ beforeAll(async () => {
   sheikh = await userWithToken(t, { role: 'sheikh', committeeIds: [own.id], allExams: false });
   head = await userWithToken(t, { role: 'committee_head', committeeIds: [other.id] });
   strangerHead = await userWithToken(t, { role: 'committee_head', committeeIds: [own.id] });
+  // The head of `other` owns it and may staff it (can_assign); the head of `own` owns it without that right.
+  await t.pool.query(
+    `INSERT INTO committee_staff (id, committee_id, user_id, role, can_assign, notified_at) VALUES
+       ('stf-h1', $1, $2, 'owner', true, NOW()), ('stf-h2', $3, $4, 'owner', false, NOW());`,
+    [other.id, head.id, own.id, strangerHead.id]
+  );
 });
 afterAll(async () => {
   await t.pool.end();
@@ -88,9 +96,9 @@ describe('an exam observer keeps the sheikh role and gains read access on one co
     expect(await audits('assignment.create')).toBe(before + 1);
     const { rows } = await t.pool.query('SELECT role, assigned_committee_ids FROM app_users WHERE id = $1;', [sheikh.id]);
     expect(rows[0].role).toBe('sheikh');
-    expect(rows[0].assigned_committee_ids).toEqual([own.id]);
+    expect([...rows[0].assigned_committee_ids].sort()).toEqual([own.id, other.id].sort());
     const inbox = (await t.api().get('/api/notifications').set(sheikh.auth)).body.notifications as any[];
-    expect(inbox.some((n) => /مراقبة امتحان/.test(n.title))).toBe(true);
+    expect(inbox.some((n) => /المراقبة/.test(n.title))).toBe(true);
     // The same task twice is refused.
     expect((await assign(head.auth, { userId: sheikh.id, committeeId: other.id, task: 'exam' })).status).toBe(409);
   });
@@ -151,17 +159,15 @@ describe('an exam observer keeps the sheikh role and gains read access on one co
     expect((await t.api().get('/api/exams/paper-obs/file').set(sheikh.auth)).status).toBe(403);
     expect((await me(sheikh)).permissions.observing).toEqual([]);
     // The account and the history survive.
-    const { rows } = await t.pool.query('SELECT count(*)::int AS n FROM committee_assignments WHERE id = $1;', [assignmentId]);
+    const { rows } = await t.pool.query('SELECT count(*)::int AS n FROM committee_staff WHERE id = $1;', [assignmentId]);
     expect(rows[0].n).toBe(1);
     expect((await t.api().post(`/api/assignments/${assignmentId}/end`).set(head.auth)).status).toBe(409);
   });
 
-  it('after the end date (with one day of grace) the powers stop by themselves', async () => {
+  it('dates no longer end a job: the committee lifecycle does (the dates sent by older apps are accepted)', async () => {
     const res = await assign(admin.auth, { userId: sheikh.id, committeeId: other.id, task: 'exam', endsOn: day(-3) });
     expect(res.status).toBe(201);
-    expect((await t.api().get(`/api/committees/${other.id}`).set(sheikh.auth)).status).toBe(404);
-    const list = (await t.api().get('/api/assignments').set(sheikh.auth)).body.assignments as any[];
-    expect(list.find((a) => a.id === res.body.assignment.id).status).toBe('ended');
+    expect((await t.api().get(`/api/committees/${other.id}`).set(sheikh.auth)).status).toBe(200);
   });
 });
 

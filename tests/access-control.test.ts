@@ -124,12 +124,9 @@ describe('committee scope (API-07, NEW-01, API-05)', () => {
     expect(res.body.user.profileId).toBe('prof-all');
   });
 
-  it('a scoped head who creates a committee gets it in scope', async () => {
+  it('a head cannot create committees (only an admin does), whatever permissions they hold', async () => {
     const h = await userWithToken(t, { role: 'committee_head', permissions: ['add_new_committee', 'manage_committees'] });
-    const body = committeeBody({ committeeNumber: 44 });
-    expect((await t.api().post('/api/committees').set(h.auth).send(body)).status).toBe(200);
-    const res = await t.api().patch(`/api/committees/${body.id}`).set(h.auth).send({ stages: { registration: { completed: true } } });
-    expect(res.status).toBe(200);
+    expect((await t.api().post('/api/committees').set(h.auth).send(committeeBody({ committeeNumber: 44 }))).status).toBe(403);
   });
 });
 

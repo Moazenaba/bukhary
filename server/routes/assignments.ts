@@ -1,14 +1,12 @@
 import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import { assertAllowed, assertCommitteeScope, can } from '../auth.ts';
+import { assertAllowed, can } from '../auth.ts';
 import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
+import { STAFF_SELECT, addStaff, endStaff, loadCommittee } from '../staff.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
-import { type Principal, isAdminRole, isAllowed, isCommitteeInScope } from '../policy.ts';
-import { notifyCeremonyAttendees } from './committees.ts';
-import { committeeLine } from './grants.ts';
-import { notify } from './notifications.ts';
+import { LIFECYCLE, canStaffCommittee, committeeViewer, isAdminRole, isAllowed, isCommitteeInScope, isManagerRole, lifecycleIndex } from '../policy.ts';
 
 /**
  * Extra assignments: a sheikh (or head) keeps their role and is sent as an «مراقب» to another committee,
@@ -16,14 +14,16 @@ import { notify } from './notifications.ts';
  * (see policy.ts: observing); it never changes the account, and ending it only changes its status.
  */
 
+// Assignments are committee_staff rows (observer → task «exam», ceremony_sheikh → task «ceremony»), shown in the
+// shape older clients know.
 const SELECT = `
-  SELECT a.id, a.user_id, u.name AS user_name, a.committee_id, c.committee_number, c.committee_name, a.kind, a.task, a.status,
-         to_char(a.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(a.ends_on, 'YYYY-MM-DD') AS ends_on,
-         a.assigned_by, a.assigned_by_name, a.created_at, a.ended_at, a.ended_by,
-         (a.status = 'active' AND (a.ends_on IS NULL OR a.ends_on + 1 >= CURRENT_DATE)) AS effective
-  FROM committee_assignments a
-  JOIN app_users u ON u.id = a.user_id
-  JOIN committees c ON c.id = a.committee_id`;
+  SELECT s.id, s.user_id, u.name AS user_name, s.committee_id, c.committee_number, c.committee_name, 'observer' AS kind,
+         CASE s.role WHEN 'observer' THEN 'exam' ELSE 'ceremony' END AS task, s.status, '' AS starts_on, '' AS ends_on,
+         s.assigned_by, s.assigned_by_name, s.created_at, s.ended_at, s.ended_by, true AS effective, s.role
+  FROM committee_staff s
+  JOIN app_users u ON u.id = s.user_id
+  JOIN committees c ON c.id = s.committee_id`;
+const JOBS = `s.role IN ('observer', 'ceremony_sheikh')`;
 
 function present(r: any) {
   return {
@@ -35,8 +35,7 @@ function present(r: any) {
     committeeName: r.committee_name,
     kind: r.kind,
     task: r.task,
-    // «active» only while it is also inside its dates; an expired one reads as «ended».
-    status: r.status === 'active' && !r.effective ? 'ended' : r.status,
+    status: r.status === 'active' ? 'active' : r.status === 'excused' ? 'cancelled' : 'ended',
     startsOn: r.starts_on ?? '',
     endsOn: r.ends_on ?? '',
     assignedBy: r.assigned_by_name,
@@ -52,112 +51,70 @@ const createInput = z.object({
   task: z.enum(['exam', 'ceremony']),
   startsOn: day.optional(),
   endsOn: day.optional(),
+  note: z.string().max(1000).nullish(),
+  confirmConflicts: z.boolean().optional(),
 });
 
 const TASK_LABEL = { exam: 'مراقبة امتحان', ceremony: 'متابعة حفل' } as const;
 
-/** Adds or removes a person on the committee's ceremony list (used by «ceremony» assignments). */
-async function setCeremonyAttendee(db: Queryable, committeeId: string, person: { id: string; name: string }, present: boolean) {
-  const { rows } = await db.query('SELECT * FROM committees WHERE id = $1 FOR UPDATE;', [committeeId]);
-  const committee = rows[0];
-  if (!committee) return;
-  const before = committee.ceremony_details ?? {};
-  const beforeAttendees: Array<{ id: string; name: string }> = before.attendees ?? [];
-  const has = beforeAttendees.some((a) => a.id === person.id);
-  if (has === present) return;
-  const attendees = present ? [...beforeAttendees, { id: person.id, name: person.name }] : beforeAttendees.filter((a) => a.id !== person.id);
-  const after = { ...before, attendees };
-  await db.query('UPDATE committees SET ceremony_details = $2::jsonb, updated_at = NOW() WHERE id = $1;', [committeeId, JSON.stringify(after)]);
-  await notifyCeremonyAttendees(db, committee, before, beforeAttendees, after);
-}
-
-/** Ends the assignments whose dates passed (the observer's powers already stop by date; this tidies up). */
-export async function sweepExpired(db: Queryable) {
-  const { rows } = await db.query(
-    `UPDATE committee_assignments SET status = 'ended', ended_at = NOW()
-     WHERE status = 'active' AND ends_on IS NOT NULL AND ends_on + 1 < CURRENT_DATE
-     RETURNING id, user_id, committee_id, task;`
-  );
-  for (const r of rows) {
-    if (r.task !== 'ceremony') continue;
-    const { rows: u } = await db.query('SELECT id, name FROM app_users WHERE id = $1;', [r.user_id]);
-    if (u[0]) await setCeremonyAttendee(db, r.committee_id, u[0], false);
-  }
-}
+/** Kept for the maintenance job: jobs no longer expire by date (the committee lifecycle decides). */
+export async function sweepExpired(_db: Queryable) {}
 
 export function assignmentsRouter(pool: Pool) {
   const r = Router();
 
-  /** May `user` manage assignments on this committee: the right plus the committee in scope. */
-  const assertManage = (user: Principal, committeeId: string) => {
-    assertAllowed(user, 'assignments.manage');
-    assertCommitteeScope(user, committeeId);
-  };
-
-  // Mine by default; ?committeeId= (managers of that committee) or ?userId= (managers; admins see all).
+  // Mine by default; ?committeeId= (who may staff that committee) or ?userId= (managers; admins see all).
   r.get('/', route(async (req, res) => {
     const user = req.user!;
-    await sweepExpired(pool);
     const q = z.object({ committeeId: z.string().max(255).optional(), userId: z.string().max(255).optional() }).parse(req.query);
-    let where = 'a.user_id = $1';
+    let where = `s.user_id = $1 AND ${JOBS}`;
     let params: unknown[] = [user.id];
     if (q.committeeId) {
-      assertManage(user, q.committeeId);
-      where = 'a.committee_id = $1';
+      assertAllowed(user, 'assignments.manage');
+      if (!canStaffCommittee(user, q.committeeId) && !isCommitteeInScope(user, q.committeeId)) throw forbidden('هذه اللجنة غير مسندة إليك');
+      where = `s.committee_id = $1 AND ${JOBS}`;
       params = [q.committeeId];
     } else if (q.userId && q.userId !== user.id) {
       assertAllowed(user, 'assignments.manage');
-      where = 'a.user_id = $1';
+      where = `s.user_id = $1 AND ${JOBS}`;
       params = [q.userId];
     }
-    const { rows } = await pool.query(`${SELECT} WHERE ${where} ORDER BY a.created_at DESC;`, params);
-    // A head sees only assignments on committees they head.
-    const visible = rows.filter((x) => x.user_id === user.id || isAdminRole(user.role) || isCommitteeInScope(user, x.committee_id));
+    const { rows } = await pool.query(`${SELECT} WHERE ${where} ORDER BY s.created_at DESC;`, params);
+    const visible = rows.filter(
+      (x) => x.user_id === user.id || isManagerRole(user.role) || isCommitteeInScope(user, x.committee_id)
+    );
     res.json({ success: true, assignments: visible.map(present) });
   }));
 
   r.post('/', can('assignments.manage'), route(async (req, res) => {
     const body = createInput.parse(req.body);
     const user = req.user!;
-    assertManage(user, body.committeeId);
     if (body.userId === user.id) throw forbidden('لا يمكنك تكليف نفسك');
     if (body.startsOn && body.endsOn && body.endsOn < body.startsOn) throw badRequest('تاريخ النهاية قبل تاريخ البداية');
     const created = await withTransaction(pool, async (db) => {
-      const { rows: c } = await db.query('SELECT id, committee_number, committee_name FROM committees WHERE id = $1;', [body.committeeId]);
-      if (!c[0]) throw notFound('اللجنة غير موجودة');
-      const { rows: u } = await db.query(
-        'SELECT id, name, role, status, assigned_committee_ids FROM app_users WHERE id = $1 FOR UPDATE;',
-        [body.userId]
-      );
-      const target = u[0];
-      if (!target || target.status !== 'approved') throw badRequest('الشخص المختار غير موجود أو غير معتمد');
-      if (target.role !== 'sheikh' && target.role !== 'committee_head') throw badRequest('التكليف للشيوخ ورؤساء اللجان فقط');
-      // A person may also observe a committee they are already on (the owner's rule): the observer role adds read-only powers.
-      const id = crypto.randomUUID();
-      try {
-        await db.query(
-          `INSERT INTO committee_assignments (id, user_id, committee_id, kind, task, status, starts_on, ends_on, assigned_by, assigned_by_name)
-           VALUES ($1,$2,$3,'observer',$4,'active',$5,$6,$7,$8);`,
-          [id, body.userId, body.committeeId, body.task, body.startsOn ?? null, body.endsOn ?? null, user.id, user.name]
-        );
-      } catch (e: any) {
-        if (e?.code === '23505') throw conflict('هذا الشخص مكلّف بالفعل بنفس المهمة على هذه اللجنة');
-        throw e;
+      const committee = await loadCommittee(db, body.committeeId, true);
+      if (committeeViewer(user, committee) === 'none' && !isManagerRole(user.role)) throw forbidden('هذه اللجنة غير مسندة إليك');
+      if (!canStaffCommittee(user, committee.id)) throw forbidden('لا تملك صلاحية تعيين أشخاص في هذه اللجنة');
+      const { rows: u } = await db.query('SELECT role FROM app_users WHERE id = $1;', [body.userId]);
+      if (u[0] && u[0].role !== 'sheikh' && u[0].role !== 'committee_head') throw badRequest('التكليف للشيوخ ورؤساء اللجان فقط');
+      const role = body.task === 'exam' ? 'observer' : 'ceremony_sheikh';
+      if (!isAdminRole(user.role)) {
+        if (role === 'observer' && lifecycleIndex(committee.lifecycle) < LIFECYCLE.indexOf('observers_open')) {
+          throw forbidden('لم يسمح الأدمن بإضافة المراقبين لهذه اللجنة بعد');
+        }
+        if (role === 'ceremony_sheikh' && lifecycleIndex(committee.lifecycle) < LIFECYCLE.indexOf('accredited')) {
+          throw forbidden('يُعيَّن مشايخ الحفلة بعد اعتماد اللجنة');
+        }
       }
-      if (body.task === 'ceremony') await setCeremonyAttendee(db, body.committeeId, target, true);
-      // The committee's place and the head to call come with the notice (see grants.ts committeeLine).
-      const line = await committeeLine(db, body.committeeId);
-      await notify(db, {
-        title: `تم تكليفك بـ${TASK_LABEL[body.task]} في ${line?.title ?? `لجنة ${c[0].committee_number}`}`,
-        description: [c[0].committee_name, body.startsOn && `من ${body.startsOn}`, body.endsOn && `حتى ${body.endsOn}`, line?.text]
-          .filter(Boolean)
-          .join(' · '),
-        type: 'info',
-        committeeId: body.committeeId,
-        targetUserId: body.userId,
+      const row = await addStaff(db, req, committee, {
+        userId: body.userId,
+        role,
+        note: body.note ?? null,
+        // Older clients do not know the warning: they assign as before.
+        confirmConflicts: body.confirmConflicts ?? true,
       });
-      const { rows } = await db.query(`${SELECT} WHERE a.id = $1;`, [id]);
-      await audit(db, req, 'assignment.create', 'assignment', id, null, present(rows[0]), `${TASK_LABEL[body.task]} — لجنة ${c[0].committee_number}`);
+      const { rows } = await db.query(`${SELECT} WHERE s.id = $1;`, [row.id]);
+      await audit(db, req, 'assignment.create', 'assignment', row.id, null, present(rows[0]), `${TASK_LABEL[body.task]} — لجنة ${committee.committee_number}`);
       return rows[0];
     });
     res.status(201).json({ success: true, assignment: present(created) });
@@ -167,22 +124,19 @@ export function assignmentsRouter(pool: Pool) {
     route(async (req, res) => {
       const user = req.user!;
       const out = await withTransaction(pool, async (db) => {
-        const { rows } = await db.query(`${SELECT} WHERE a.id = $1 FOR UPDATE OF a;`, [req.params.id]);
+        const { rows } = await db.query(`${STAFF_SELECT} WHERE s.id = $1 AND ${JOBS} FOR UPDATE OF s;`, [req.params.id]);
         const before = rows[0];
         if (!before) throw notFound('التكليف غير موجود');
         // Not being allowed to manage it looks the same as it not existing.
-        if (!isAllowed(user, 'assignments.manage') || !isCommitteeInScope(user, before.committee_id)) throw notFound('التكليف غير موجود');
+        if (!isAllowed(user, 'assignments.manage') || !canStaffCommittee(user, before.committee_id)) throw notFound('التكليف غير موجود');
         if (before.status !== 'active') throw conflict('هذا التكليف منتهٍ أو ملغى بالفعل');
-        await db.query(
-          'UPDATE committee_assignments SET status = $2, ended_at = NOW(), ended_by = $3 WHERE id = $1;',
-          [before.id, status, user.id]
-        );
-        if (before.task === 'ceremony') await setCeremonyAttendee(db, before.committee_id, { id: before.user_id, name: before.user_name }, false);
-        const { rows: after } = await db.query(`${SELECT} WHERE a.id = $1;`, [before.id]);
-        await audit(db, req, status === 'ended' ? 'assignment.end' : 'assignment.cancel', 'assignment', before.id, present(before), present(after[0]));
+        const committee = await loadCommittee(db, before.committee_id, true);
+        await endStaff(db, req, committee, before, { status: 'removed' });
+        const { rows: after } = await db.query(`${SELECT} WHERE s.id = $1;`, [before.id]);
+        await audit(db, req, status === 'ended' ? 'assignment.end' : 'assignment.cancel', 'assignment', before.id, null, present(after[0]));
         return after[0];
       });
-      res.json({ success: true, assignment: present(out) });
+      res.json({ success: true, assignment: { ...present(out), status } });
     });
   r.post('/:id/end', finish('ended'));
   r.post('/:id/cancel', finish('cancelled'));
@@ -206,10 +160,10 @@ export function assignmentsRouter(pool: Pool) {
 
   r.get('/:id/observations', route(async (req, res) => {
     const user = req.user!;
-    const { rows: a } = await pool.query('SELECT user_id, committee_id FROM committee_assignments WHERE id = $1;', [req.params.id]);
+    const { rows: a } = await pool.query('SELECT user_id, committee_id FROM committee_staff WHERE id = $1;', [req.params.id]);
     const asg = a[0];
     const own = asg && asg.user_id === user.id;
-    const manages = asg && isAllowed(user, 'assignments.manage') && isCommitteeInScope(user, asg.committee_id);
+    const manages = asg && isAllowed(user, 'assignments.manage') && (canStaffCommittee(user, asg.committee_id) || isCommitteeInScope(user, asg.committee_id));
     if (!asg || !(own || manages)) throw notFound('التكليف غير موجود');
     const { rows } = await pool.query(
       `SELECT o.id, o.note, o.created_at, u.name AS user_name FROM committee_observations o JOIN app_users u ON u.id = o.user_id

@@ -24,6 +24,7 @@ afterAll(async () => {
 const committee = async (n: number) => {
   const res = await t.api().post('/api/committees').set(admin.auth).send(committeeBody({ committeeNumber: n }));
   expect(res.status).toBe(200);
+  await t.pool.query(`UPDATE committees SET lifecycle = 'active' WHERE id = $1;`, [res.body.committee.id]);
   return res.body.committee as any;
 };
 const ids = (list: any[]) => list.map((x) => x.id);
@@ -71,13 +72,14 @@ describe('admins and super admins', () => {
     expect(res.status).toBe(200);
     const me = (await t.api().get('/api/auth/me').set(admin.auth)).body.permissions;
     expect(me.actions['users.admins']).toBe(false);
-    expect(me.actions['audit.read']).toBe(false);
+    // Admins read the audit log (without super admins' own actions).
+    expect(me.actions['audit.read']).toBe(true);
     expect(me.actions['database.admin']).toBe(false);
     expect(me.actions['users.grant']).toBe(true);
     expect(me.actions['committees.create']).toBe(true);
-    expect(me.grantableRoles).toEqual(['committee_head', 'sheikh']);
+    expect(me.grantableRoles).toEqual(['exams_manager', 'committee_head', 'sheikh']);
     expect(me.committeeScope).toBe('all');
-    expect((await t.api().get('/api/audit-logs').set(admin.auth)).status).toBe(403);
+    expect((await t.api().get('/api/audit-logs').set(admin.auth)).status).toBe(200);
   });
 
   it('admins invited to a ceremony are hidden from other admins, and stay invited when an admin edits the list', async () => {
@@ -108,6 +110,12 @@ describe('committee heads', () => {
     const head = await userWithToken(t, { role: 'committee_head', committeeIds: [mine.id] });
     const sheikh = await userWithToken(t, { role: 'sheikh', name: 'الشيخ أحمد' });
     const otherHead = await userWithToken(t, { role: 'committee_head' });
+    // A head staffs a committee only as its owner with «صلاحية التعيين» (can_assign).
+    expect((await t.api().put(`/api/committees/${mine.id}/members`).set(head.auth).send({ userIds: [sheikh.id] })).status).toBe(403);
+    await t.pool.query(
+      `INSERT INTO committee_staff (id, committee_id, user_id, role, can_assign, notified_at) VALUES ($1, $2, $3, 'owner', true, NOW());`,
+      [`stf-${mine.id}`, mine.id, head.id]
+    );
 
     const add = await t.api().put(`/api/committees/${mine.id}/members`).set(head.auth).send({ userIds: [sheikh.id] });
     expect(add.status).toBe(200);
@@ -115,10 +123,11 @@ describe('committee heads', () => {
       { id: sheikh.id, name: 'الشيخ أحمد', role: 'sheikh' },
       expect.objectContaining({ id: head.id, role: 'committee_head' }),
     ]));
-    expect((await inbox(sheikh.auth)).some((m) => m.startsWith('تمت إضافتك إلى لجنة 10'))).toBe(true);
+    expect((await inbox(sheikh.auth)).some((m) => m.startsWith('تم تكليفك بالمراقبة في لجنة 10'))).toBe(true);
     expect(ids((await t.api().get('/api/committees').set(sheikh.auth)).body.committees)).toEqual([mine.id]);
 
-    expect((await t.api().put(`/api/committees/${other.id}/members`).set(head.auth).send({ userIds: [sheikh.id] })).status).toBe(403);
+    // Another committee does not exist for him.
+    expect((await t.api().put(`/api/committees/${other.id}/members`).set(head.auth).send({ userIds: [sheikh.id] })).status).toBe(404);
     expect((await t.api().put(`/api/committees/${mine.id}/members`).set(head.auth).send({ userIds: [otherHead.id] })).status).toBe(400);
     expect((await t.api().put(`/api/committees/${mine.id}/members`).set(head.auth).send({ userIds: [admin.id] })).status).toBe(400);
 
@@ -126,7 +135,7 @@ describe('committee heads', () => {
     const remove = await t.api().put(`/api/committees/${mine.id}/members`).set(head.auth).send({ userIds: [] });
     expect(remove.status).toBe(200);
     expect(ids(remove.body.committee.staff)).toEqual([head.id]);
-    expect((await inbox(sheikh.auth)).some((m) => m.startsWith('تم إلغاء إضافتك إلى لجنة 10'))).toBe(true);
+    expect((await inbox(sheikh.auth)).some((m) => m.startsWith('تم إلغاء تكليفك (مراقب) في لجنة 10'))).toBe(true);
     expect((await t.api().get('/api/committees').set(sheikh.auth)).body.committees).toEqual([]);
   });
 
@@ -153,15 +162,11 @@ describe('committee heads', () => {
     expect(me.committeeScope).toEqual([c.id]);
   });
 
-  it('a head creates a committee, which becomes theirs, but cannot delete it without the permission', async () => {
-    // «إضافة لجنة جديدة» decides whether a head may add committees.
-    const without = await userWithToken(t, { role: 'committee_head' });
-    expect((await t.api().post('/api/committees').set(without.auth).send(committeeBody({ committeeNumber: 12 }))).status).toBe(403);
-    const head = await userWithToken(t, { role: 'committee_head', permissions: ['add_new_committee'] });
-    const body = committeeBody({ committeeNumber: 13 });
-    expect((await t.api().post('/api/committees').set(head.auth).send(body)).status).toBe(200);
-    expect(ids((await t.api().get('/api/committees').set(head.auth)).body.committees)).toEqual([body.id]);
-    expect((await t.api().delete(`/api/committees/${body.id}`).set(head.auth)).status).toBe(403);
+  it('only an admin creates or deletes committees, whatever permissions a head holds', async () => {
+    const head = await userWithToken(t, { role: 'committee_head', permissions: ['add_new_committee', 'manage_committees'] });
+    expect((await t.api().post('/api/committees').set(head.auth).send(committeeBody({ committeeNumber: 13 }))).status).toBe(403);
+    const c = await committee(14);
+    expect((await t.api().delete(`/api/committees/${c.id}`).set(head.auth)).status).toBe(403);
   });
 });
 
@@ -184,7 +189,7 @@ describe('sheikhs', () => {
     const invite = await t.api().post(`/api/committees/${c.id}/ceremony-attendees`).set(admin.auth).send({ add: [sheikh.id] });
     expect(invite.status).toBe(200);
     expect(invite.body.committee.ceremonyDetails.ceremonyPlace).toBe('المسجد');
-    expect((await inbox(sheikh.auth)).some((m) => m.startsWith('تمت إضافتك لحفل تكريم لجنة 21'))).toBe(true);
+    expect((await inbox(sheikh.auth)).some((m) => m.startsWith('تم تعيينك شيخًا لحفلة لجنة 21'))).toBe(true);
 
     const seen = (await t.api().get('/api/committees').set(sheikh.auth)).body.committees;
     expect(ids(seen)).toEqual([c.id]);

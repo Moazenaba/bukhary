@@ -14,6 +14,7 @@ const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISO
 const mk = async (n: number) => {
   const res = await t.api().post('/api/committees').set(admin.auth).send(committeeBody({ committeeNumber: n }));
   expect(res.status).toBe(200);
+  await t.pool.query(`UPDATE committees SET lifecycle = 'active' WHERE id = $1;`, [res.body.committee.id]);
   return res.body.committee as any;
 };
 const grant = (body: Record<string, unknown>) => t.api().post('/api/grants').set(admin.auth).send(body);
@@ -40,7 +41,9 @@ describe('granting a temporary head', () => {
     expect(res.status).toBe(201);
     const perms = (await me(sheikh)).permissions;
     expect(perms.committeeScope).toEqual([c1.id]);
-    expect(perms.actions['committees.members']).toBe(true);
+    expect(perms.actions['committees.update']).toBe(true);
+    // Staffing is for an owner given can_assign, not for a head as such.
+    expect(perms.actions['committees.members']).toBe(false);
     expect(perms.actions['users.read']).toBe(false); // a head right that is not about one committee stays out
     // Not the other committee.
     const onOther = await t.api().patch(`/api/committees/${c2.id}`).set(sheikh.auth).send({ stages: { registration: { completed: true } } });

@@ -118,9 +118,17 @@ export const PRINCIPAL_COLUMNS = `
   u.all_exams, u.allowed_exam_ids, u.must_change_password, u.token_version,
   COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
             WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb) AS assigned_numbers,
-  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'committeeId', a.committee_id, 'task', a.task, 'book', COALESCE(c.competition_book, '')))
-            FROM committee_assignments a JOIN committees c ON c.id = a.committee_id
-            WHERE a.user_id = u.id AND a.status = 'active' AND (a.ends_on IS NULL OR a.ends_on + 1 >= CURRENT_DATE)), '[]'::jsonb) AS observing,
+  -- Observers and ceremony sheikhs (committee_staff), once the committee is active: the «observing» shape older
+  -- clients know (exam → the committee's paper, ceremony → its ceremony).
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', s.id, 'committeeId', s.committee_id,
+                     'task', CASE s.role WHEN 'observer' THEN 'exam' ELSE 'ceremony' END, 'book', COALESCE(c.competition_book, '')))
+            FROM committee_staff s JOIN committees c ON c.id = s.committee_id
+            WHERE s.user_id = u.id AND s.status = 'active' AND s.role IN ('observer', 'ceremony_sheikh')
+              AND c.lifecycle IN ('active', 'observed', 'accredited', 'ceremony_done')), '[]'::jsonb) AS observing,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', s.id, 'committeeId', s.committee_id, 'role', s.role,
+                     'canAssign', s.can_assign, 'lifecycle', c.lifecycle))
+            FROM committee_staff s JOIN committees c ON c.id = s.committee_id
+            WHERE s.user_id = u.id AND s.status = 'active'), '[]'::jsonb) AS staff,
   -- Temporary head grants inside their dates. A grant with a «yes» ceremony lasts until the ceremony is done
   -- (the sweep in grants.ts ends it then); otherwise it ends on its last day.
   COALESCE((SELECT jsonb_agg(jsonb_build_object('id', g.id, 'committeeId', cid, 'decision', g.ceremony_decision))
@@ -147,6 +155,7 @@ export function toPrincipal(row: any): Principal {
     mustChangePassword: Boolean(row.must_change_password),
     observing: Array.isArray(row.observing) ? row.observing : [],
     headGrants: Array.isArray(row.head_grants) ? row.head_grants : [],
+    staff: Array.isArray(row.staff) ? row.staff : [],
   };
 }
 
