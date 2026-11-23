@@ -17,10 +17,13 @@ describe('users', () => {
     const res = await t.api().post('/api/users').set(asst.auth)
       .send({ id: asst.id, name: 'جديد', phone: asst.phone, role: 'super_admin', permissions: ['manage_assistants'] });
     expect(res.status).toBe(403);
-    const ok = await t.api().post('/api/users').set(asst.auth).send({ id: asst.id, name: 'اسم جديد', phone: asst.phone });
+    // The name, phone and email need a manager's review; other details of one's own profile can be saved.
+    const rename = await t.api().post('/api/users').set(asst.auth).send({ id: asst.id, name: 'اسم جديد', phone: asst.phone });
+    expect(rename.status).toBe(403);
+    const ok = await t.api().post('/api/users').set(asst.auth).send({ id: asst.id, name: 'sheikh user', phone: asst.phone, availability: 'مساءً' });
     expect(ok.status).toBe(200);
     const { rows } = await t.pool.query('SELECT name, role FROM app_users WHERE id = $1;', [asst.id]);
-    expect(rows[0]).toEqual({ name: 'اسم جديد', role: 'sheikh' });
+    expect(rows[0]).toEqual({ name: 'sheikh user', role: 'sheikh' });
   });
 
   it('managers who are not super admins cannot grant roles or permissions', async () => {

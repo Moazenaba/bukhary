@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DATA_ROOT_KEY, useCacheSetter, useServerData, useLiveRefresh, useSettings } from './data/queries';
 import { overdueCommittees } from './utils/overdue';
@@ -270,6 +270,9 @@ export default function App() {
 
   // Saves of one committee run one at a time, each with the version the previous one returned (WEB-10).
   const committeeQueue = useMemo(() => createKeyedQueue(), []);
+  /** Sheet edits per committee that are still being saved (see onUpdateCommitteeFields). */
+  const pendingFieldEdits = useRef<Record<string, Partial<Committee>>>({});
+
   const latestCommittee = (id: string) =>
     queryClient.getQueryData<Committee[]>(server.keys.committees)?.find((c) => c.id === id);
 
@@ -813,8 +816,15 @@ export default function App() {
                 if (target) handleSaveCommittee({ ...target, courseId });
               }}
               onUpdateCommitteeFields={(committeeId, patch) => {
+                // Cells edited one after another (name, then place) are saved together: a later save carries the
+                // earlier edits still on their way, so it never writes the old value back over them.
+                const merged = { ...pendingFieldEdits.current[committeeId], ...patch };
+                pendingFieldEdits.current[committeeId] = merged;
                 const target = latestCommittee(committeeId);
-                return target ? handleSaveCommittee({ ...target, ...patch }) : false;
+                if (!target) return false;
+                return handleSaveCommittee({ ...target, ...merged }).finally(() => {
+                  if (pendingFieldEdits.current[committeeId] === merged) delete pendingFieldEdits.current[committeeId];
+                });
               }}
               onAddCourse={handleAddCourse}
               onNavigateToCommittees={() => setActiveTab('committees')}
