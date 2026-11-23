@@ -1,3 +1,4 @@
+import { RELEASE } from '../release';
 import React, { useState } from 'react';
 
 export const Footer: React.FC = () => {
@@ -14,6 +15,9 @@ export const Footer: React.FC = () => {
 
           <p className="text-[12px] sm:text-[13px] text-ink-soft">
             نظام إدارة لجان الاختبار والتصحيح لمتون العقيدة والكتب الشرعية © {new Intl.DateTimeFormat('ar-SA-u-ca-islamic', { year: 'numeric' }).format(new Date())} — جميع الحقوق محفوظة
+          </p>
+          <p className="text-[11px] text-muted" data-testid="release" dir="ltr">
+            الإصدار {RELEASE}
           </p>
 
           <div className="flex items-center gap-3 sm:gap-4 text-ink-soft text-xs sm:text-[12px] font-medium">

@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import { authenticate } from './auth.ts';
+import { RELEASE } from '../src/release.ts';
 import type { AppConfig } from './config.ts';
 import type { Pool } from './db.ts';
 import { errorHandler, notFound, requestId, route } from './http.ts';
@@ -71,7 +72,8 @@ export function createApp(config: AppConfig, pool: Pool) {
 
   // ---- Public ----
   app.get('/ping', (_req, res) => res.type('text/plain').send('pong'));
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+  // `release` tells which version is live (src/release.ts, shown in the site's footer too).
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', release: RELEASE }));
   app.get('/api/ready', route(async (_req, res) => {
     try {
       await pool.query('SELECT 1;');
