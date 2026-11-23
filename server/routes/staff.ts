@@ -65,6 +65,11 @@ export async function peopleFor(db: Pool | any, user: Principal, committee: any)
   const full = viewer === 'admin' || viewer === 'manager';
   const phones = full || viewer === 'owner';
   const owner = await ownerOf(db, committee);
+  // A note is for its person: colleagues of the same kind see each other's names, not their notes.
+  const seen = (s: StaffRow) => {
+    const p = presentStaff(s, { phones });
+    return full || viewer === 'owner' || s.user_id === user.id ? p : { ...p, note: undefined };
+  };
   const show = (role: string) =>
     full || viewer === 'owner' || (viewer === 'observer' && role === 'observer') || (viewer === 'ceremony_sheikh' && role === 'ceremony_sheikh');
   const out: Record<string, unknown> = {
@@ -73,8 +78,8 @@ export async function peopleFor(db: Pool | any, user: Principal, committee: any)
     lifecycleLabel: LIFECYCLE_LABEL[committee.lifecycle as keyof typeof LIFECYCLE_LABEL],
     owner: owner ? { ...(owner.id ? { userId: owner.id } : {}), name: owner.name, ...(owner.phone ? { phone: owner.phone } : {}) } : null,
     ownerCanAssign: staff.some((s) => s.role === 'owner' && s.can_assign),
-    observers: show('observer') ? staff.filter((s) => s.role === 'observer').map((s) => presentStaff(s, { phones })) : [],
-    ceremonySheikhs: show('ceremony_sheikh') ? staff.filter((s) => s.role === 'ceremony_sheikh').map((s) => presentStaff(s, { phones })) : [],
+    observers: show('observer') ? staff.filter((s) => s.role === 'observer').map(seen) : [],
+    ceremonySheikhs: show('ceremony_sheikh') ? staff.filter((s) => s.role === 'ceremony_sheikh').map(seen) : [],
     driver: committee.has_driver ? { name: committee.driver_name ?? '', phone: committee.driver_phone ?? '' } : null,
     mine: staff.filter((s) => s.user_id === user.id).map((s) => presentStaff(s)),
   };

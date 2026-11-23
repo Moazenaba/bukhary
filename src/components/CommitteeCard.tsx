@@ -82,6 +82,18 @@ export const CommitteeCard: React.FC<CommitteeCardProps> = ({
 
           {/* Status & Women Tag */}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {committee.lifecycleLabel && (
+              <span
+                data-testid="lifecycle-badge"
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                  committee.lifecycle === 'draft' || committee.lifecycle === 'sent_to_manager' || committee.lifecycle === 'observers_open'
+                    ? 'bg-slate-100 text-slate-700 border-slate-300'
+                    : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                }`}
+              >
+                {committee.lifecycleLabel}
+              </span>
+            )}
             {committee.isWomenCommittee && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs">
                 <span>🧕</span>

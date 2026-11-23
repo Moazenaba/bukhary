@@ -115,7 +115,11 @@ export function committeeFromRow(r: any) {
     stages: { ...emptyStages(), ...(r.stages ?? {}) },
     scoringDetails: r.scoring_details && Object.keys(r.scoring_details).length ? r.scoring_details : undefined,
     aggregationDetails: r.aggregation_details && Object.keys(r.aggregation_details).length ? r.aggregation_details : undefined,
-    ceremonyDetails: r.ceremony_details && Object.keys(r.ceremony_details).length ? r.ceremony_details : undefined,
+    // Only the server's list of ceremony sheikhs (attendees, maybe empty) is not a ceremony yet; a ceremony always has
+    // its list of attending sheikhs, which older clients read.
+    ceremonyDetails: Object.keys(r.ceremony_details ?? {}).some((k) => k !== 'attendees') || r.ceremony_details?.attendees?.length
+      ? { attendingSheikhs: [], ...r.ceremony_details }
+      : undefined,
     receivedByAssistant: r.received_by_assistant ?? undefined,
     examApprovedBy: r.exam_approved_by ?? undefined,
     createdDate: r.created_date ?? '',
@@ -171,7 +175,7 @@ async function presenterFor(db: Queryable, user: Principal) {
       const c = committeeFromRow(row);
       const viewer = committeeViewer(user, row);
       // Observers do not see the ceremony's sheikhs; ceremony sheikhs see only the committee's owner.
-      const attendees: Person[] | undefined = viewer === 'observer' ? [] : c.ceremonyDetails?.attendees;
+      const attendees: Person[] | undefined = c.ceremonyDetails && viewer === 'observer' ? [] : c.ceremonyDetails?.attendees;
       const staff = (staffBy.get(row.id) ?? []).filter((p) => viewer !== 'ceremony_sheikh' || p.role === 'committee_head');
       return {
         ...c,

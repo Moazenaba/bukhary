@@ -183,7 +183,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               }`}>
                 {currentUser.role === 'super_admin' ? 'سوبر أدمن' :
                  currentUser.role === 'admin' ? 'أدمن' :
-                 currentUser.role === 'committee_head' ? 'رئيس لجنة' : 'شيخ'}
+                 AuthService.getRoleLabel(currentUser.role)}
               </span>
             </div>
             <span className="material-symbols-outlined text-xs text-muted hidden sm:inline">expand_more</span>

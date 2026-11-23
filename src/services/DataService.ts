@@ -82,6 +82,8 @@ export interface AuditLogEntry {
   status: string;
   entity?: string;
   entityId?: string;
+  /** The admin who did it while acting as `user` («الدخول بعين المستخدم»). */
+  impersonatedBy?: string;
 }
 
 export type CommitteePatch = Partial<Pick<Committee, 'scoringDetails' | 'aggregationDetails' | 'ceremonyDetails'>> & {
@@ -206,8 +208,9 @@ export const DataService = {
     api('/notifications', { method: 'POST', body: n }),
 
   // ---- Admin ----
-  getAuditLogs: async (q: { limit?: number; before?: string; entity?: string } = {}) => {
+  getAuditLogs: async (q: { limit?: number; before?: string; entity?: string; impersonatedOnly?: boolean } = {}) => {
     const params = new URLSearchParams();
+    if (q.impersonatedOnly) params.set('impersonatedOnly', 'true');
     if (q.limit) params.set('limit', String(q.limit));
     if (q.before) params.set('before', q.before);
     if (q.entity) params.set('entity', q.entity);

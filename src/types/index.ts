@@ -194,6 +194,15 @@ export interface Committee {
   sheikhPhone?: string;          // رقم هاتف الشيخ
   sheikhCountry?: string;        // مكان الشيخ (العمود في قاعدة البيانات اسمه sheikh_country)
   examDate?: string | null;      // ميعاد امتحان اللجنة YYYY-MM-DD (null = يُمسح)
+  /** مرحلة اللجنة: إنشاء ← إرسال للمدير ← السماح بالمراقبين ← تفعيل ← تمت المراقبة ← الاعتماد ← تمت الحفلة */
+  lifecycle?: 'draft' | 'sent_to_manager' | 'observers_open' | 'active' | 'observed' | 'accredited' | 'ceremony_done';
+  lifecycleLabel?: string;
+  /** سائق اللجنة (اختياري). */
+  driver?: { name: string; phone: string } | null;
+  /** كيف يرى المستخدم الحالي هذه اللجنة (من الخادم). */
+  viewer?: 'none' | 'admin' | 'manager' | 'owner' | 'observer' | 'ceremony_sheikh';
+  /** يُرسل عند الإنشاء فقط: شيخ اللجنة الذي يحدده الأدمن. */
+  ownerUserId?: string | null;
   studentsCount?: number;        // عدد الطلاب في اللجنة
   isWomenCommittee?: boolean;    // اختيار لجنة نسائية أو لا (true: نسائية / false: رجال)
 
@@ -249,7 +258,8 @@ export interface ScheduleTask {
 export type UserRole =
   | 'super_admin'      // المشرف العام: كل شيء، والوحيد الذي يرى حسابات الأدمن
   | 'admin'            // أدمن: كل الصلاحيات عدا صلاحيات المشرف العام، ولا يرى الأدمنز الآخرين
-  | 'committee_head'   // رئيس لجنة: يدير اللجان المسندة إليه ويضيف إليها الشيوخ
+  | 'exams_manager'    // مدير إدارة الحفلات والامتحانات: يعيّن المراقبين ومشايخ الحفلات ويفعّل اللجان
+  | 'committee_head'   // شيخ لجنة: يتابع لجانه؛ يعيّن فقط إذا أعطاه المدير صلاحية التعيين
   | 'sheikh';          // شيخ: يرى اللجان والحفلات المسندة إليه فقط
 
 export interface RoleDefinition {
@@ -276,15 +286,23 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
     shortLabel: 'أدمن',
     badgeClass: 'bg-teal-100 text-teal-800 border-teal-300',
     icon: 'admin_panel_settings',
-    description: 'كل الصلاحيات عدا صلاحيات السوبر أدمن: يدير الشيوخ ورؤساء اللجان واللجان والحفلات، ولا يرى الأدمنز الآخرين.',
+    description: 'كل الصلاحيات عدا صلاحيات السوبر أدمن: ينشئ اللجان ويحدد شيخها، يرسلها للمدير ويعتمدها، ويرسل التنبيهات ويدخل بعين أي مستخدم.',
+  },
+  {
+    role: 'exams_manager',
+    title: 'مدير إدارة الحفلات والامتحانات',
+    shortLabel: 'مدير الحفلات والامتحانات',
+    badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    icon: 'event_available',
+    description: 'تصله اللجان التي يرسلها الأدمن: يعيّن المراقبين والسائق ويفعّل اللجنة، ثم ينشئ الحفلة ويعيّن مشايخها بعد الاعتماد.',
   },
   {
     role: 'committee_head',
-    title: 'رئيس لجنة',
-    shortLabel: 'رئيس لجنة',
+    title: 'شيخ لجنة',
+    shortLabel: 'شيخ لجنة',
     badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
     icon: 'school',
-    description: 'يدير اللجان التي يسندها إليه الأدمن: يضيف إليها الشيوخ أو يزيلهم، ويدعوهم لحفلاتها.',
+    description: 'صاحب اللجنة: يتابع مراحلها ويعرف مراقبيها ومشايخ حفلتها. يعيّن فيها فقط إذا أعطاه المدير صلاحية التعيين.',
   },
   {
     role: 'sheikh',
@@ -292,7 +310,7 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
     shortLabel: 'شيخ',
     badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
     icon: 'person',
-    description: 'يرى اللجان والحفلات المسندة إليه فقط، ويصله تنبيه عند إضافته للجنة أو حفل.',
+    description: 'يُكلَّف مراقبًا في لجنة أو شيخًا لحفلة؛ يرى ما كُلّف به فقط ويصله تنبيه بالتفاصيل، ويمكنه الاعتذار.',
   },
 ];
 

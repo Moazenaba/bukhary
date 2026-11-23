@@ -15,7 +15,9 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code?: string
+    public code?: string,
+    /** Extra data the server sent with the error (e.g. the conflicts of a schedule_conflict). */
+    public details?: any
   ) {
     super(message);
   }
@@ -104,8 +106,10 @@ export async function refreshTokens(): Promise<boolean> {
 async function toError(res: Response): Promise<ApiError> {
   let message = 'تعذر إتمام العملية، حاول مرة أخرى';
   let code: string | undefined;
+  let details: any;
   try {
     const body = await res.json();
+    details = body?.details;
     if (body?.message) message = body.message;
     if (body?.errors?.length) message = `${message}: ${body.errors.map((e: any) => e.message).join('، ')}`;
     code = body?.code;
@@ -113,7 +117,7 @@ async function toError(res: Response): Promise<ApiError> {
     // not JSON
   }
   if (res.status === 403 && !code) message = 'ليس لديك صلاحية لتنفيذ هذا الإجراء';
-  return new ApiError(message, res.status, code);
+  return new ApiError(message, res.status, code, details);
 }
 
 export interface RequestOptions {

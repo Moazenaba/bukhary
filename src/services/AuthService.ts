@@ -19,6 +19,10 @@ export interface ServerPermissions {
   /** Extra assignments (read-only powers on other committees); the server enforces them. */
   observing?: { id: string; committeeId: string; task: 'exam' | 'ceremony' }[];
   mustChangePassword?: boolean;
+  /** Jobs on committees: owner («شيخ اللجنة»), observer, ceremony sheikh. */
+  staff?: { id: string; committeeId: string; role: 'owner' | 'observer' | 'ceremony_sheikh'; canAssign: boolean; lifecycle: string }[];
+  /** Set while an admin acts as this user. */
+  impersonating?: { by: string } | null;
 }
 
 /** Access changes a super admin makes when approving or editing someone; only changed fields are sent. */
@@ -171,8 +175,38 @@ class AuthServiceClass {
     }
   }
 
+  /** The admin's own access token while acting as another user («الدخول بعين المستخدم»); in memory only. */
+  private adminAccess: string | null = null;
+
+  /** Whether an admin is acting as this user right now (the server says who). */
+  public impersonatedBy = (): string | null => (this.permissions as any)?.impersonating?.by ?? null;
+
+  /** Opens the app as another person: their screens, their data, their actions (logged with both names). */
+  public async impersonate(userId: string) {
+    const data = await api<{ token: string }>(`/impersonation/start/${encodeURIComponent(userId)}`, { method: 'POST', body: {} });
+    this.adminAccess = tokens.access;
+    tokens.setAccess(data.token);
+    try {
+      await this.loadMe();
+    } catch (err) {
+      await this.stopImpersonating();
+      throw err;
+    }
+  }
+
+  /** Back to the admin's own account. */
+  public async stopImpersonating() {
+    await api('/impersonation/end', { method: 'POST', body: {} }).catch(() => {});
+    if (this.adminAccess) tokens.setAccess(this.adminAccess);
+    else await refreshTokens();
+    this.adminAccess = null;
+    await this.loadMe();
+  }
+
   /** Ends the session on the server (the access token stops working at once) and clears the cookie. */
   public async logout() {
+    // Signing out while acting as someone only ends that.
+    if (this.impersonatedBy()) return this.stopImpersonating();
     const access = tokens.access;
     await api('/auth/logout', { method: 'POST', body: {}, auth: false, headers: access ? { Authorization: `Bearer ${access}` } : {} }).catch(() => {});
     this.reset();
@@ -342,6 +376,8 @@ class AuthServiceClass {
         return this.can('courses.write');
       case 'audit':
         return this.can('audit.read');
+      case 'availability':
+        return this.can('people.availability');
       default:
         return false;
     }

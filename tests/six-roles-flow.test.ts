@@ -94,7 +94,11 @@ describe('staffing and activation (exams manager)', () => {
     for (const part of ['مسجد النور', DAY, 'شيخ اللجنة: شيخ اللجنة', '1011112222', 'مراقب ب', 'عم سيد', '01099998888']) {
       expect(forA, part).toContain(part);
     }
-    expect((await t.api().get(`/api/committees/${c.id}`).set(obsA.auth)).status).toBe(200);
+    const seen = await t.api().get(`/api/committees/${c.id}`).set(obsA.auth);
+    expect(seen.status).toBe(200);
+    // No ceremony yet: no ceremony details (older screens read a ceremony's lists when they are present).
+    expect(seen.body.committee.ceremonyDetails).toBeUndefined();
+    expect((await t.api().get(`/api/committees/${c.id}`).set(admin.auth)).body.committee.ceremonyDetails).toBeUndefined();
     expect((await t.api().get('/api/auth/me').set(owner.auth)).body.permissions.staff).toEqual([
       expect.objectContaining({ committeeId: c.id, role: 'owner', canAssign: false, lifecycle: 'active' }),
     ]);
@@ -133,6 +137,7 @@ describe('who sees whom on the committee', () => {
     expect(res.body.owner).toMatchObject({ name: 'شيخ اللجنة', phone: '01011112222' });
     expect(res.body.observers.map((o: any) => o.name)).toEqual(expect.arrayContaining(['مراقب أ', 'مراقب ب']));
     expect(res.body.observers.every((o: any) => !('phone' in o))).toBe(true);
+    expect(res.body.observers.every((o: any) => o.userId === obsA.id || o.note === undefined)).toBe(true);
     expect(res.body.driver).toEqual({ name: 'عم سيد', phone: '01099998888' });
     expect((await people(outsider, c.id)).status).toBe(404);
   });

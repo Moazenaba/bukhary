@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { toast } from './Toasts';
+import { errorMessage } from '../services/api';
 import { UserAssignmentsPanel } from './Assignments';
 import { HeadGrantsAdminPanel, canSeeHeadGrants } from './HeadGrants';
 import { PageHeader, primaryAction, quietAction } from './ui/PageHeader';
@@ -604,6 +606,28 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {AuthService.can('users.impersonate') &&
+                    user.status === 'approved' &&
+                    user.id !== currentUser?.id &&
+                    (currentUser?.role === 'super_admin' || (user.role !== 'admin' && user.role !== 'super_admin')) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm(`الدخول بعين ${user.name}؟ سترى ما يراه بالضبط، وما تفعله يُسجَّل باسمك نيابة عنه، ولن يصله أي تنبيه بالدخول.`)) return;
+                          try {
+                            await AuthService.impersonate(user.id);
+                            window.location.hash = '#/home';
+                          } catch (err) {
+                            toast.error(errorMessage(err));
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 font-bold cursor-pointer flex items-center gap-1 text-xs"
+                      >
+                        <span className="material-symbols-outlined text-sm">visibility</span>
+                        الدخول بعين المستخدم
+                      </button>
+                    )}
 
                   {(user.role === 'sheikh' || user.role === 'committee_head') && (
                     <UserAssignmentsPanel userId={user.id} roleLabel={AuthService.getRoleLabel(user.role)} />
