@@ -2,7 +2,7 @@ import React from 'react';
 import { AppUser } from '../types';
 import { AuthService } from '../services/AuthService';
 
-export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts' | 'ceremonies' | 'audit';
+export type NavTab = 'home' | 'summer_course' | 'committees' | 'assistants' | 'exams' | 'courses' | 'calendar' | 'stats' | 'daily_alerts' | 'ceremonies' | 'audit' | 'availability';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -136,6 +136,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: todaysTasksCount > 0 ? `${todaysTasksCount} اليوم` : null,
           isPendingBadge: todaysTasksCount > 0,
           visible: AuthService.canAccessTab('daily_alerts', currentUser),
+        },
+        {
+          id: 'availability',
+          label: 'المتاحون والمشغولون',
+          icon: 'event_available',
+          badge: null,
+          visible: AuthService.canAccessTab('availability', currentUser),
         },
         {
           id: 'audit',

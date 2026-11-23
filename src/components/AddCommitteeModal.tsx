@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AuthService } from '../services/AuthService';
 import { Committee, StageKey, Course } from '../types';
 import { todayISO } from '../utils/stageUtils';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -39,6 +40,9 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
   // البيانات الجديدة المطلوبة
   const [isWomenCommittee, setIsWomenCommittee] = useState<boolean>(false);
   const [sheikhName, setSheikhName] = useState<string>('');
+  // «شيخ اللجنة»: the account that owns the committee (told once the exams manager activates it).
+  const [ownerUserId, setOwnerUserId] = useState<string>('');
+  const ownerCandidates = AuthService.getUsers().filter((u) => u.status === 'approved' && (u.role === 'sheikh' || u.role === 'committee_head'));
   const [sheikhPhone, setSheikhPhone] = useState<string>('');
   const [sheikhCountry, setSheikhCountry] = useState<string>('');
   const [examDate, setExamDate] = useState<string>('');
@@ -218,6 +222,7 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
       courseName: courses.find((c) => c.id === selectedCourseId)?.name,
       sheikhName: sheikhName.trim() || undefined,
       sheikhPhone: sheikhPhone.trim() || undefined,
+      ownerUserId: ownerUserId || undefined,
       sheikhCountry: sheikhCountry.trim() || undefined,
       examDate: examDate || undefined,
       studentsCount: typeof studentsCount === 'number' && !isNaN(studentsCount) ? studentsCount : undefined,
@@ -498,6 +503,32 @@ export const AddCommitteeModal: React.FC<AddCommitteeModalProps> = ({
               <span className="text-xs text-muted">
                 (المسؤول عن تسليم واستلام الاختبارات)
               </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-ink mb-1" htmlFor="committee-owner">
+                شيخ اللجنة (الحساب) — يصله تنبيه عند تفعيل اللجنة
+              </label>
+              <select
+                id="committee-owner"
+                value={ownerUserId}
+                onChange={(e) => {
+                  setOwnerUserId(e.target.value);
+                  const u = ownerCandidates.find((x) => x.id === e.target.value);
+                  if (u) {
+                    setSheikhName(u.name);
+                    if (u.phone) setSheikhPhone(u.phone);
+                  }
+                }}
+                className="w-full bg-white border border-line rounded-xl px-3 py-2 text-xs text-ink outline-none focus:border-brand"
+              >
+                <option value="">— اختر شيخ اللجنة —</option>
+                {ownerCandidates.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

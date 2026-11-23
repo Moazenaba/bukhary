@@ -49,6 +49,8 @@ import { CentralLoginPortal } from './components/CentralLoginPortal';
 import { SupabaseDatabaseModal } from './components/SupabaseDatabaseModal';
 import { Toasts, toast } from './components/Toasts';
 import { useAuth, AuthService, type AccessChanges } from './services/AuthService';
+import { AvailabilityView } from './components/AvailabilityView';
+import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { Book, CommitteeAction, DataService } from './services/DataService';
 import { ApiError, errorMessage } from './services/api';
 
@@ -728,6 +730,7 @@ export default function App() {
 
       {/* 2. Main Content Canvas */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen max-lg:overflow-x-hidden transition-all duration-300">
+        <ImpersonationBanner />
         {/* Top Header */}
         <TopNavBar
           currentUser={currentUser}
@@ -893,6 +896,7 @@ export default function App() {
           )}
 
           {activeTab === 'audit' && <AuditLogView />}
+          {activeTab === 'availability' && <AvailabilityView />}
 
           {activeTab === 'ceremonies' && (
             <CeremoniesView
@@ -934,7 +938,7 @@ export default function App() {
                   <div>
                     <span className="font-bold text-brand text-sm block flex items-center gap-1.5 mb-1">
                       <span className="material-symbols-outlined text-lg">person_pin</span>
-                      <span>مرحباً بك: {currentUser.name} ({currentUser.role === 'sheikh' ? 'شيخ' : 'رئيس لجنة'})</span>
+                      <span>مرحباً بك: {currentUser.name} ({AuthService.getRoleLabel(currentUser.role)})</span>
                     </span>
                     <span className="text-ink-soft block leading-relaxed">
                       اللجان المسندة إليك:{' '}

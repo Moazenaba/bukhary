@@ -22,8 +22,8 @@ import {
 } from '../utils/stageUtils';
 import { STAGE_ACTION } from '../utils/committeeChanges';
 import { AuthService } from '../services/AuthService';
-import { CommitteeStaffPanel } from './StaffAssignment';
-import { CommitteeObserversPanel, MyObservationPanel } from './Assignments';
+import { MyObservationPanel } from './Assignments';
+import { CommitteeFlowPanel } from './CommitteeFlowPanel';
 import { CeremonyDecisionCard } from './HeadGrants';
 import { useSettings } from '../data/queries';
 import { CommitteeHistory } from './CommitteeHistory';
@@ -687,8 +687,7 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
           </div>
 
           <MyObservationPanel committee={committee} />
-          <CommitteeStaffPanel committee={committee} onChanged={onCommitteeChanged} />
-          <CommitteeObserversPanel committee={committee} />
+          <CommitteeFlowPanel committee={committee} onChanged={onCommitteeChanged} />
           <CeremonyDecisionCard committee={committee} />
 
           {/* Section: Stages Progression with Special Scoring & Aggregation Details */}

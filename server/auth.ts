@@ -19,7 +19,24 @@ interface AccessClaims {
   sub: string;
   ver: number;
   sid?: string;
+  /** «الدخول بعين المستخدم»: the admin acting as `sub`. */
+  imp?: string;
 }
+
+/** How long an admin may act as another user before signing in as them again. */
+export const IMPERSONATION_TTL_SECONDS = 3600;
+
+/** A token for an admin acting as `userId` (no refresh token: it simply ends). */
+export function signImpersonationToken(config: AppConfig, userId: string, tokenVersion: number, sessionId: string, adminId: string): string {
+  return jwt.sign({ ver: tokenVersion, sid: sessionId, imp: adminId } satisfies Omit<AccessClaims, 'sub'>, config.jwtSecret, {
+    subject: userId,
+    expiresIn: IMPERSONATION_TTL_SECONDS,
+    algorithm: 'HS256',
+  });
+}
+
+/** What an admin acting as someone may not do: their own phone would get the person's pushes, and so on. */
+const IMPERSONATION_BLOCKED = [/^\/api\/devices/, /^\/api\/auth\/change-password$/, /^\/api\/auth\/logout-all$/, /^\/api\/impersonation\/start/];
 
 /** A rotated refresh token presented again within this window is treated as a race between tabs, not theft. */
 export const REFRESH_REUSE_GRACE_SECONDS = 30;
@@ -118,9 +135,17 @@ export const PRINCIPAL_COLUMNS = `
   u.all_exams, u.allowed_exam_ids, u.must_change_password, u.token_version,
   COALESCE((SELECT jsonb_agg(DISTINCT c.committee_number) FROM committees c
             WHERE u.assigned_committee_ids ? c.id), '[]'::jsonb) AS assigned_numbers,
-  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'committeeId', a.committee_id, 'task', a.task, 'book', COALESCE(c.competition_book, '')))
-            FROM committee_assignments a JOIN committees c ON c.id = a.committee_id
-            WHERE a.user_id = u.id AND a.status = 'active' AND (a.ends_on IS NULL OR a.ends_on + 1 >= CURRENT_DATE)), '[]'::jsonb) AS observing,
+  -- Observers and ceremony sheikhs (committee_staff), once the committee is active: the «observing» shape older
+  -- clients know (exam → the committee's paper, ceremony → its ceremony).
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', s.id, 'committeeId', s.committee_id,
+                     'task', CASE s.role WHEN 'observer' THEN 'exam' ELSE 'ceremony' END, 'book', COALESCE(c.competition_book, '')))
+            FROM committee_staff s JOIN committees c ON c.id = s.committee_id
+            WHERE s.user_id = u.id AND s.status = 'active' AND s.role IN ('observer', 'ceremony_sheikh')
+              AND c.lifecycle IN ('active', 'observed', 'accredited', 'ceremony_done')), '[]'::jsonb) AS observing,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', s.id, 'committeeId', s.committee_id, 'role', s.role,
+                     'canAssign', s.can_assign, 'lifecycle', c.lifecycle))
+            FROM committee_staff s JOIN committees c ON c.id = s.committee_id
+            WHERE s.user_id = u.id AND s.status = 'active'), '[]'::jsonb) AS staff,
   -- Temporary head grants inside their dates. A grant with a «yes» ceremony lasts until the ceremony is done
   -- (the sweep in grants.ts ends it then); otherwise it ends on its last day.
   COALESCE((SELECT jsonb_agg(jsonb_build_object('id', g.id, 'committeeId', cid, 'decision', g.ceremony_decision))
@@ -147,6 +172,7 @@ export function toPrincipal(row: any): Principal {
     mustChangePassword: Boolean(row.must_change_password),
     observing: Array.isArray(row.observing) ? row.observing : [],
     headGrants: Array.isArray(row.head_grants) ? row.head_grants : [],
+    staff: Array.isArray(row.staff) ? row.staff : [],
   };
 }
 
@@ -177,7 +203,7 @@ export function authenticate(config: AppConfig, pool: Pool) {
       }
 
       const { rows } = await pool.query(
-        `SELECT ${PRINCIPAL_COLUMNS}, s.revoked_at AS session_revoked, s.id AS session_found
+        `SELECT ${PRINCIPAL_COLUMNS}, s.revoked_at AS session_revoked, s.id AS session_found, s.impersonator_id AS session_impersonator
          FROM app_users u LEFT JOIN sessions s ON s.id = $2 AND s.user_id = u.id
          WHERE u.id = $1;`,
         [claims.sub, claims.sid ?? null]
@@ -190,6 +216,21 @@ export function authenticate(config: AppConfig, pool: Pool) {
       req.user = toPrincipal(row);
       req.sessionId = claims.sid;
       const path = `${req.baseUrl}${req.path}`.replace(/\/$/, '');
+      if (claims.imp || row.session_impersonator) {
+        // The session must be the one opened for this admin, who must still be an admin.
+        if (!claims.imp || claims.imp !== row.session_impersonator) {
+          throw new HttpError(401, 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى', 'session_revoked');
+        }
+        const { rows: admins } = await pool.query(
+          `SELECT id, name, role FROM app_users WHERE id = $1 AND status = 'approved' AND role IN ('super_admin', 'admin');`,
+          [claims.imp]
+        );
+        if (!admins[0]) throw new HttpError(401, 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى', 'session_revoked');
+        req.user.impersonator = { id: admins[0].id, name: admins[0].name, role: admins[0].role };
+        if (IMPERSONATION_BLOCKED.some((re) => re.test(path))) {
+          throw new HttpError(403, 'غير متاح أثناء الدخول بعين مستخدم', 'impersonation_blocked');
+        }
+      }
       if (config.enforcePasswordChange && req.user.mustChangePassword && !PASSWORD_CHANGE_ALLOWED.has(path)) {
         throw new HttpError(403, 'يجب تغيير كلمة المرور قبل المتابعة', 'password_change_required');
       }

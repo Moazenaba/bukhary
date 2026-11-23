@@ -10,48 +10,59 @@ const WHO = {
   headAll: { role: 'committee_head', permissions: ALL },
   sheikh: { role: 'sheikh', permissions: [] },
   sheikhAll: { role: 'sheikh', permissions: ALL },
+  manager: { role: 'exams_manager', permissions: [] },
 } as const;
 type Who = keyof typeof WHO;
-//                                      admin head headAll sheikh sheikhAll
-const EXPECTED: Record<Action, [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1]> = {
-  'committees.read':      [1, 1, 1, 1, 1],
-  'committees.create':    [1, 0, 1, 0, 0],
-  'committees.update':    [1, 1, 1, 0, 0],
-  'committees.delete':    [1, 0, 1, 0, 0],
-  'committees.members':   [1, 1, 1, 0, 0],
-  'assignments.manage':   [1, 1, 1, 0, 0],
-  'committees.reception': [1, 1, 1, 0, 0],
-  'committees.scoring':   [1, 1, 1, 0, 0],
-  'committees.finalize':  [1, 1, 1, 0, 0],
-  'courses.read':         [1, 1, 1, 1, 1],
-  'courses.write':        [1, 0, 1, 0, 0],
-  'exams.read':           [1, 1, 1, 0, 1],
-  'exams.write':          [1, 0, 1, 0, 0],
-  'exams.delete':         [1, 0, 0, 0, 0],
-  'exams.file':           [1, 1, 1, 0, 1],
-  'tasks.read':           [1, 1, 1, 1, 1],
-  'tasks.write':          [1, 0, 1, 0, 0],
-  'tasks.delete':         [1, 0, 1, 0, 0],
-  'users.read':           [1, 1, 1, 0, 0],
-  'users.manage':         [1, 0, 1, 0, 0],
-  'users.delete':         [1, 0, 0, 0, 0],
-  'users.grant':          [1, 0, 0, 0, 0],
-  'users.admins':         [0, 0, 0, 0, 0],
-  'profiles.read':        [1, 0, 0, 0, 0],
-  'profiles.write':       [1, 0, 0, 0, 0],
-  'books.read':           [1, 1, 1, 1, 1],
-  'books.write':          [1, 0, 1, 0, 0],
-  'summerRows.read':      [1, 0, 1, 0, 0],
-  'summerRows.write':     [1, 0, 1, 0, 0],
-  'scoring.read':         [1, 1, 1, 0, 0],
-  'scoring.write':        [1, 1, 1, 0, 0],
-  'settings.write':       [1, 0, 0, 0, 0],
-  'notifications.create': [1, 0, 0, 0, 0],
-  'audit.read':           [0, 0, 0, 0, 0],
-  'stats.read':           [1, 0, 1, 0, 0],
-  'database.admin':       [0, 0, 0, 0, 0],
-  'database.backup':      [1, 0, 0, 0, 0],
-  'ocr.use':              [1, 0, 1, 0, 0],
+// «committees.members» and «assignments.manage» are 1 for heads at the role level; on a committee they also need to
+// own it with can_assign (canStaffCommittee). The exams manager is «مدير إدارة الحفلات والامتحانات».
+//                                      admin head headAll sheikh sheikhAll manager
+const EXPECTED: Record<Action, [0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1, 0 | 1]> = {
+  'committees.read':      [1, 1, 1, 1, 1, 1],
+  'committees.create':    [1, 0, 0, 0, 0, 0],
+  'committees.update':    [1, 1, 1, 0, 0, 0],
+  'committees.delete':    [1, 0, 0, 0, 0, 0],
+  'committees.members':   [1, 1, 1, 0, 0, 1],
+  'committees.owner':     [1, 0, 0, 0, 0, 0],
+  'committees.delegate':  [1, 0, 0, 0, 0, 1],
+  'committees.driver':    [1, 0, 0, 0, 0, 1],
+  'committees.ceremony':  [1, 0, 0, 0, 0, 1],
+  'lifecycle.admin':      [1, 0, 0, 0, 0, 0],
+  'lifecycle.manager':    [1, 0, 0, 0, 0, 1],
+  'people.availability':  [1, 0, 0, 0, 0, 1],
+  'committees.reception': [1, 1, 1, 0, 0, 0],
+  'committees.scoring':   [1, 1, 1, 0, 0, 0],
+  'committees.finalize':  [1, 1, 1, 0, 0, 0],
+  'courses.read':         [1, 1, 1, 1, 1, 1],
+  'courses.write':        [1, 0, 1, 0, 0, 0],
+  'exams.read':           [1, 1, 1, 0, 1, 1],
+  'exams.write':          [1, 0, 1, 0, 0, 0],
+  'exams.delete':         [1, 0, 0, 0, 0, 0],
+  'exams.file':           [1, 1, 1, 0, 1, 1],
+  'assignments.manage':   [1, 1, 1, 0, 0, 1],
+  'tasks.read':           [1, 1, 1, 1, 1, 1],
+  'tasks.write':          [1, 0, 1, 0, 0, 0],
+  'tasks.delete':         [1, 0, 1, 0, 0, 0],
+  'users.read':           [1, 1, 1, 0, 0, 1],
+  'users.manage':         [1, 0, 1, 0, 0, 0],
+  'users.delete':         [1, 0, 0, 0, 0, 0],
+  'users.grant':          [1, 0, 0, 0, 0, 0],
+  'users.admins':         [0, 0, 0, 0, 0, 0],
+  'profiles.read':        [1, 0, 0, 0, 0, 0],
+  'profiles.write':       [1, 0, 0, 0, 0, 0],
+  'books.read':           [1, 1, 1, 1, 1, 1],
+  'books.write':          [1, 0, 1, 0, 0, 0],
+  'summerRows.read':      [1, 0, 1, 0, 0, 0],
+  'summerRows.write':     [1, 0, 1, 0, 0, 0],
+  'scoring.read':         [1, 1, 1, 0, 0, 0],
+  'scoring.write':        [1, 1, 1, 0, 0, 0],
+  'settings.write':       [1, 0, 0, 0, 0, 0],
+  'notifications.create': [1, 0, 0, 0, 0, 1],
+  'audit.read':           [1, 0, 0, 0, 0, 0],
+  'users.impersonate':    [1, 0, 0, 0, 0, 0],
+  'stats.read':           [1, 0, 1, 0, 0, 1],
+  'database.admin':       [0, 0, 0, 0, 0, 0],
+  'database.backup':      [1, 0, 0, 0, 0, 0],
+  'ocr.use':              [1, 0, 1, 0, 0, 0],
 };
 
 const principal = (over: Partial<Principal>): Principal => ({
@@ -97,9 +108,9 @@ describe('scope and grants', () => {
     expect(isCommitteeInScope(principal({ role: 'admin' }), 'anything')).toBe(true);
   });
 
-  it('nobody but a super admin can create admins; admins create heads and sheikhs only', () => {
+  it('nobody but a super admin can create admins; admins create exams managers, heads and sheikhs only', () => {
     expect(grantableRoles({ role: 'super_admin', permissions: [] })).toContain('admin');
-    expect(grantableRoles({ role: 'admin', permissions: [] })).toEqual(['committee_head', 'sheikh']);
+    expect(grantableRoles({ role: 'admin', permissions: [] })).toEqual(['exams_manager', 'committee_head', 'sheikh']);
     expect(grantableRoles({ role: 'committee_head', permissions: ALL })).toEqual(['sheikh']);
   });
 

@@ -117,8 +117,11 @@ describe('authorization', () => {
     const mine = await createCommittee({ committeeNumber: 30 });
     const other = await createCommittee({ committeeNumber: 31 });
     const head = await userWithToken(t, { role: 'committee_head', permissions: ['manage_committees'], assigned: [30] });
-    const ok = await t.api().patch(`/api/committees/${mine.id}`).set(head.auth).send({ stages: { ceremony: { completed: true } } });
+    const ok = await t.api().patch(`/api/committees/${mine.id}`).set(head.auth).send({ stages: { registration: { completed: true } } });
     expect(ok.status).toBe(200);
+    // The accreditation (and so the ceremony after it) is the admin's step.
+    const accredit = await t.api().patch(`/api/committees/${mine.id}`).set(head.auth).send({ stages: { ceremony: { completed: true } } });
+    expect(accredit.status).toBe(403);
     const del = await t.api().delete(`/api/committees/${other.id}`).set(head.auth);
     expect(del.status).toBe(403);
   });

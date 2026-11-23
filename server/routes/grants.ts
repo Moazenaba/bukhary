@@ -7,6 +7,7 @@ import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
 import { type Principal, isAdminRole } from '../policy.ts';
 import { notify } from './notifications.ts';
+import { ownerOf } from '../staff.ts';
 
 /**
  * «شيخ اللجنة»: temporary committee-head grants. An admin makes an approved sheikh the head of one or more
@@ -82,12 +83,8 @@ export async function committeeLine(db: Queryable, committeeId: string) {
   );
   const c = rows[0];
   if (!c) return null;
-  const { rows: heads } = await db.query(
-    `SELECT name, COALESCE(phone, '') AS phone FROM app_users
-     WHERE role = 'committee_head' AND assigned_committee_ids ? $1 ORDER BY name LIMIT 1;`,
-    [committeeId]
-  );
-  const head = heads[0] ? `رئيس اللجنة: ${heads[0].name}${heads[0].phone ? ` (${heads[0].phone})` : ''}` : 'رئيس اللجنة: لم يُسند بعد';
+  const owner = await ownerOf(db, { id: committeeId });
+  const head = owner ? `رئيس اللجنة: ${owner.name}${owner.phone ? ` (${owner.phone})` : ''}` : 'رئيس اللجنة: لم يُسند بعد';
   return {
     number: c.committee_number as number,
     title: `لجنة ${c.committee_number}`,

@@ -4,7 +4,7 @@ import type { NavTab } from '../components/Sidebar';
 // the previous screen and a link opens the right screen (WEB-17). Unknown hashes are ignored.
 
 export const NAV_TABS: readonly NavTab[] = [
-  'home', 'summer_course', 'committees', 'exams', 'ceremonies', 'calendar', 'courses', 'assistants', 'stats', 'daily_alerts', 'audit',
+  'home', 'summer_course', 'committees', 'exams', 'ceremonies', 'calendar', 'courses', 'assistants', 'stats', 'daily_alerts', 'audit', 'availability',
 ];
 
 export function tabFromHash(hash: string): NavTab | null {

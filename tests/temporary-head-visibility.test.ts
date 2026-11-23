@@ -49,7 +49,7 @@ describe('an observer assigned after a ceremony is done keeps the assignment', (
     expect(a.status).toBe(201);
     // Any read runs the sweep; the new observer must still be active.
     await t.api().get('/api/grants').set(admin.auth);
-    const { rows } = await t.pool.query('SELECT status FROM committee_assignments WHERE id = $1;', [a.body.assignment.id]);
+    const { rows } = await t.pool.query('SELECT status FROM committee_staff WHERE id = $1;', [a.body.assignment.id]);
     expect(rows[0].status).toBe('active');
   });
 });

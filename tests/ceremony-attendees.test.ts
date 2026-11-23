@@ -19,6 +19,8 @@ afterAll(async () => {
 const committee = async (n: number) => {
   const res = await t.api().post('/api/committees').set(admin.auth).send(committeeBody({ committeeNumber: n }));
   expect(res.status).toBe(200);
+  // Ceremony sheikhs are named once the committee is accredited, and see it from then on.
+  await t.pool.query(`UPDATE committees SET lifecycle = 'accredited' WHERE id = $1;`, [res.body.committee.id]);
   return res.body.committee as any;
 };
 const schedule = (id: string, action: Record<string, unknown>) =>
@@ -34,10 +36,10 @@ describe('ceremony attendees', () => {
     expect(res.status).toBe(200);
     expect(res.body.committee.ceremonyDetails.attendees).toEqual([{ id: teacher.id, name: 'الشيخ محمد' }]);
     const mine = await inbox(teacher.auth);
-    expect(mine.some((m) => m.startsWith('تمت إضافتك لحفل تكريم لجنة 41') && m.includes('2026-11-05 8 م — القاعة الكبرى'))).toBe(true);
+    expect(mine.some((m) => m.startsWith('تم تعيينك شيخًا لحفلة لجنة 41') && m.includes('الموعد: 2026-11-05 8 م') && m.includes('القاعة الكبرى'))).toBe(true);
     // Only the person added gets the personal notice.
     const other = await userWithToken(t, { role: 'sheikh' });
-    expect((await inbox(other.auth)).some((m) => m.startsWith('تمت إضافتك'))).toBe(false);
+    expect((await inbox(other.auth)).some((m) => m.startsWith('تم تعيينك'))).toBe(false);
   });
 
   it('a new time notifies those still invited; removed people are told; others are not re-notified', async () => {
@@ -47,9 +49,9 @@ describe('ceremony attendees', () => {
     await schedule(c.id, { ceremonyDate: '2026-11-06', attendeeUserIds: [a.id, b.id] });
     await schedule(c.id, { ceremonyDate: '2026-11-07', attendeeUserIds: [a.id] });
     const forA = await inbox(a.auth);
-    expect(forA.filter((m) => m.startsWith('تمت إضافتك')).length).toBe(1);
+    expect(forA.filter((m) => m.startsWith('تم تعيينك')).length).toBe(1);
     expect(forA.some((m) => m.startsWith('تغيّر موعد حفل تكريم لجنة 42') && m.includes('2026-11-07'))).toBe(true);
-    expect((await inbox(b.auth)).some((m) => m.startsWith('تم إلغاء إضافتك لحفل تكريم لجنة 42'))).toBe(true);
+    expect((await inbox(b.auth)).some((m) => m.startsWith('تم إلغاء تكليفك (شيخ الحفلة) في لجنة 42'))).toBe(true);
   });
 
   it('saving without attendeeUserIds, or saving the committee, keeps the attendees', async () => {

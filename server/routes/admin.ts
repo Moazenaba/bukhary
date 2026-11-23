@@ -24,16 +24,24 @@ export function auditLogsRouter(pool: Pool) {
         before: z.string().datetime({ offset: true }).optional(),
         entity: z.string().max(50).optional(),
         entityId: z.string().max(255).optional(),
+        /** Only what was done while an admin acted as another user. */
+        impersonatedOnly: z.enum(['true', 'false']).optional(),
       })
       .parse(req.query);
     const where: string[] = [];
     const params: unknown[] = [];
+    // Admins read the log without what super admins did (themselves, or acting as someone).
+    if (req.user!.role !== 'super_admin') {
+      where.push(`user_role <> 'super_admin'`);
+      where.push(`(impersonator_id IS NULL OR NOT EXISTS (SELECT 1 FROM app_users a WHERE a.id = impersonator_id AND a.role = 'super_admin'))`);
+    }
+    if (q.impersonatedOnly === 'true') where.push('impersonator_id IS NOT NULL');
     if (q.before) { params.push(q.before); where.push(`created_at < $${params.length}`); }
     if (q.entity) { params.push(q.entity); where.push(`entity = $${params.length}`); }
     if (q.entityId) { params.push(q.entityId); where.push(`entity_id = $${params.length}`); }
     params.push(q.limit);
     const { rows } = await pool.query(
-      `SELECT id, user_name, user_role, actor_id, action, details, status, entity, entity_id, created_at
+      `SELECT id, user_name, user_role, actor_id, action, details, status, entity, entity_id, created_at, impersonator_id, impersonator_name
        FROM audit_logs ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        ORDER BY created_at DESC LIMIT $${params.length};`,
       params
@@ -51,6 +59,7 @@ export function auditLogsRouter(pool: Pool) {
         status: l.status,
         entity: l.entity ?? undefined,
         entityId: l.entity_id ?? undefined,
+        impersonatedBy: l.impersonator_name ?? undefined,
       })),
     });
   }));

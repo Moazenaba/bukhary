@@ -20,6 +20,10 @@ export interface PushMessage {
   committeeId?: string | null;
   /** null = everyone with an approved account. */
   targetUserId?: string | null;
+  /** Several people at once (one push to each of their phones); takes precedence over targetUserId. */
+  targetUserIds?: string[];
+  /** Server tags; `kind` is passed to the phone so the app opens the right screen. */
+  data?: Record<string, unknown>;
 }
 
 /** Sends one HTTP request; replaced in tests. */
@@ -101,7 +105,13 @@ async function accessToken(): Promise<string> {
 
 async function deliver(message: PushMessage) {
   const db = pool!;
-  const { rows } = message.targetUserId
+  const { rows } = message.targetUserIds
+    ? await db.query(
+        `SELECT d.token FROM device_tokens d JOIN app_users u ON u.id = d.user_id
+         WHERE d.user_id = ANY($1::text[]) AND u.status = 'approved';`,
+        [message.targetUserIds]
+      )
+    : message.targetUserId
     ? await db.query(
         `SELECT d.token FROM device_tokens d JOIN app_users u ON u.id = d.user_id
          WHERE d.user_id = $1 AND u.status = 'approved';`,
@@ -112,6 +122,7 @@ async function deliver(message: PushMessage) {
         `SELECT d.token FROM device_tokens d JOIN app_users u ON u.id = d.user_id
          WHERE u.status = 'approved' AND (
            $1::text IS NULL OR u.role IN ('super_admin', 'admin') OR u.all_committees OR u.assigned_committee_ids ? $1
+           OR (u.role = 'exams_manager' AND EXISTS (SELECT 1 FROM committees c WHERE c.id = $1 AND c.lifecycle <> 'draft'))
            OR EXISTS (SELECT 1 FROM committees c WHERE c.id = $1
                       AND c.ceremony_details -> 'attendees' @> jsonb_build_array(jsonb_build_object('id', u.id))));`,
         [message.committeeId ?? null]
@@ -132,7 +143,7 @@ async function deliver(message: PushMessage) {
             message: {
               token,
               notification: { title: message.title, body: message.description || undefined },
-              data: { type: message.type ?? 'info', committeeId: message.committeeId ?? '' },
+              data: { type: message.type ?? 'info', committeeId: message.committeeId ?? '', kind: String(message.data?.kind ?? '') },
               android: {
                 priority: message.type === 'urgent' ? 'HIGH' : 'NORMAL',
                 notification: { channel_id: 'bukhari_alerts', sound: 'default' },

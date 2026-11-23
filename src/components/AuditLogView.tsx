@@ -27,10 +27,12 @@ function when(iso: string) {
 /** Read-only audit trail for super admins and auditors (WEB-12): who did what, when. */
 export const AuditLogView: React.FC = () => {
   const [entity, setEntity] = useState('');
+  const [impersonatedOnly, setImpersonatedOnly] = useState(false);
   const query = useInfiniteQuery({
-    queryKey: [...DATA_ROOT_KEY, 'audit-logs', entity],
+    queryKey: [...DATA_ROOT_KEY, 'audit-logs', entity, impersonatedOnly],
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => DataService.getAuditLogs({ limit: PAGE, before: pageParam, entity: entity || undefined }),
+    queryFn: ({ pageParam }) =>
+      DataService.getAuditLogs({ limit: PAGE, before: pageParam, entity: entity || undefined, impersonatedOnly: impersonatedOnly || undefined }),
     getNextPageParam: (last: AuditLogEntry[]) => (last.length === PAGE ? last[last.length - 1].timestamp : undefined),
   });
   const rows = query.data?.pages.flat() ?? [];
@@ -49,6 +51,10 @@ export const AuditLogView: React.FC = () => {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+        </label>
+        <label className="text-xs text-ink-soft flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={impersonatedOnly} onChange={(e) => setImpersonatedOnly(e.target.checked)} />
+          عمليات «الدخول بعين المستخدم» فقط
         </label>
       </div>
 
@@ -77,7 +83,11 @@ export const AuditLogView: React.FC = () => {
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-line/30">
                   <td className="p-2.5 whitespace-nowrap font-mono">{when(r.timestamp)}</td>
-                  <td className="p-2.5">{r.user}<span className="text-muted"> ({r.role})</span></td>
+                  <td className="p-2.5">
+                    {r.user}
+                    <span className="text-muted"> ({r.role})</span>
+                    {r.impersonatedBy && <span className="block text-amber-800 font-semibold">بواسطة {r.impersonatedBy}</span>}
+                  </td>
                   <td className="p-2.5 font-mono" dir="ltr">{r.action}</td>
                   <td className="p-2.5 font-mono text-muted" dir="ltr">{r.entity ? `${r.entity}:${r.entityId ?? ''}` : '—'}</td>
                   <td className="p-2.5 text-ink-soft break-words min-w-[14rem]">{r.details || '—'}</td>

@@ -5,15 +5,41 @@
 // The system manages people: who goes to which committee and which ceremony.
 // - super_admin: everything, and the only role that sees or manages admin accounts.
 // - admin: everything except the super-admin-only actions; never sees other admins or super admins.
-// - committee_head: heads the committees an admin assigned to them; adds and removes sheikhs there.
-// - sheikh: every other user; sees only the committees and ceremonies they were assigned to.
+// - exams_manager («مدير إدارة الحفلات والامتحانات»): sees every committee once an admin sent it; staffs observers
+//   and ceremony sheikhs, activates committees, sets the driver.
+// - committee_head / sheikh: account labels. What a person may do on a committee comes from committee_staff
+//   (Principal.staff): owner («شيخ اللجنة»), observer («مراقب»), ceremony_sheikh («شيخ الحفلة»).
+//   An owner follows the committee and does its stage work; they staff it only when given can_assign.
+// See docs/PLAN_ROLES_AND_FLOW.md.
 
-export const ROLES = ['super_admin', 'admin', 'committee_head', 'sheikh'] as const;
+export const ROLES = ['super_admin', 'admin', 'exams_manager', 'committee_head', 'sheikh'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Roles that see every committee and the whole system. */
 export const ADMIN_ROLES: readonly Role[] = ['super_admin', 'admin'];
 export const isAdminRole = (role: Role) => ADMIN_ROLES.includes(role);
+/** Roles that run the staffing of committees (admins and the exams manager). */
+export const MANAGER_ROLES: readonly Role[] = ['super_admin', 'admin', 'exams_manager'];
+export const isManagerRole = (role: Role) => MANAGER_ROLES.includes(role);
+
+/** The committee lifecycle, in order (docs/PLAN_ROLES_AND_FLOW.md 1.2). */
+export const LIFECYCLE = ['draft', 'sent_to_manager', 'observers_open', 'active', 'observed', 'accredited', 'ceremony_done'] as const;
+export type Lifecycle = (typeof LIFECYCLE)[number];
+export const lifecycleIndex = (l: string | null | undefined) => Math.max(0, LIFECYCLE.indexOf((l ?? 'active') as Lifecycle));
+/** Members (owner, observers, ceremony sheikhs) see and hear about a committee only from 'active' on. */
+export const isMemberVisible = (l: string | null | undefined) => lifecycleIndex(l) >= LIFECYCLE.indexOf('active');
+/** The exams manager sees a committee once an admin sent it. */
+export const isManagerVisible = (l: string | null | undefined) => lifecycleIndex(l) >= LIFECYCLE.indexOf('sent_to_manager');
+
+export const STAFF_ROLES = ['owner', 'observer', 'ceremony_sheikh'] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+export interface StaffEntry {
+  id: string;
+  committeeId: string;
+  role: StaffRole;
+  canAssign: boolean;
+  lifecycle: Lifecycle;
+}
 
 /** Extra rights an admin may give a committee head (admins have all of them implicitly). */
 export const SYSTEM_PERMISSIONS = [
@@ -43,15 +69,28 @@ export interface ActionRule {
 
 const EVERYONE: readonly Role[] = ROLES;
 const MANAGERS: readonly Role[] = ['super_admin', 'admin', 'committee_head'];
+/** Who staffs committees: admins, the exams manager, and an owner given can_assign (checked per committee). */
+const STAFFERS: readonly Role[] = ['super_admin', 'admin', 'exams_manager', 'committee_head'];
 const HEADS: readonly Role[] = ['committee_head'];
+const EXAMS_MANAGER: readonly Role[] = ['super_admin', 'admin', 'exams_manager'];
 
 export const ACTIONS = {
   'committees.read': { roles: EVERYONE, description: 'عرض اللجان (الشيخ ورئيس اللجنة يريان لجانهما وحفلاتهما فقط)' },
   // «إضافة لجنة جديدة» decides it for committee heads (migration 019 kept it for existing heads).
-  'committees.create': { roles: MANAGERS, anyPermission: ['add_new_committee'], description: 'إضافة لجنة' },
+  // Only an admin creates committees (the flow starts there, docs/PLAN_ROLES_AND_FLOW.md).
+  'committees.create': { roles: ADMIN_ROLES, description: 'إضافة لجنة' },
   'committees.update': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'تعديل بيانات اللجنة' },
-  'committees.delete': { roles: MANAGERS, anyPermission: ['manage_committees'], committeeScoped: true, description: 'حذف لجنة' },
-  'committees.members': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'إضافة الشيوخ للجنة وإزالتهم' },
+  'committees.delete': { roles: ADMIN_ROLES, description: 'حذف لجنة' },
+  // A committee owner staffs a committee only with can_assign on it (canStaffCommittee).
+  'committees.members': { roles: STAFFERS, committeeScoped: true, description: 'تعيين المراقبين ومشايخ الحفلات وإزالتهم' },
+  'committees.owner': { roles: ADMIN_ROLES, description: 'تعيين شيخ اللجنة' },
+  'committees.delegate': { roles: EXAMS_MANAGER, description: 'إعطاء شيخ اللجنة صلاحية التعيين' },
+  'committees.driver': { roles: EXAMS_MANAGER, description: 'تحديد سائق اللجنة' },
+  'committees.ceremony': { roles: EXAMS_MANAGER, description: 'إنشاء الحفلة وتعديل موعدها ومكانها' },
+  // Lifecycle steps: each step names who may take it (LIFECYCLE_ACTION).
+  'lifecycle.admin': { roles: ADMIN_ROLES, description: 'إرسال اللجنة للمدير، والسماح بالمراقبين، والاعتماد' },
+  'lifecycle.manager': { roles: EXAMS_MANAGER, description: 'تفعيل اللجنة، وتمت المراقبة، وتمت الحفلة' },
+  'people.availability': { roles: EXAMS_MANAGER, description: 'عرض المتاحين والمشغولين في يوم' },
   'committees.reception': {
     roles: MANAGERS,
     grantedToRoles: HEADS,
@@ -74,12 +113,12 @@ export const ACTIONS = {
   'exams.delete': { roles: ADMIN_ROLES, description: 'حذف الامتحانات' },
   'exams.file': { roles: EVERYONE, anyPermission: ['exams_pdf'], grantedToRoles: HEADS, description: 'تنزيل ملف أسئلة الامتحان' },
   // Who may give or end an extra «مراقب» assignment on a committee: admins anywhere, a head only on their own.
-  'assignments.manage': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'تكليف شيخ بمراقبة امتحان أو متابعة حفل في لجنة وإنهاء التكليف' },
+  'assignments.manage': { roles: STAFFERS, committeeScoped: true, description: 'تكليف شيخ بمراقبة امتحان أو متابعة حفل في لجنة وإنهاء التكليف' },
   'tasks.read': { roles: EVERYONE, description: 'عرض المهام (الشيخ يرى مهامه ومهام لجانه فقط)' },
   // «الجدول الزمني» decides it for committee heads (migration 019 kept it for existing heads).
   'tasks.write': { roles: MANAGERS, anyPermission: ['calendar_schedule'], description: 'إضافة وتعديل المهام' },
   'tasks.delete': { roles: MANAGERS, anyPermission: ['calendar_schedule'], description: 'حذف المهام' },
-  'users.read': { roles: MANAGERS, grantedToRoles: HEADS, description: 'عرض الشيوخ' },
+  'users.read': { roles: STAFFERS, grantedToRoles: HEADS, description: 'عرض الشيوخ' },
   'users.manage': { roles: MANAGERS, anyPermission: ['manage_assistants'], description: 'قبول ورفض طلبات الانضمام وتعديل بيانات الشيوخ' },
   'users.delete': { roles: ADMIN_ROLES, description: 'حذف المستخدمين' },
   'users.grant': { roles: ADMIN_ROLES, description: 'تعيين الأدوار والصلاحيات وإسناد اللجان' },
@@ -97,10 +136,12 @@ export const ACTIONS = {
   'scoring.read': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'عرض رصد الدرجات' },
   'scoring.write': { roles: MANAGERS, grantedToRoles: HEADS, committeeScoped: true, description: 'رصد درجات الطلاب' },
   'settings.write': { roles: ADMIN_ROLES, description: 'تعديل إعدادات النظام (موعد فتح الامتحانات، المراقبون، الخط، مدة التأخير)' },
-  'notifications.create': { roles: ADMIN_ROLES, description: 'إرسال تنبيه عام' },
-  'audit.read': { superOnly: true, description: 'عرض سجلات التدقيق' },
+  'notifications.create': { roles: EXAMS_MANAGER, description: 'إرسال تنبيه (لشخص، لمجموعة، للكل، لدور، للجنة، للمتاحين)' },
+  // Admins see the log without super admins' own actions (admin.ts).
+  'audit.read': { roles: ADMIN_ROLES, description: 'عرض سجلات التدقيق' },
+  'users.impersonate': { roles: ADMIN_ROLES, description: 'الدخول بعين مستخدم' },
   // Statistics are computed in the clients from data the user may read; this action decides who sees the screen.
-  'stats.read': { roles: MANAGERS, anyPermission: ['progress_stats'], description: 'الإحصائيات' },
+  'stats.read': { roles: [...MANAGERS, 'exams_manager'], anyPermission: ['progress_stats'], description: 'الإحصائيات' },
   'database.admin': { superOnly: true, description: 'حالة قاعدة البيانات' },
   'database.backup': { roles: ADMIN_ROLES, description: 'تنزيل نسخة احتياطية كاملة من قاعدة البيانات' },
   'ocr.use': { roles: MANAGERS, anyPermission: ['database_sheets'], description: 'استخراج جدول من صورة' },
@@ -134,6 +175,10 @@ export interface Principal {
    * committee head on that committee only. Absent means none.
    */
   headGrants?: HeadGrant[];
+  /** Jobs on committees (committee_staff, active rows). Absent means none. */
+  staff?: StaffEntry[];
+  /** Set while an admin acts as this user («الدخول بعين المستخدم»): the admin who really acts. */
+  impersonator?: { id: string; name: string; role: Role };
 }
 
 export interface HeadGrant {
@@ -156,7 +201,10 @@ export const SCOPED_ROLES: readonly Role[] = ['committee_head', 'sheikh'];
 export const isScopedRole = (role: Role) => SCOPED_ROLES.includes(role);
 
 /** Whether `user` may perform `action` at all (committee scope is checked separately). */
-export function isAllowed(user: Pick<Principal, 'role' | 'permissions'> & { headGrants?: HeadGrant[] }, action: Action): boolean {
+export function isAllowed(
+  user: Pick<Principal, 'role' | 'permissions'> & { headGrants?: HeadGrant[]; staff?: StaffEntry[] },
+  action: Action
+): boolean {
   if (user.role === 'super_admin') return true;
   const rule: ActionRule = ACTIONS[action];
   if (rule.superOnly) return false;
@@ -164,8 +212,15 @@ export function isAllowed(user: Pick<Principal, 'role' | 'permissions'> & { head
   // (isCommitteeInScope checks that for committee-scoped actions). Checked before the role list, since a sheikh
   // is not in it.
   if (rule.committeeScoped && rule.grantedToRoles?.includes('committee_head') && (user.headGrants?.length ?? 0) > 0) return true;
-  if (rule.roles && !rule.roles.includes(user.role)) return false;
-  if (user.role === 'admin') return true;
+  // The owner («شيخ اللجنة») of a committee acts as its head whatever the account label: the committee itself is
+  // checked by canManageCommittee / canStaffCommittee.
+  const ownsOne = (user.staff ?? []).some((s) => s.role === 'owner');
+  const role: Role = user.role === 'sheikh' && ownsOne ? 'committee_head' : user.role;
+  if (rule.roles && !rule.roles.includes(role)) return false;
+  if (role === 'admin') return true;
+  // The exams manager has every right their role is listed for.
+  if (role === 'exams_manager') return true;
+  if (rule.grantedToRoles?.includes(role)) return true;
   if (rule.grantedToRoles?.includes(user.role)) return true;
   if (rule.anyPermission && !rule.anyPermission.some((p) => user.permissions.includes(p))) return false;
   return true;
@@ -186,10 +241,30 @@ export function isCommitteeInScope(user: Principal, committeeId: string | null |
 export const grantedHeadCommitteeIds = (user: Pick<Principal, 'headGrants'>): string[] =>
   [...new Set((user.headGrants ?? []).map((g) => g.committeeId))];
 
-/** Whether the user acts as the committee head on this committee: the role, or a grant on it. */
-export const isHeadOn = (user: Principal, committeeId: string): boolean =>
-  (user.role === 'committee_head' && user.assignedCommitteeIds.includes(committeeId)) ||
-  grantedHeadCommitteeIds(user).includes(committeeId);
+/** The person's active job rows on one committee. */
+export const staffOn = (user: Pick<Principal, 'staff'>, committeeId: string) => (user.staff ?? []).filter((s) => s.committeeId === committeeId);
+
+/**
+ * Whether the user acts as the committee head on this committee: its owner in committee_staff (or, for rows that
+ * predate committee_staff, a committee head on it with no job row there), or a temporary grant on it.
+ */
+export const isHeadOn = (user: Principal, committeeId: string): boolean => {
+  if (grantedHeadCommitteeIds(user).includes(committeeId)) return true;
+  if (!user.assignedCommitteeIds.includes(committeeId)) return false;
+  const jobs = staffOn(user, committeeId);
+  if (jobs.some((j) => j.role === 'owner')) return true;
+  return user.role === 'committee_head' && jobs.length === 0;
+};
+
+/** May the user change this committee (its data and stage work): admins anywhere, its head on it. */
+export const canManageCommittee = (user: Principal, committeeId: string | null | undefined): boolean =>
+  Boolean(committeeId) && (!isScopedRole(user.role) || user.allCommittees || isHeadOn(user, committeeId!));
+
+/** May the user staff this committee (observers, ceremony sheikhs): admins, the exams manager, an owner with can_assign. */
+export const canStaffCommittee = (user: Principal, committeeId: string): boolean =>
+  isManagerRole(user.role) ||
+  user.allCommittees ||
+  (user.assignedCommitteeIds.includes(committeeId) && staffOn(user, committeeId).some((j) => j.role === 'owner' && j.canAssign));
 
 /** Committees the user observes through an active assignment (read-only, on top of the role). */
 export const observedCommitteeIds = (user: Pick<Principal, 'observing'>): string[] =>
@@ -215,7 +290,7 @@ export const visibleCommitteeIds = (user: Principal): string[] => [...new Set([.
 /** Roles a user may give to other accounts. Admin accounts are managed by super admins only. */
 export function grantableRoles(user: Pick<Principal, 'role' | 'permissions'>): Role[] {
   if (user.role === 'super_admin') return [...ROLES];
-  if (isAllowed(user, 'users.grant')) return ['committee_head', 'sheikh'];
+  if (isAllowed(user, 'users.grant')) return ['exams_manager', 'committee_head', 'sheikh'];
   return ['sheikh'];
 }
 
@@ -260,5 +335,34 @@ export function evaluatedPermissions(user: Principal) {
     // Committees this person heads by a temporary grant right now (the head's screens and tabs follow).
     headCommitteeIds: grantedHeadCommitteeIds(user),
     mustChangePassword: user.mustChangePassword,
+    // Jobs on committees (owner / observer / ceremony sheikh), only on committees the person may see.
+    staff: (user.staff ?? [])
+      .filter((s) => user.assignedCommitteeIds.includes(s.committeeId) || s.role === 'ceremony_sheikh')
+      .map((s) => ({ id: s.id, committeeId: s.committeeId, role: s.role, canAssign: s.canAssign, lifecycle: s.lifecycle })),
+    impersonating: user.impersonator ? { by: user.impersonator.name } : null,
   };
+}
+
+export type CommitteeViewer = 'none' | 'admin' | 'manager' | 'owner' | 'observer' | 'ceremony_sheikh';
+
+/**
+ * How `user` sees a committee (docs/PLAN_ROLES_AND_FLOW.md 1.4): admins everything; the exams manager once it was
+ * sent; members (owner, observers, ceremony sheikhs) from 'active' on, each seeing their own kind of colleague.
+ * The strongest view wins (owner over observer over ceremony sheikh).
+ */
+export function committeeViewer(user: Principal, committee: { id: string; lifecycle?: string | null; ceremony_details?: any }): CommitteeViewer {
+  if (isAdminRole(user.role)) return 'admin';
+  if (user.role === 'exams_manager') return isManagerVisible(committee.lifecycle) ? 'manager' : 'none';
+  if (user.allCommittees) return 'manager';
+  if (isHeadOn(user, committee.id)) return 'owner';
+  const jobs = staffOn(user, committee.id);
+  const visible = isMemberVisible(committee.lifecycle);
+  if (visible && (jobs.some((j) => j.role === 'observer') || (jobs.length === 0 && user.assignedCommitteeIds.includes(committee.id)))) {
+    return 'observer';
+  }
+  if (visible && jobs.some((j) => j.role === 'ceremony_sheikh')) return 'ceremony_sheikh';
+  if (user.assignedCommitteeIds.includes(committee.id)) return 'observer';
+  const attendees: Array<{ id: string }> = committee.ceremony_details?.attendees ?? [];
+  if (attendees.some((a) => a.id === user.id)) return 'ceremony_sheikh';
+  return 'none';
 }
