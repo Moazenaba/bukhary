@@ -62,6 +62,11 @@ describe('sending to an audience', () => {
     expect(await titles(obs)).toContain('لكل المراقبين');
     expect(await titles(cer)).not.toContain('لكل المراقبين');
 
+    await send(admin, { title: 'للمراقبين ومشايخ الحفلة', audience: { kind: 'staffRole', staffRoles: ['observer', 'ceremony_sheikh'] } });
+    expect(await titles(obs)).toContain('للمراقبين ومشايخ الحفلة');
+    expect(await titles(cer)).toContain('للمراقبين ومشايخ الحفلة');
+    expect(await titles(owner)).not.toContain('للمراقبين ومشايخ الحفلة');
+
     await send(admin, { title: 'لمشايخ حفلة 5', audience: { kind: 'committee', committeeId: c.id, committeeRoles: ['ceremony_sheikh'] } });
     expect(await titles(cer)).toContain('لمشايخ حفلة 5');
     expect(await titles(obs)).not.toContain('لمشايخ حفلة 5');

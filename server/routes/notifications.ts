@@ -60,6 +60,8 @@ const audienceInput = z.object({
   userIds: z.array(z.string().max(255)).max(2000).optional(),
   accountRole: z.enum(['admin', 'exams_manager', 'committee_head', 'sheikh']).optional(),
   staffRole: z.enum(['owner', 'observer', 'ceremony_sheikh']).optional(),
+  /** Several staff categories at once (e.g. observers and ceremony sheikhs); wins over `staffRole`. */
+  staffRoles: z.array(z.enum(['owner', 'observer', 'ceremony_sheikh'])).min(1).max(3).optional(),
   committeeId: z.string().max(255).optional(),
   committeeRoles: z.array(z.enum(['owner', 'observer', 'ceremony_sheikh'])).max(3).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -96,11 +98,12 @@ export async function resolveAudience(db: Queryable, sender: Principal, a: Audie
       ({ rows } = await db.query(`${base} AND u.role = $3;`, [hidden, sender.id, a.accountRole]));
       break;
     case 'staffRole':
-      if (!a.staffRole) throw badRequest('اختر الدور');
+      const staffRoles = a.staffRoles?.length ? a.staffRoles : a.staffRole ? [a.staffRole] : [];
+      if (staffRoles.length === 0) throw badRequest('اختر الدور');
       ({ rows } = await db.query(
         `${base} AND EXISTS (SELECT 1 FROM committee_staff s JOIN committees c ON c.id = s.committee_id
-                             WHERE s.user_id = u.id AND s.status = 'active' AND s.role = $3 AND ${live} AND c.lifecycle <> 'ceremony_done');`,
-        [hidden, sender.id, a.staffRole]
+                             WHERE s.user_id = u.id AND s.status = 'active' AND s.role = ANY($3::text[]) AND ${live} AND c.lifecycle <> 'ceremony_done');`,
+        [hidden, sender.id, staffRoles]
       ));
       break;
     case 'committee': {

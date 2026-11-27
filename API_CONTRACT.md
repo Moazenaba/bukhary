@@ -271,7 +271,7 @@ a committee (`committee_staff`): `owner`, `observer`, `ceremony_sheikh`. Committ
 | PATCH | `/api/committees/:id/driver` `{hasDriver, name?, phone?}` | admin, manager | |
 | POST | `/api/committees/:id/ceremony` `{ceremonyDate, ceremonyTime, ceremonyPlace, honoredStudentsCount?, notes?}` | admin, manager | |
 | GET | `/api/people/availability?date=` | admin, manager | `{available, unassigned, busy[{items}]}` |
-| POST | `/api/notifications` `{title, description, type, audience}` | admin, manager | audience `kind`: all, users, accountRole, staffRole, committee, available; without `audience`, the old broadcast |
+| POST | `/api/notifications` `{title, description, type, audience}` | admin, manager | audience `kind`: all, users (one or many `userIds`), accountRole, staffRole (`staffRole`, or several at once in `staffRoles`), committee, available; without `audience`, the old broadcast |
 | POST | `/api/notifications/preview` `{audience}` | admin, manager | `{recipients, sample}` |
 | GET | `/api/notifications/sent` | admin, manager | |
 | POST | `/api/impersonation/start/:userId` | admin (non-admins), super admin | `{token}` valid 1 h, no refresh; devices, password change and nested impersonation refused |
