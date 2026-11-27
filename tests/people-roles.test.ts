@@ -32,22 +32,23 @@ const inbox = async (auth: Record<string, string>) =>
   ((await t.api().get('/api/notifications').set(auth)).body.notifications as any[]).map((n) => n.title as string);
 
 describe('admins and super admins', () => {
-  it('an admin never sees other admins or super admins, a super admin sees everyone', async () => {
+  it('an admin sees other admins (read-only) but never super admins, a super admin sees everyone', async () => {
     const other = await userWithToken(t, { role: 'admin', name: 'أدمن ثان' });
     const sheikh = await userWithToken(t, { role: 'sheikh' });
     const asAdmin = ids((await t.api().get('/api/users').set(admin.auth)).body.users);
     expect(asAdmin).toEqual(expect.arrayContaining([admin.id, sheikh.id]));
-    expect(asAdmin).not.toContain(other.id);
+    expect(asAdmin).toContain(other.id);
     expect(asAdmin).not.toContain(superAdmin.id);
     const asSuper = ids((await t.api().get('/api/users').set(superAdmin.auth)).body.users);
     expect(asSuper).toEqual(expect.arrayContaining([admin.id, other.id, superAdmin.id, sheikh.id]));
   });
 
-  it('an admin cannot edit, reset, delete or create admin accounts; it is as if they did not exist', async () => {
+  it('an admin cannot edit, reset, delete or create admin accounts: another admin is refused, a super admin does not exist for them', async () => {
     const other = await userWithToken(t, { role: 'admin' });
     const edit = await t.api().post('/api/users').set(admin.auth).send({ id: other.id, name: 'تغيير', phone: other.phone });
-    expect(edit.status).toBe(404);
-    expect((await t.api().post(`/api/users/${other.id}/reset-password`).set(admin.auth).send({ password: 'NewPassw0rd' })).status).toBe(404);
+    expect(edit.status).toBe(403);
+    expect((await t.api().post(`/api/users/${other.id}/reset-password`).set(admin.auth).send({ password: 'NewPassw0rd' })).status).toBe(403);
+    expect((await t.api().delete(`/api/users/${other.id}`).set(admin.auth)).status).toBe(403);
     expect((await t.api().delete(`/api/users/${superAdmin.id}`).set(admin.auth)).status).toBe(404);
     const create = await t.api().post('/api/users').set(admin.auth)
       .send({ id: 'usr_new_admin', name: 'أدمن جديد', phone: '0533000001', password: 'Initial123', role: 'admin', status: 'approved' });

@@ -6,7 +6,7 @@ import { audit } from '../audit.ts';
 import type { Pool, Queryable } from '../db.ts';
 import { badRequest, notFound, route } from '../http.ts';
 import { optionalId } from '../schemas.ts';
-import { type Principal, canSeeRole, isAdminRole, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
+import { type Principal, canViewRole, isAdminRole, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
 import { busyOn } from '../staff.ts';
 import { queuePush } from '../push.ts';
 
@@ -81,7 +81,7 @@ const messageInput = z.object({
  * reached only once the committee is active.
  */
 export async function resolveAudience(db: Queryable, sender: Principal, a: Audience): Promise<string[]> {
-  const hidden = sender.role === 'super_admin' ? ['__none__'] : canSeeRole(sender, 'admin') ? ['super_admin'] : ['super_admin', 'admin'];
+  const hidden = sender.role === 'super_admin' ? ['__none__'] : canViewRole(sender, 'admin') ? ['super_admin'] : ['super_admin', 'admin'];
   const base = `SELECT u.id FROM app_users u WHERE u.status = 'approved' AND NOT (u.role = ANY($1::text[])) AND u.id <> $2`;
   const live = `c.lifecycle IN ('active', 'observed', 'accredited', 'ceremony_done')`;
   let rows: Array<{ id: string }> = [];

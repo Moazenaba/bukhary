@@ -6,7 +6,7 @@ import { audit } from '../audit.ts';
 import { type Pool, type Queryable, withTransaction } from '../db.ts';
 import { badRequest, conflict, forbidden, notFound, route } from '../http.ts';
 import { logger } from '../logger.ts';
-import { type Principal, ROLES, type Role, canSeeRole, grantableRoles, isAllowed, isCommitteeInScope, isSystemPermission } from '../policy.ts';
+import { type Principal, ROLES, type Role, canSeeRole, canViewRole, grantableRoles, isAllowed, isCommitteeInScope, isSystemPermission } from '../policy.ts';
 import { id, normalizePhone, optionalText, toAsciiDigits } from '../schemas.ts';
 import { notify } from './notifications.ts';
 
@@ -185,8 +185,8 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
   const canGrant = isAllowed(actor, 'users.grant');
 
   if (!existing && !canManage) throw forbidden();
-  // Admin accounts do not exist for anyone but a super admin: not listed, not editable.
-  if (existing && !isSelf && !canSeeRole(actor, existing.role)) throw notFound('المستخدم غير موجود');
+  // Another admin is listed for an admin but only a super admin edits it; super admins do not exist for an admin.
+  if (existing && !isSelf) assertManageable(actor, existing.role);
   if (existing && !isSelf && !canManage) throw forbidden('ليس لديك صلاحية لتعديل هذا المستخدم');
   // Committee heads who may manage people handle sheikhs only (API-01).
   if (existing && !isSelf && !canGrant && existing.status === 'approved' && existing.role !== 'sheikh') {
@@ -366,8 +366,8 @@ async function saveUser(db: Queryable, req: Request, input: UserInput, opts: Sav
 }
 
 /**
- * Which users someone sees (API-08): super admins see everyone; admins see everyone except other
- * admins and super admins; committee heads see themself and the approved sheikhs they can staff
+ * Which users someone sees (API-08): super admins see everyone; admins see everyone except super
+ * admins (other admins are listed, read-only: only a super admin edits them); committee heads see themself and the approved sheikhs they can staff
  * their committees with (plus applicants when they may manage people).
  */
 async function listUsersFor(db: Queryable, actor: Principal) {
@@ -377,7 +377,7 @@ async function listUsersFor(db: Queryable, actor: Principal) {
     return rows;
   }
   if (isAllowed(actor, 'users.grant')) {
-    const { rows } = await db.query(`${USER_SELECT} WHERE u.id = $1 OR u.role NOT IN ('super_admin', 'admin') ${order};`, [actor.id]);
+    const { rows } = await db.query(`${USER_SELECT} WHERE u.id = $1 OR u.role <> 'super_admin' ${order};`, [actor.id]);
     return rows;
   }
   const { rows } = await db.query(
@@ -392,6 +392,13 @@ async function listUsersFor(db: Queryable, actor: Principal) {
 }
 
 /** Approved people `actor` may add to a committee or a ceremony (admins never see admin accounts). */
+/** Not found for what the actor cannot even see; forbidden for another admin, who is visible but not theirs to change. */
+function assertManageable(actor: Principal, role: string) {
+  if (canSeeRole(actor, role)) return;
+  if (canViewRole(actor, role)) throw forbidden('حسابات الأدمن يديرها المشرف العام فقط');
+  throw notFound('المستخدم غير موجود');
+}
+
 export async function staffableUsers(db: Queryable, actor: Principal, ids?: string[]) {
   const roles: Role[] = isAllowed(actor, 'users.admins')
     ? [...ROLES]
@@ -450,7 +457,8 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
     if (req.params.id === req.user!.id) throw badRequest('لتغيير كلمة مرورك استخدم «حسابي» ← تغيير كلمة المرور');
     await withTransaction(pool, async (db) => {
       const { rows } = await db.query('SELECT id, role FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
-      if (!rows[0] || !canSeeRole(req.user!, rows[0].role)) throw notFound('المستخدم غير موجود');
+      if (!rows[0]) throw notFound('المستخدم غير موجود');
+      assertManageable(req.user!, rows[0].role);
       await db.query(
         `UPDATE app_users SET password = $2, password_changed_at = NOW(), must_change_password = true,
            token_version = token_version + 1, failed_login_count = 0, locked_until = NULL, updated_at = NOW()
@@ -470,7 +478,8 @@ export function usersRouter(pool: Pool, opts: SaveOptions) {
     await withTransaction(pool, async (db) => {
       await db.query("SELECT id FROM app_users WHERE role = 'super_admin' FOR UPDATE;");
       const { rows } = await db.query('SELECT * FROM app_users WHERE id = $1 FOR UPDATE;', [req.params.id]);
-      if (!rows[0] || !canSeeRole(req.user!, rows[0].role)) throw notFound('المستخدم غير موجود');
+      if (!rows[0]) throw notFound('المستخدم غير موجود');
+      assertManageable(req.user!, rows[0].role);
       if (rows[0].role === 'super_admin' && (await countSuperAdmins(db, rows[0].id)) === 0) {
         throw conflict('لا يمكن حذف آخر مشرف عام في النظام');
       }

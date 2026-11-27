@@ -4,7 +4,7 @@
 //
 // The system manages people: who goes to which committee and which ceremony.
 // - super_admin: everything, and the only role that sees or manages admin accounts.
-// - admin: everything except the super-admin-only actions; never sees other admins or super admins.
+// - admin: everything except the super-admin-only actions; sees other admin accounts (read-only), never super admins.
 // - exams_manager («مدير إدارة الحفلات والامتحانات»): sees every committee once an admin sent it; staffs observers
 //   and ceremony sheikhs, activates committees, sets the driver.
 // - committee_head / sheikh: account labels. What a person may do on a committee comes from committee_staff
@@ -294,9 +294,16 @@ export function grantableRoles(user: Pick<Principal, 'role' | 'permissions'>): R
   return ['sheikh'];
 }
 
-/** Whether `actor` may see or manage an account with `targetRole` (admins are hidden from admins). */
+/** Whether `actor` may manage (edit, reset, delete) an account with `targetRole`: admin accounts are for super admins only. */
 export const canSeeRole = (actor: Pick<Principal, 'role' | 'permissions'>, targetRole: string) =>
   isAllowed(actor, 'users.admins') || !ADMIN_ROLES.includes(targetRole as Role);
+
+/**
+ * Whether `actor` may see an account with `targetRole` in lists: admins also see the other admins (read-only);
+ * only super admins see super-admin accounts.
+ */
+export const canViewRole = (actor: Pick<Principal, 'role' | 'permissions'>, targetRole: string) =>
+  canSeeRole(actor, targetRole) || (isAllowed(actor, 'users.grant') && targetRole === 'admin');
 
 /** Admins and people granted all exams open every exam. */
 export const seesAllExams = (user: Pick<Principal, 'role' | 'allExams'>) => isAdminRole(user.role) || user.allExams;
