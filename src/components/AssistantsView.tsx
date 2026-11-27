@@ -501,7 +501,9 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
             {filteredApproved.map((user) => {
               const userProfile = effectiveProfiles.find((p) => p.id === user.profileId);
               const assignedLabel = committeeLabel(user.assignedCommitteeIds);
-              const canEditUser = canGrant || (user.role === 'sheikh' && AuthService.canManageUsers()) || user.id === currentUser.id;
+              // Another admin's account is listed for an admin, but only a super admin changes it (server: 403).
+              const readOnlyAdmin = user.role === 'admin' && !isSuperAdmin && user.id !== currentUser.id;
+              const canEditUser = !readOnlyAdmin && (canGrant || (user.role === 'sheikh' && AuthService.canManageUsers()) || user.id === currentUser.id);
               const placed = assignmentsOf(user, committees);
               const canPlace = (user.role === 'sheikh' || (user.role === 'committee_head' && canGrant)) &&
                 (AuthService.can('committees.members') || AuthService.can('committees.finalize'));
@@ -552,7 +554,7 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                           <span className="material-symbols-outlined text-base">edit</span>
                         </button>
                       )}
-                      {user.role !== 'super_admin' && user.id !== currentUser.id && AuthService.can('users.delete') && (
+                      {!readOnlyAdmin && user.role !== 'super_admin' && user.id !== currentUser.id && AuthService.can('users.delete') && (
                         <button
                           onClick={() => setUserToDelete(user)}
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
@@ -573,7 +575,8 @@ export const AssistantsView: React.FC<AssistantsViewProps> = ({
                       </strong>
                     </div>
 
-                    {canGrant && user.role !== 'super_admin' && (
+                    {readOnlyAdmin && <span className="text-xs text-slate-500">حساب أدمن: للعرض فقط، يعدّله المشرف العام</span>}
+                    {canGrant && !readOnlyAdmin && user.role !== 'super_admin' && (
                       <button
                         onClick={() => setAssigningProfileUser(user)}
                         className="px-3 py-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-950 font-bold text-xs cursor-pointer flex items-center gap-1"
