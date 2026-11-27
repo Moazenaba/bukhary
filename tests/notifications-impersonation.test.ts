@@ -39,14 +39,14 @@ describe('sending to an audience', () => {
     expect((await send(obs, { audience: { kind: 'all' } })).status).toBe(403);
   });
 
-  it('to everyone: never a super admin, and no admin when an admin sends', async () => {
+  it('to everyone: never a super admin; other admins are reached when an admin sends', async () => {
     const res = await send(admin, { title: 'للكل', audience: { kind: 'all' } });
     expect(res.status).toBe(201);
     expect(await titles(obs)).toContain('للكل');
     expect(await titles(manager)).toContain('للكل');
     expect(await titles(sa)).not.toContain('للكل');
-    expect(await titles(admin2)).not.toContain('للكل');
-    expect(res.body.recipients).toBe(5); // manager, owner, observer, ceremony sheikh, idle
+    expect(await titles(admin2)).toContain('للكل');
+    expect(res.body.recipients).toBe(6); // manager, owner, observer, ceremony sheikh, idle, the other admin
   });
 
   it('to chosen people, to an account role, to every observer, to a committee or some of its roles', async () => {
@@ -61,6 +61,11 @@ describe('sending to an audience', () => {
     await send(admin, { title: 'لكل المراقبين', audience: { kind: 'staffRole', staffRole: 'observer' } });
     expect(await titles(obs)).toContain('لكل المراقبين');
     expect(await titles(cer)).not.toContain('لكل المراقبين');
+
+    await send(admin, { title: 'للمراقبين ومشايخ الحفلة', audience: { kind: 'staffRole', staffRoles: ['observer', 'ceremony_sheikh'] } });
+    expect(await titles(obs)).toContain('للمراقبين ومشايخ الحفلة');
+    expect(await titles(cer)).toContain('للمراقبين ومشايخ الحفلة');
+    expect(await titles(owner)).not.toContain('للمراقبين ومشايخ الحفلة');
 
     await send(admin, { title: 'لمشايخ حفلة 5', audience: { kind: 'committee', committeeId: c.id, committeeRoles: ['ceremony_sheikh'] } });
     expect(await titles(cer)).toContain('لمشايخ حفلة 5');
@@ -78,7 +83,7 @@ describe('sending to an audience', () => {
 
   it('lists what was sent, with how many it reached', async () => {
     const sent = (await t.api().get('/api/notifications/sent').set(admin.auth)).body.sent as any[];
-    expect(sent.find((x) => x.title === 'للكل')).toMatchObject({ recipients: 5 });
+    expect(sent.find((x) => x.title === 'للكل')).toMatchObject({ recipients: 6 });
     const mine = (await t.api().get('/api/notifications/sent').set(manager.auth)).body.sent as any[];
     expect(mine.map((x) => x.title)).toEqual(['لشخص']);
   });

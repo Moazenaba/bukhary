@@ -6,7 +6,7 @@ import { audit } from '../audit.ts';
 import type { Pool, Queryable } from '../db.ts';
 import { badRequest, notFound, route } from '../http.ts';
 import { optionalId } from '../schemas.ts';
-import { type Principal, canSeeRole, isAdminRole, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
+import { type Principal, canViewRole, isAdminRole, seesAllCommittees, visibleCommitteeIds } from '../policy.ts';
 import { busyOn } from '../staff.ts';
 import { queuePush } from '../push.ts';
 
@@ -60,6 +60,8 @@ const audienceInput = z.object({
   userIds: z.array(z.string().max(255)).max(2000).optional(),
   accountRole: z.enum(['admin', 'exams_manager', 'committee_head', 'sheikh']).optional(),
   staffRole: z.enum(['owner', 'observer', 'ceremony_sheikh']).optional(),
+  /** Several staff categories at once (e.g. observers and ceremony sheikhs); wins over `staffRole`. */
+  staffRoles: z.array(z.enum(['owner', 'observer', 'ceremony_sheikh'])).min(1).max(3).optional(),
   committeeId: z.string().max(255).optional(),
   committeeRoles: z.array(z.enum(['owner', 'observer', 'ceremony_sheikh'])).max(3).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -79,7 +81,7 @@ const messageInput = z.object({
  * reached only once the committee is active.
  */
 export async function resolveAudience(db: Queryable, sender: Principal, a: Audience): Promise<string[]> {
-  const hidden = sender.role === 'super_admin' ? ['__none__'] : canSeeRole(sender, 'admin') ? ['super_admin'] : ['super_admin', 'admin'];
+  const hidden = sender.role === 'super_admin' ? ['__none__'] : canViewRole(sender, 'admin') ? ['super_admin'] : ['super_admin', 'admin'];
   const base = `SELECT u.id FROM app_users u WHERE u.status = 'approved' AND NOT (u.role = ANY($1::text[])) AND u.id <> $2`;
   const live = `c.lifecycle IN ('active', 'observed', 'accredited', 'ceremony_done')`;
   let rows: Array<{ id: string }> = [];
@@ -96,11 +98,12 @@ export async function resolveAudience(db: Queryable, sender: Principal, a: Audie
       ({ rows } = await db.query(`${base} AND u.role = $3;`, [hidden, sender.id, a.accountRole]));
       break;
     case 'staffRole':
-      if (!a.staffRole) throw badRequest('اختر الدور');
+      const staffRoles = a.staffRoles?.length ? a.staffRoles : a.staffRole ? [a.staffRole] : [];
+      if (staffRoles.length === 0) throw badRequest('اختر الدور');
       ({ rows } = await db.query(
         `${base} AND EXISTS (SELECT 1 FROM committee_staff s JOIN committees c ON c.id = s.committee_id
-                             WHERE s.user_id = u.id AND s.status = 'active' AND s.role = $3 AND ${live} AND c.lifecycle <> 'ceremony_done');`,
-        [hidden, sender.id, a.staffRole]
+                             WHERE s.user_id = u.id AND s.status = 'active' AND s.role = ANY($3::text[]) AND ${live} AND c.lifecycle <> 'ceremony_done');`,
+        [hidden, sender.id, staffRoles]
       ));
       break;
     case 'committee': {
