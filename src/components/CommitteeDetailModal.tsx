@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { headOf, mapsUrl } from '../utils/logistics';
-import * as XLSX from 'xlsx';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { toast } from './Toasts';
 import {
@@ -327,6 +326,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     if (!file) return;
     try {
       const data = await file.arrayBuffer();
+      // The Excel library (~400 kB) loads only when a file is read or written, not with the first page.
+      const XLSX = await import('xlsx');
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
@@ -403,7 +404,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     }
   };
 
-  const handleDownloadSheetTemplate = () => {
+  const handleDownloadSheetTemplate = async () => {
+    const XLSX = await import('xlsx');
     const templateData = [
       { 'م': 1, 'اسم الطالب': 'أحمد محمد علي', 'الدرجة': 98, 'التقدير': 'ممتاز مرتفع', 'ملاحظات': 'حفظ متقن ومتميز' },
       { 'م': 2, 'اسم الطالب': 'عبد الرحمن خالد', 'الدرجة': 92, 'التقدير': 'ممتاز', 'ملاحظات': 'أداء متقن' },
@@ -417,7 +419,8 @@ const CommitteeDetailForm: React.FC<CommitteeDetailModalProps & { committee: Com
     XLSX.writeFile(wb, `نموذج_كشف_درجات_لجنة_${committee.committeeNumber}.xlsx`);
   };
 
-  const handleExportCommitteeSheet = () => {
+  const handleExportCommitteeSheet = async () => {
+    const XLSX = await import('xlsx');
     try {
       const exportData = (sheetStudents.length > 0 ? sheetStudents : Array.from({ length: Number(studentsCount) || 1 }, (_, i) => ({
         number: i + 1,

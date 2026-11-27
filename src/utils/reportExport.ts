@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { Committee, ScheduleTask } from '../types';
 import { calculateCurrentStage, isAwaitingExam, todayISO } from './stageUtils';
 
@@ -15,7 +14,12 @@ const parseISO = (iso: string) => {
   return new Date(y, m - 1, d);
 };
 
+/** Writes the file. The Excel library (~400 kB) is loaded only now, not with the first page. */
 function writeSheet(rows: Record<string, string | number>[], widths: number[], sheetName: string, filename: string) {
+  void import('xlsx').then((XLSX) => writeSheetWith(XLSX, rows, widths, sheetName, filename));
+}
+
+function writeSheetWith(XLSX: typeof import('xlsx'), rows: Record<string, string | number>[], widths: number[], sheetName: string, filename: string) {
   const sheet = XLSX.utils.json_to_sheet(rows);
   sheet['!cols'] = widths.map((wch) => ({ wch }));
   const book = XLSX.utils.book_new();
