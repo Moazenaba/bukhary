@@ -15,10 +15,8 @@ export const FONT_CSS_NAME: Record<Family, string> = {
 const LOADERS: Record<Family, () => Promise<unknown>> = {
   cairo: () => Promise.all([import('@fontsource/cairo/400.css'), import('@fontsource/cairo/500.css'), import('@fontsource/cairo/600.css'), import('@fontsource/cairo/700.css')]),
   tajawal: () => Promise.all([import('@fontsource/tajawal/400.css'), import('@fontsource/tajawal/500.css'), import('@fontsource/tajawal/700.css')]),
-  'ibm-plex-sans-arabic': () => Promise.all([
-    import('@fontsource/ibm-plex-sans-arabic/400.css'), import('@fontsource/ibm-plex-sans-arabic/500.css'),
-    import('@fontsource/ibm-plex-sans-arabic/600.css'), import('@fontsource/ibm-plex-sans-arabic/700.css'),
-  ]),
+  // The default font is bundled with the first page (main.tsx): nothing more to download.
+  'ibm-plex-sans-arabic': () => Promise.resolve(),
   'noto-naskh-arabic': () => Promise.all([
     import('@fontsource/noto-naskh-arabic/400.css'), import('@fontsource/noto-naskh-arabic/500.css'),
     import('@fontsource/noto-naskh-arabic/600.css'), import('@fontsource/noto-naskh-arabic/700.css'),
