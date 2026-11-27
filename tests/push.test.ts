@@ -15,7 +15,7 @@ const account = {
 };
 
 let t: TestApp;
-let sent: Array<{ token: string; title: string; body?: string; data: Record<string, string> }>;
+let sent: Array<{ token: string; title: string; body?: string; data: Record<string, string>; android: any }>;
 let authCalls: number;
 let deadTokens: Set<string>;
 
@@ -35,7 +35,7 @@ const transport: PushTransport = async (url, init) => {
   if (deadTokens.has(message.token)) {
     return { status: 404, json: async () => ({ error: { status: 'NOT_FOUND', details: [{ errorCode: 'UNREGISTERED' }] } }) };
   }
-  sent.push({ token: message.token, title: message.notification.title, body: message.notification.body, data: message.data });
+  sent.push({ token: message.token, title: message.notification.title, body: message.notification.body, data: message.data, android: message.android });
   return { status: 200, json: async () => ({ name: 'projects/x/messages/1' }) };
 };
 
@@ -75,6 +75,21 @@ describe('push notifications', () => {
     await flushPushes();
     expect(sent.map((s) => s.token).sort()).toEqual([a, b].sort());
     expect(sent[0]).toMatchObject({ title: 'اجتماع عاجل', body: 'بعد العصر', data: { type: 'urgent' } });
+    // Urgent rings on its own channel; a push to a phone that stays off is dropped after two days, not four weeks.
+    expect(sent[0].android).toMatchObject({ priority: 'HIGH', ttl: '172800s', notification: { channel_id: 'bukhari_urgent', sound: 'default' } });
+    expect(sent[0].data.notificationId).toBeTruthy();
+  });
+
+  it('a routine notice goes to the quiet channel', async () => {
+    const admin = await userWithToken(t, { role: 'super_admin' });
+    const asst = await userWithToken(t, { role: 'sheikh' });
+    const b = token();
+    await t.api().post('/api/devices').set(asst.auth).send({ token: b });
+    await t.api().post('/api/notifications').set(admin.auth).send({ title: 'للعلم', description: '', type: 'info' });
+    await flushPushes();
+    const mine = sent.find((s) => s.token === b)!;
+    expect(mine.android).toMatchObject({ priority: 'NORMAL', ttl: '172800s', notification: { channel_id: 'bukhari_general' } });
+    expect(mine.android.notification.sound).toBeUndefined();
   });
 
   it('a targeted notification reaches only that user, and the access token is reused', async () => {
