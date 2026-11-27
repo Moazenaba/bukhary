@@ -24,7 +24,20 @@ export interface PushMessage {
   targetUserIds?: string[];
   /** Server tags; `kind` is passed to the phone so the app opens the right screen. */
   data?: Record<string, unknown>;
+  /** The notification row (one recipient), so a tap can open that very notice. */
+  notificationId?: string | null;
 }
+
+/**
+ * Android channels the app creates (PushNotifications.kt). Urgent notices may ring and pop up; everything else
+ * arrives quietly in the tray, so routine notices do not train people to ignore the urgent ones.
+ */
+export const PUSH_CHANNEL = { urgent: 'bukhari_urgent', general: 'bukhari_general' } as const;
+/**
+ * How long FCM keeps trying a phone that is off or offline. The default is 4 weeks: a «come today» notice
+ * would pop up weeks late. The notice itself stays in the app's inbox either way.
+ */
+export const PUSH_TTL = '172800s';
 
 /** Sends one HTTP request; replaced in tests. */
 export type PushTransport = (url: string, init: { method: string; headers: Record<string, string>; body: string }) =>
@@ -143,10 +156,18 @@ async function deliver(message: PushMessage) {
             message: {
               token,
               notification: { title: message.title, body: message.description || undefined },
-              data: { type: message.type ?? 'info', committeeId: message.committeeId ?? '', kind: String(message.data?.kind ?? '') },
+              data: {
+                type: message.type ?? 'info',
+                committeeId: message.committeeId ?? '',
+                kind: String(message.data?.kind ?? ''),
+                notificationId: message.notificationId ?? '',
+              },
               android: {
                 priority: message.type === 'urgent' ? 'HIGH' : 'NORMAL',
-                notification: { channel_id: 'bukhari_alerts', sound: 'default' },
+                ttl: PUSH_TTL,
+                notification: message.type === 'urgent'
+                  ? { channel_id: PUSH_CHANNEL.urgent, sound: 'default' }
+                  : { channel_id: PUSH_CHANNEL.general },
               },
             },
           }),

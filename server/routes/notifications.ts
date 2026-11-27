@@ -25,13 +25,14 @@ export async function notify(
     data?: Record<string, unknown>;
   }
 ) {
+  const id = crypto.randomUUID();
   await db.query(
     `INSERT INTO notifications (id, title, description, type, committee_id, target_user_id, created_at, data)
      VALUES ($1,$2,$3,$4,$5,$6,NOW(),$7::jsonb);`,
-    [crypto.randomUUID(), n.title, n.description, n.type ?? 'info', n.committeeId ?? null, n.targetUserId ?? null, JSON.stringify(n.data ?? {})]
+    [id, n.title, n.description, n.type ?? 'info', n.committeeId ?? null, n.targetUserId ?? null, JSON.stringify(n.data ?? {})]
   );
   // The same notification reaches the phones of the people it is for (no-op without FCM credentials).
-  queuePush(n);
+  queuePush({ ...n, notificationId: id });
 }
 
 /**
