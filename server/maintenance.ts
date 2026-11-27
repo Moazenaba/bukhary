@@ -5,7 +5,7 @@ import { sweepExpired } from './routes/assignments.ts';
 
 /**
  * Housekeeping that keeps auth tables small (API-21): expired or long-revoked refresh tokens,
- * ended sessions, old idempotency keys and old audit logs are removed. Safe to run on several instances.
+ * ended sessions, old idempotency keys, old audit logs and notifications older than 180 days are removed. Safe to run on several instances.
  */
 export async function purgeExpired(pool: Pool) {
   const tokens = await pool.query(
@@ -20,6 +20,9 @@ export async function purgeExpired(pool: Pool) {
   const failures = await pool.query("DELETE FROM login_failures WHERE updated_at < NOW() - interval '1 day';");
   const limits = await pool.query("DELETE FROM rate_limits WHERE updated_at < NOW() - interval '1 day';");
   const auditLogs = await pool.query("DELETE FROM audit_logs WHERE created_at < NOW() - interval '90 days';");
+  // One row per recipient per message: without a limit the table (and every poll over it) only grows.
+  // Their read marks go with them (notification_reads cascades).
+  const notifications = await pool.query("DELETE FROM notifications WHERE created_at < NOW() - interval '180 days';");
   return {
     refreshTokens: tokens.rowCount ?? 0,
     sessions: sessions.rowCount ?? 0,
@@ -27,6 +30,7 @@ export async function purgeExpired(pool: Pool) {
     loginFailures: failures.rowCount ?? 0,
     rateLimits: limits.rowCount ?? 0,
     auditLogs: auditLogs.rowCount ?? 0,
+    notifications: notifications.rowCount ?? 0,
   };
 }
 

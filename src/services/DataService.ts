@@ -103,7 +103,11 @@ export const DataService = {
   saveSetting: async <K extends keyof import('../types').SystemSettings>(key: K, value: import('../types').SystemSettings[K]) =>
     (await api<{ value: import('../types').SystemSettings[K] }>(`/settings/${key}`, { method: 'PUT', body: { value } })).value,
   /** Short fingerprint of all server data; changes whenever anything visible changes. */
-  getSyncVersion: async () => (await api<{ version: string }>('/sync/state')).version,
+  /** The fingerprint whole and per list (`parts` is missing on an older server). */
+  getSyncState: async () => {
+    const r = await api<{ version: string; parts?: Record<string, string> }>('/sync/state');
+    return { version: r.version, parts: r.parts ?? null };
+  },
   getCommittees: async () => (await api<{ committees: Committee[] }>('/committees')).committees,
   saveCommittee: async (c: Committee) =>
     (await api<{ committee: Committee }>('/committees', { method: 'POST', body: { ...c, expectedUpdatedAt: c.updatedAt } })).committee,

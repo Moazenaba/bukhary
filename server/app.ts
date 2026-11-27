@@ -1,3 +1,4 @@
+import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
 import { authenticate } from './auth.ts';
@@ -56,6 +57,9 @@ export function createApp(config: AppConfig, pool: Pool) {
     })
   );
   app.use(requestLog);
+  // Lists of committees, people and sheet rows are large JSON that shrinks ~10x compressed. On Vercel the
+  // edge network compresses already, so the function does not spend time doing it twice.
+  if (!process.env.VERCEL) app.use(compression({ threshold: 1024 }));
   // OCR images are the only large JSON bodies; everything else stays small.
   app.use('/api/extract-table', express.json({ limit: '15mb' }));
   app.use(express.json({ limit: '1mb' }));

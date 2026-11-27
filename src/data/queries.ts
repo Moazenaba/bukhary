@@ -64,14 +64,46 @@ export function useCacheSetter<T>(queryKey: QueryKey, empty: T) {
   );
 }
 
+/** Which cached lists (the second segment of their query key) each part of the server's fingerprint covers. */
+export const SYNC_PART_KEYS: Record<string, string[]> = {
+  committees: ['committees'],
+  tasks: ['tasks'],
+  courses: ['courses'],
+  exams: ['exams'],
+  sheet: ['summerRows'],
+  users: ['assignable'],
+  notifications: ['notifications'],
+  books: ['books'],
+  settings: ['settings'],
+  permissions: [],
+};
+
+/**
+ * The query-key names to reload, given the previous and current per-list fingerprints, or 'all' (first
+ * look, an older server without parts, or a change to the person's own account). Lists no part names
+ * (e.g. the audit log) reload on any change.
+ */
+export function changedKeys(prev: Record<string, string> | null, next: Record<string, string> | null): 'all' | { names: Set<string>; other: boolean } {
+  if (!prev || !next || prev.me !== next.me) return 'all';
+  const names = new Set<string>();
+  let any = false;
+  for (const [part, value] of Object.entries(next)) {
+    if (part === 'me' || prev[part] === value) continue;
+    any = true;
+    (SYNC_PART_KEYS[part] ?? []).forEach((k) => names.add(k));
+  }
+  return { names, other: any };
+}
+
 /**
  * Keeps an open page current: every `intervalMs` while the tab is visible (and when it becomes
- * visible again) it asks the server for its short data fingerprint, and reloads the lists only when
- * that changed — so changes made on another device show up without reloading the page.
+ * visible again) it asks the server for its short data fingerprint, and reloads only the lists whose
+ * part changed — so changes made on another device show up without reloading the page, and a change
+ * to one task does not download every committee again.
  */
 export function useLiveRefresh(enabled: boolean, intervalMs = 30_000) {
   const queryClient = useQueryClient();
-  const last = useRef<string | null>(null);
+  const last = useRef<{ version: string; parts: Record<string, string> | null } | null>(null);
   useEffect(() => {
     if (!enabled) return;
     let running = false;
@@ -79,9 +111,24 @@ export function useLiveRefresh(enabled: boolean, intervalMs = 30_000) {
       if (running || document.visibilityState !== 'visible') return;
       running = true;
       try {
-        const version = await DataService.getSyncVersion();
-        if (last.current !== null && version !== last.current) await queryClient.invalidateQueries({ queryKey: DATA_ROOT_KEY });
-        last.current = version;
+        const state = await DataService.getSyncState();
+        const prev = last.current;
+        last.current = state;
+        if (prev === null || state.version === prev.version) return;
+        const changed = changedKeys(prev.parts, state.parts);
+        if (changed === 'all') {
+          await queryClient.invalidateQueries({ queryKey: DATA_ROOT_KEY });
+          return;
+        }
+        const known = new Set(Object.values(SYNC_PART_KEYS).flat());
+        await queryClient.invalidateQueries({
+          predicate: (q) => {
+            const key = q.queryKey as unknown[];
+            if (key[0] !== DATA_ROOT_KEY[0]) return false;
+            const name = String(key[1]);
+            return changed.names.has(name) || (changed.other && !known.has(name));
+          },
+        });
       } catch {
         // Offline or signed out: try again on the next tick.
       } finally {

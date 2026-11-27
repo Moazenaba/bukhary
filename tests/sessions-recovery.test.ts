@@ -91,6 +91,18 @@ describe('sessions', () => {
     expect(purged.refreshTokens).toBeGreaterThan(0);
     expect((await t.api().get('/api/tasks').set(bearer(token))).status).toBe(200);
   });
+
+  it('the purge removes notifications older than 180 days and keeps recent ones', async () => {
+    await t.pool.query(
+      `INSERT INTO notifications (id, title, description, type, created_at, data) VALUES
+         ('n-old', 'قديم', '', 'info', NOW() - interval '200 days', '{}'::jsonb),
+         ('n-new', 'جديد', '', 'info', NOW() - interval '10 days', '{}'::jsonb);`
+    );
+    const purged = await purgeExpired(t.pool);
+    expect(purged.notifications).toBeGreaterThanOrEqual(1);
+    const { rows } = await t.pool.query("SELECT id FROM notifications WHERE id IN ('n-old', 'n-new');");
+    expect(rows.map((r) => r.id)).toEqual(['n-new']);
+  });
 });
 
 describe('admin password reset (WEB-02)', () => {

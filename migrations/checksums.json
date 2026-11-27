@@ -24,5 +24,6 @@
   "023_committee_assignments.sql": "ad3bd2255a80ee6063d78fb102cfb19d723f9f47d4f7f85344e2ecc3eeefa05c",
   "024_temporary_head_grants.sql": "2ea70a7e0175acad25912942ffeff56654f9eeba90f65c2190c8a127c71a105e",
   "025_six_roles_and_lifecycle.sql": "d22c5954efbd4770ba85386ffaa47e11b6173a8a520bd315fcfda109c2d59562",
-  "026_impersonation_and_batches.sql": "91237f8f20c227e59ae4232aae404c0ba1a8a9ab46bdec44205a5e1d4d1f768c"
+  "026_impersonation_and_batches.sql": "91237f8f20c227e59ae4232aae404c0ba1a8a9ab46bdec44205a5e1d4d1f768c",
+  "027_notification_indexes.sql": "777534f07c66dcd7e7a9a798123367ce908a5e8aa6dbee230d5dd00aff9dfe53"
 }

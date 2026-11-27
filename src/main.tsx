@@ -19,7 +19,7 @@ import { applyRememberedFont } from './utils/fonts';
 installA11yEnhancer();
 applyRememberedFont();
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true } } });
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } } });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

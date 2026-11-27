@@ -69,3 +69,27 @@ describe('useServerData', () => {
     spy.mockRestore();
   });
 });
+
+describe('changedKeys (per-list live refresh)', () => {
+  const base = { me: 'm', committees: 'c', tasks: 't', courses: 'k', exams: 'e', sheet: 's', users: 'u', notifications: 'n', books: 'b', settings: 'x', permissions: 'p' };
+  it('reloads everything on the first look, without parts (older server) or when my account changed', async () => {
+    const { changedKeys } = await import('../../src/data/queries');
+    expect(changedKeys(null, base)).toBe('all');
+    expect(changedKeys(base, null)).toBe('all');
+    expect(changedKeys(base, { ...base, me: 'm2' })).toBe('all');
+  });
+  it('a changed task reloads tasks only', async () => {
+    const { changedKeys } = await import('../../src/data/queries');
+    const r = changedKeys(base, { ...base, tasks: 't2' });
+    expect(r).not.toBe('all');
+    if (r !== 'all') {
+      expect([...r.names]).toEqual(['tasks']);
+      expect(r.other).toBe(true);
+    }
+  });
+  it('nothing changed: nothing to reload', async () => {
+    const { changedKeys } = await import('../../src/data/queries');
+    const r = changedKeys(base, { ...base });
+    expect(r !== 'all' && r.names.size === 0 && !r.other).toBe(true);
+  });
+});

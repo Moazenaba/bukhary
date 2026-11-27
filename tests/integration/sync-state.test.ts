@@ -51,6 +51,29 @@ describe('sync fingerprint', () => {
     expect(await version(admin.auth)).toBe(mine);
   });
 
+  it('says which list changed: a task changes «tasks» only, a committee «committees» only', async () => {
+    const parts = async () => (await t.api().get('/api/sync/state').set(admin.auth)).body.parts as Record<string, string>;
+    const p0 = await parts();
+    expect(Object.keys(p0)).toEqual(expect.arrayContaining(['me', 'committees', 'tasks', 'courses', 'exams', 'sheet', 'users', 'notifications', 'books', 'settings', 'permissions']));
+    await t.api().post('/api/tasks').set(admin.auth).send({ id: 'sync-task-2', title: 'مهمة', date: '2026-12-02' });
+    const p1 = await parts();
+    expect(p1.tasks).not.toBe(p0.tasks);
+    for (const k of ['committees', 'courses', 'exams', 'sheet', 'users', 'books', 'settings', 'permissions']) expect(p1[k]).toBe(p0[k]);
+    await t.api().post('/api/committees').set(admin.auth).send(committeeBody({ committeeNumber: 7 }));
+    const p2 = await parts();
+    expect(p2.committees).not.toBe(p1.committees);
+    expect(p2.tasks).toBe(p1.tasks);
+    expect(p2.exams).toBe(p1.exams);
+  });
+
+  it('a change to my own account (role, scope) changes every part', async () => {
+    const sheikh = await userWithToken(t, { role: 'sheikh' });
+    const before = (await t.api().get('/api/sync/state').set(sheikh.auth)).body.parts as Record<string, string>;
+    await t.pool.query(`UPDATE app_users SET all_committees = true WHERE id = $1;`, [sheikh.id]);
+    const after = (await t.api().get('/api/sync/state').set(sheikh.auth)).body.parts as Record<string, string>;
+    for (const k of Object.keys(before)) expect(after[k]).not.toBe(before[k]);
+  });
+
   it('needs a login', async () => {
     expect((await t.api().get('/api/sync/state')).status).toBe(401);
   });
